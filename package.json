@@ -1,0 +1,23 @@
+{
+  "name": "bc-fcm",
+  "private": true,
+  "version": "1.5.0",
+  "type": "module",
+  "description": "Liko - FCM (Friends and ChatRoom Manager) for Bondage Club",
+  "scripts": {
+    "predev": "node scripts/sync-version.mjs && node scripts/copy-assets.mjs",
+    "dev": "vite build && concurrently -k -n build,serve \"vite build --watch\" \"vite preview --port 5175\"",
+    "preview": "vite preview --port 5175",
+    "sync-version": "node scripts/sync-version.mjs",
+    "prebuild": "node scripts/sync-version.mjs && node scripts/copy-assets.mjs",
+    "build": "vite build",
+    "lint": "eslint ."
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.30.1",
+    "concurrently": "^9.1.0",
+    "eslint": "^9.30.1",
+    "globals": "^16.3.0",
+    "vite": "^7.0.4"
+  }
+}
