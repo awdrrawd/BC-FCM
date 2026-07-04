@@ -1,7 +1,7 @@
 <h1 align="center">👥 Liko-FCM — Friends & ChatRoom Manager</h1>
 <div align="center">
    
-![Version](https://img.shields.io/badge/version-1.4.2-purple.svg)
+![Version](https://img.shields.io/badge/version-1.5.0-purple.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)
 ![BondageClub](https://img.shields.io/badge/BondageClub-Compatible-pink.svg)
 
@@ -169,6 +169,54 @@ import(`https://github.com/awdrrawd/liko-Plugin-Repository/raw/refs/heads/main/P
 
 ---
 
+
+## 🛠️ 開發與建置 · Development & Build
+
+原本的單檔 userscript 已模組化為 `src/` 下的 ES 模組，並以 Vite 打包成單一 bundle（`dist/assets/main.js`），由 GitHub Pages 部署、userscript loader 動態載入（與 BC-HSC 相同架構）。  
+The former single-file userscript is now split into ES modules under `src/`, bundled by Vite into a single `dist/assets/main.js`, deployed via GitHub Pages and pulled in by a thin userscript loader (same model as BC-HSC).
+
+```
+src/
+  main.js              # 入口：設定 window.Liko.FCM 並呼叫 init()
+  modules/
+    config.js          # 版本、modApi、按鈕座標、圖示、設定存取
+    i18n.js            # 語言偵測 + T() 取字（與 HSC 共用 Liko-i18n 引擎）
+    profile-db.js      # Profile DB（WCE 相容）、Snapshot DB、頭像佇列
+    wps-share.js       # LIKOSHARE 分享協議
+    data.js            # 關係／名稱／房間等資料查詢
+    actions.js         # 查看 / BEEP / 悄悄話 / 名單操作 / 房管動作
+    styles.js          # 面板 CSS
+    chat-fx.js         # 悄悄話頭像、OOC 保護、輸入框提示、幽靈隱身
+    panel.js           # 面板 UI 與各分頁渲染
+    hooks.js           # 所有 bcModSdk 繪圖／事件掛鉤
+    core-init.js       # 初始化流程
+Translation/
+  Liko-i18n.js         # 與 HSC 共用的多語引擎（有防重複載入）
+  FCM-i18n.js          # FCM 字庫：TW / CN / EN / DE / FR / RU / UA
+```
+
+> 多語系統與 BC-HSC 相同：`Translation/` 於 build 前由 `copy-assets` 複製到 `public/` 一併部署，
+> FCM 啟動時 fetch 引擎 + 字庫；語言預設跟隨遊戲（`TranslationLanguage`），設定頁可手動覆蓋。
+> Same i18n as BC-HSC: the shared engine + FCM dictionary are self-hosted under `Translation/`,
+> fetched at startup. Language follows the game by default; the Settings page can override it.
+
+```bash
+npm install          # 安裝相依套件
+npm run build        # 建置到 dist/（CI 會自動部署到 Pages）
+npm run lint         # ESLint（no-undef 會抓出漏掉的跨模組匯入）
+npm run dev          # 本地開發：watch 建置 + vite preview（port 5175）
+```
+
+**本地開發 · Local dev：** 執行 `npm run dev`，於 Tampermonkey 安裝 `loader.local.user.js`，重整 BC 即可載入本機 bundle。  
+Run `npm run dev`, install `loader.local.user.js` in Tampermonkey, and reload BC to load the local bundle.
+
+推送到 `main` 後，`.github/workflows/deploy.yml` 會建置並部署到 GitHub Pages；正式使用者透過 `loader.user.js` 載入。  
+On push to `main`, the workflow builds and deploys to GitHub Pages; end users load via `loader.user.js`.
+
+> `Plugins/liko-FCM.user.js` 為模組化前的舊單檔版本，保留作參考。  
+> `Plugins/liko-FCM.user.js` is the pre-modularization monolith, kept for reference.
+
+---
 
 ## 📄 授權 · License
 
