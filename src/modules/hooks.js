@@ -166,7 +166,7 @@ import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from './wps-share.
             }
             return ret;
         });
-        modApi.hookFunction('InformationSheetRun', 7, (args, next) => {
+        modApi.hookFunction('InformationSheetRun', 5, (args, next) => {
             const collecting = cfg.profileRelations && typeof CurrentScreen !== 'undefined' && CurrentScreen === 'InformationSheet'
                 && !(typeof InformationSheetSecondScreen !== 'undefined' && InformationSheetSecondScreen);
             if (collecting) _relCollect = [];
