@@ -101,7 +101,7 @@ import { cfg } from './config.js';
             btnShowMainHall: '大廳按鈕',
             btnShowProfile: '個人檔案按鈕',
             profileRelLabel: 'Profile 關係人快速搜尋',
-            profileRelNote: '查看角色資料頁時，將主人／戀人等關係人的 ID 做成按鈕，點擊即開啟 FCM 人員查詢並帶入該 ID',
+            profileRelNote: '查看角色資料頁時，將主人／戀人等關係人的 ID 做成按鈕，點擊即開啟 FCM 人員查詢並帶入該 ID（須配合 Profile 保存功能）',
             profileRelTitle: '🔍 關係人快速查詢',
             noBeepNotFriend: '非好友，無法私信',
         },
@@ -201,7 +201,7 @@ import { cfg } from './config.js';
             btnShowMainHall: 'Main Hall button',
             btnShowProfile: 'Profile button',
             profileRelLabel: 'Quick Search Profile Relations',
-            profileRelNote: 'On a character profile page, turn related people (owner/lovers) IDs into buttons — click to open FCM People search prefilled with that ID',
+            profileRelNote: 'On a character profile page, turn related people (owner/lovers) IDs into buttons — click to open FCM People search prefilled with that ID (requires the Profile save feature)',
             profileRelTitle: '🔍 Quick Relation Lookup',
             noBeepNotFriend: 'Not a friend — cannot BEEP',
         },
@@ -213,8 +213,8 @@ import { cfg } from './config.js';
     //  未載入時退回上方 L（zh/en，含函式型 key），保證離線可用。
     // ════════════════════════════════════════
     const I18N_NS = 'FCM';
-    const FCM_LANGS = ['auto', 'TW', 'CN', 'EN', 'DE', 'FR', 'RU', 'UA'];
-    const FCM_LANG_NAMES = { auto: 'Auto', TW: '繁體中文', CN: '简体中文', EN: 'English', DE: 'Deutsch', FR: 'Français', RU: 'Русский', UA: 'Українська' };
+    const FCM_LANGS = ['auto', 'TW', 'CN', 'EN', 'JP', 'KR', 'DE', 'FR', 'RU', 'UA'];
+    const FCM_LANG_NAMES = { auto: 'Auto', TW: '繁體中文', CN: '简体中文', EN: 'English', JP: '日本語', KR: '한국어', DE: 'Deutsch', FR: 'Français', RU: 'Русский', UA: 'Українська' };
 
     // 依 bundle（assets/main.js）位置解析同層根目錄的素材網址；本地 vite preview 與 Pages 皆適用。
     function assetUrl(path) {
