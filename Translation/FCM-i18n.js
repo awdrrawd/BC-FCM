@@ -1,11 +1,11 @@
 // Liko - FCM i18n 字庫
 // 此檔案由 FCM 插件動態載入，不需手動安裝
-// 載入後自動呼叫 register('FCM', {...})，並暴露 window.Liko._FCM_strings 供 FCM 依使用者選的語言查表
+// 載入後自動呼叫 register('FCM', {...})，將字串注入共用引擎 BC_i18n（window.Liko.__Sys_i18n__）
 // 佔位符以 {0} {1} {2} 表示位置參數，由 FCM 的 T(key, ...args) 依序代入
 // 語言：TW 繁中 / CN 簡中 / EN 英 / JP 日 / KR 韓 / DE 德 / FR 法 / RU 俄 / UA 烏
 
 (function () {
-    if (!window.Liko?.i18n?.register) {
+    if (!window.Liko?.__Sys_i18n__?.register) {
         console.error('[Liko FCM strings] i18n 引擎尚未載入');
         return;
     }
@@ -235,7 +235,5 @@
         'noBeepNotFriend': { TW: '非好友，無法私信', CN: '非好友，无法私信', EN: 'Not a friend — cannot BEEP', JP: 'フレンドではないため BEEP 不可', KR: '친구가 아니므로 BEEP 불가', DE: 'Kein Freund — BEEP nicht möglich', FR: 'Pas un ami — BEEP impossible', RU: 'Не друг — BEEP недоступен', UA: 'Не друг — BEEP недоступний' },
     };
 
-    window.Liko.i18n.register('FCM', FCM_STRINGS);
-    window.Liko._FCM_strings = FCM_STRINGS;   // 供 FCM 自行依使用者選的語言查表
-    if (window.Liko?.i18n) window.Liko.i18n._fcmStringsLoaded = true;
+    window.Liko.__Sys_i18n__.register('FCM', FCM_STRINGS);
 })();

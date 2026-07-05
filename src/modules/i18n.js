@@ -223,7 +223,7 @@ import { cfg } from './config.js';
         url.search = '';
         return url.toString();
     }
-    const LIKO_I18N_ENGINE_URL = assetUrl('Translation/Liko-i18n.js');
+    const LIKO_I18N_ENGINE_URL = assetUrl('Translation/BC_i18n.js');
     const LIKO_FCM_STRINGS_URL = assetUrl('Translation/FCM-i18n.js');
 
     // 加時間戳避免 CDN 快取到舊字庫（翻譯會經常修改）
@@ -235,11 +235,9 @@ import { cfg } from './config.js';
     }
     async function ensureI18n() {
         try {
-            if (!window.Liko?.i18n?.version) await _i18nLoadScript(LIKO_I18N_ENGINE_URL);
-            if (!window.Liko?.i18n?._fcmStringsLoaded) {
-                await _i18nLoadScript(LIKO_FCM_STRINGS_URL);
-                if (window.Liko?.i18n) window.Liko.i18n._fcmStringsLoaded = true;
-            }
+            // 能力偵測：新引擎 BC_i18n 暴露 __Sys_i18n__.ensure；舊 v1 只有 version 會被誤判
+            if (typeof window.Liko?.__Sys_i18n__?.ensure !== 'function') await _i18nLoadScript(LIKO_I18N_ENGINE_URL);
+            await window.Liko?.__Sys_i18n__?.ensure(I18N_NS, LIKO_FCM_STRINGS_URL);   // 依 URL 去重
         } catch (e) { console.warn('🐈‍⬛ [FCM] i18n 載入失敗，改用內建 zh/en:', e.message); }
     }
 
@@ -261,18 +259,11 @@ import { cfg } from './config.js';
     // 中文語系（TW/CN）→ 供大量 inline 三元判斷使用（其餘語言走英文分支）
     function isZh() { const l = fcmLang(); return l === 'TW' || l === 'CN'; }
 
-    // 取翻譯：優先 window.Liko._FCM_strings（7 語，{0}{1} 位置參數）；退回內建 L（含函式型 key）。
+    // 取翻譯：引擎（__Sys_i18n__）有此 key 就用引擎 t()，args 以陣列傳入走位置式 {0}{1}，
+    //   並把 FCM 自己算好的語言（含手動選擇）以第 4 參 forceLang 傳入；引擎未載入才退內建 L（含函式型 key）。
     function T(key, ...args) {
-        const lang = fcmLang();
-        const store = (typeof window !== 'undefined') && window.Liko && window.Liko._FCM_strings;
-        const entry = store && store[key];
-        if (entry) {
-            let s = entry[lang] ?? entry[lang === 'CN' ? 'TW' : 'XX'] ?? entry['EN'];
-            if (typeof s === 'string') {
-                if (args.length) s = s.replace(/\{(\d+)\}/g, (m, i) => { const v = args[+i]; return v === undefined ? m : String(v); });
-                return s;
-            }
-        }
+        const eng = window.Liko?.__Sys_i18n__;
+        if (eng?.has?.(I18N_NS, key)) return eng.t(I18N_NS, key, args, fcmLang());
         const d = isZh() ? L.zh : L.en;
         const v = d[key] ?? L.en[key] ?? key;
         return typeof v === 'function' ? v(...args) : v;
