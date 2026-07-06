@@ -15,6 +15,29 @@ import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from './wps-share.
     //  _relCollect：InformationSheetRun 繪製期間暫存本幀擷取結果；_relRegions：供點擊命中測試。
     let _relCollect = null;
     let _relRegions = [];
+    let _afcRegions = [];   // AFC 拓展戀人面板的可點區塊（透過 window.Liko.AFC 公開 API）
+
+    function _afcPanelOpen() {
+        try { const A = window.Liko && window.Liko.AFC; return !!(A && typeof A.isProfilePanelOpen === 'function' && A.isProfilePanelOpen()); } catch { return false; }
+    }
+
+    // 量測文字依欄寬縮字級後的實際寬度與字級（給 AFC 面板底線用）
+    function _fittedTextWidth(text, maxW) {
+        let w = 0, size = 36;
+        try {
+            if (typeof DrawingGetTextSize === 'function' && typeof CommonGetFont === 'function' && typeof MainCanvas !== 'undefined' && MainCanvas) {
+                const res = DrawingGetTextSize(text, maxW);
+                size = parseInt(res[1]) || 36;
+                const prev = MainCanvas.font;
+                MainCanvas.font = CommonGetFont(String(res[1]));
+                w = MainCanvas.measureText(res[0]).width;
+                MainCanvas.font = prev;
+            }
+        } catch {}
+        if (!w && typeof MainCanvas !== 'undefined' && MainCanvas) { try { w = MainCanvas.measureText(text).width; } catch {} }
+        if (!w) w = Math.min(maxW || 500, String(text).length * 18);
+        return { w, size };
+    }
 
     // 由 DrawTextFit 的參數量測實際繪製後的文字寬度（BC 會依欄寬縮字級）
     function _measureRelRegion(text, X, Y, Width) {
@@ -166,7 +189,8 @@ import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from './wps-share.
             }
             return ret;
         });
-        modApi.hookFunction('InformationSheetRun', 7, (args, next) => {
+        // BC 原生關係列：priority 5（與 BC 按鈕同層）→ AFC 面板(7) 會畫在其上，展開時自然被蓋住
+        modApi.hookFunction('InformationSheetRun', 5, (args, next) => {
             const collecting = cfg.profileRelations && typeof CurrentScreen !== 'undefined' && CurrentScreen === 'InformationSheet'
                 && !(typeof InformationSheetSecondScreen !== 'undefined' && InformationSheetSecondScreen);
             if (collecting) _relCollect = [];
@@ -211,7 +235,7 @@ import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from './wps-share.
             }
             return r;
         });
-        modApi.hookFunction('InformationSheetClick', 7, (args, next) => {
+        modApi.hookFunction('InformationSheetClick', 5, (args, next) => {
             const viewingSelf = (typeof InformationSheetSelection !== 'undefined') &&
                   (InformationSheetSelection === Player.MemberNumber || InformationSheetSelection?.MemberNumber === Player.MemberNumber);
             if (viewingSelf && cfg.btnShowProfile && typeof MouseIn === 'function' && MouseIn(1705, 420, 90, 90)) { openPanel(); return; }
@@ -219,6 +243,46 @@ import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from './wps-share.
             if (cfg.profileRelations) {
                 try {
                     for (const reg of _relRegions) {
+                        if (typeof MouseIn === 'function' && MouseIn(reg.x, reg.y, reg.w, reg.h)) { openPeopleSearch(reg.mn); return; }
+                    }
+                } catch {}
+            }
+            return next(args);
+        });
+
+        // ── AFC 拓展戀人面板支援（priority 8，遵守 AFC 優先序契約）──────────
+        //  AFC 於 priority 7 繪製「更多戀人」面板並填好 getProfileLoverRegions()；
+        //  我們掛 priority 8（外層）→ next() 後 AFC 已畫完，於面板之上疊底線並優先吃點擊。
+        modApi.hookFunction('InformationSheetRun', 8, (args, next) => {
+            const r = next(args);
+            _afcRegions = [];
+            try {
+                const AFC = window.Liko && window.Liko.AFC;
+                if (cfg.profileRelations && _afcPanelOpen() && AFC && typeof AFC.getProfileLoverRegions === 'function') {
+                    for (const e of (AFC.getProfileLoverRegions() || [])) {
+                        if (!e || !e.memberNumber) continue;
+                        const nameStr = `♥ ${e.name} (${e.memberNumber})`;   // 對齊 AFC 的名稱行格式
+                        const fit = _fittedTextWidth(nameStr, e.w);
+                        const w = Math.max(0, Math.min(fit.w, e.w));
+                        const hit = { mn: parseInt(e.memberNumber), x: e.x - 5, y: e.y, w: w + 10, h: 46 };
+                        _afcRegions.push(hit);
+                        const hov = typeof MouseIn === 'function' && MouseIn(hit.x, hit.y, hit.w, hit.h);
+                        if (typeof MainCanvas !== 'undefined' && MainCanvas) {
+                            MainCanvas.save();
+                            MainCanvas.fillStyle = hov ? '#d0b0ff' : '#8868c0';
+                            // AFC: region.y = 名稱行中心 - 26；底線畫在名稱文字正下方
+                            MainCanvas.fillRect(e.x, e.y + 26 + fit.size * 0.5 + 1, w, hov ? 3 : 2);
+                            MainCanvas.restore();
+                        }
+                    }
+                }
+            } catch { _afcRegions = []; }
+            return r;
+        });
+        modApi.hookFunction('InformationSheetClick', 8, (args, next) => {
+            if (cfg.profileRelations && _afcPanelOpen()) {
+                try {
+                    for (const reg of _afcRegions) {
                         if (typeof MouseIn === 'function' && MouseIn(reg.x, reg.y, reg.w, reg.h)) { openPeopleSearch(reg.mn); return; }
                     }
                 } catch {}
