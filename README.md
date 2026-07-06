@@ -204,7 +204,7 @@ Translation/
 npm install          # 安裝相依套件
 npm run build        # 建置到 dist/（CI 會自動部署到 Pages）
 npm run lint         # ESLint（no-undef 會抓出漏掉的跨模組匯入）
-npm run dev          # 本地開發：watch 建置 + vite preview（port 5175）
+npm run dev          # 本地開發：watch 建置 + vite preview（port 5176）
 ```
 
 **本地開發 · Local dev：** 執行 `npm run dev`，於 Tampermonkey 安裝 `loader.local.user.js`，重整 BC 即可載入本機 bundle。  
