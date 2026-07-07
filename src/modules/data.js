@@ -48,12 +48,14 @@ import { _pc } from './profile-db.js';
     const REL_ORDER = { owner: 0, lover: 1, sub: 2, friend: 3, contact: 4, whitelist: 5, blacklist: 6, none: 7 };
 
     let showNickname = true;
-    function getDisplayName(mn) {
+    // nickOverride: undefined = 依目前的顯示切換(showNickname)；true/false = 強制指定（供搜尋比對用，不受切換影響）
+    function getDisplayName(mn, nickOverride) {
         mn = parseInt(mn);
+        const useNick = nickOverride !== undefined ? nickOverride : showNickname;
         // 1. 在線角色（房間內）
         const C = ChatRoomCharacter && ChatRoomCharacter.find(c => c.MemberNumber === mn);
         if (C) {
-            if (showNickname && typeof CharacterNickname === 'function') {
+            if (useNick && typeof CharacterNickname === 'function') {
                 const n = CharacterNickname(C); if (n) return n;
             }
             return C.Name || `#${mn}`;
@@ -62,14 +64,14 @@ import { _pc } from './profile-db.js';
         const online = onlineFriends.find(f => f.MemberNumber === mn);
         if (online) {
             // 優先檢查快取暱稱
-            if (showNickname) {
+            if (useNick) {
                 const cached = _pc[mn];
                 if (cached && cached.lastNick) return cached.lastNick;
             }
             if (online.MemberName) return online.MemberName;
         }
         // 3. ★ 對所有離線玩家，先查 _pc 快取的暱稱
-        if (showNickname) {
+        if (useNick) {
             const cached = _pc[mn];
             if (cached && cached.lastNick) return cached.lastNick;
         }
@@ -85,6 +87,18 @@ import { _pc } from './profile-db.js';
         const cached = _pc[mn];
         if (cached) return cached.name || `#${mn}`;
         return `#${mn}`;
+    }
+
+    // 搜尋比對：不論目前顯示切換是「名稱」還是「暱稱」，都同時比對 ID／BC 名稱／暱稱三者，
+    //  避免「顯示暱稱時搜不到名稱、顯示名稱時搜不到暱稱」的問題。
+    function matchesSearch(mn, q) {
+        if (!q) return true;
+        q = String(q).trim().toLowerCase();
+        if (!q) return true;
+        if (String(mn).includes(q)) return true;
+        if (getDisplayName(mn, true).toLowerCase().includes(q)) return true;
+        if (getDisplayName(mn, false).toLowerCase().includes(q)) return true;
+        return false;
     }
 
     function buildFriendList() {
@@ -179,4 +193,4 @@ import { _pc } from './profile-db.js';
     function setOnlineFriends(v) { onlineFriends = v; }
     function setShowNickname(v) { showNickname = v; }
 
-export { onlineFriends, setOnlineFriends, showNickname, setShowNickname, parseAFC, getSubSet, getRel, getAllRels, REL_ORDER, getDisplayName, buildFriendList, getZone, getRoomInfo, getRoomName, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep, _getWhisperTargetMN };
+export { onlineFriends, setOnlineFriends, showNickname, setShowNickname, parseAFC, getSubSet, getRel, getAllRels, REL_ORDER, getDisplayName, matchesSearch, buildFriendList, getZone, getRoomInfo, getRoomName, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep, _getWhisperTargetMN };

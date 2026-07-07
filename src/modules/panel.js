@@ -1,7 +1,7 @@
 import { cfg, MOD_VER, saveCfg } from './config.js';
 import { isZh, T, FCM_LANGS, FCM_LANG_NAMES } from './i18n.js';
 import { PDB, _pc, Snapshot, _avQueue, _avBusy, _processAvQueue, loadAvatarFromBundle, _captureSnapshotDelayed, detectWCESave, setAvStatusEl } from './profile-db.js';
-import { onlineFriends, showNickname, setShowNickname, getDisplayName, buildFriendList, getRel, getAllRels, REL_ORDER, getZone, getRoomInfo, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep } from './data.js';
+import { onlineFriends, showNickname, setShowNickname, getDisplayName, matchesSearch, buildFriendList, getRel, getAllRels, REL_ORDER, getZone, getRoomInfo, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep } from './data.js';
 import { roomOp, doView, doBeep, doWhisper, doAddFriend, doToggleList, doRemoveFriend, navigateToRoom, showConfirm, makeIdCell } from './actions.js';
 import { injectStyles } from './styles.js';
 import { _removeWhisperAvatar, startWhisperIndicator, stopWhisperIndicator, _installOocProtect, _uninstallOocProtect, applyGhostHide } from './chat-fx.js';
@@ -431,13 +431,8 @@ import { wpsShareProfile } from './wps-share.js';
         container.appendChild(toolbar);
 
         let friends = buildFriendList();
-        if (searchQ.trim()) { const q = searchQ.trim().toLowerCase();
-                             friends = friends.filter(f => {
-                                 const nick = _pc[f.mn]?.lastNick || '';
-                                 return f.name.toLowerCase().includes(q)
-                                 || nick.toLowerCase().includes(q)
-                                 || String(f.mn).includes(q);
-                             });
+        if (searchQ.trim()) { const q = searchQ.trim();
+                             friends = friends.filter(f => matchesSearch(f.mn, q));
                             }
         friends = friends.filter(applyFilters);
         switch (sortMode) {
@@ -586,6 +581,27 @@ import { wpsShareProfile } from './wps-share.js';
             let filtered = q
             ? allProfiles.filter(p => (p.name || '').toLowerCase().includes(qLow) || (p.lastNick || '').toLowerCase().includes(qLow) || String(p.memberNumber).includes(q))
             : allProfiles;
+            // 相關性排序：BC ID 是依序分配的，兩個人的 ID 很可能剛好相近（例如搜「123」會連帶找到
+            // 「3123」「12345」），因此把「最接近」的結果（完全相同 → 開頭相符 → 其餘）排到最前面，
+            // 其餘結果維持原本（最近見面）的相對順序。
+            if (q && filtered.length > 1) {
+                const _score = (p) => {
+                    if (isNumId) {
+                        const idStr = String(p.memberNumber);
+                        if (idStr === q) return 0;
+                        if (idStr.startsWith(q)) return 1;
+                        return 2;
+                    }
+                    const name = (p.name || '').toLowerCase(), nick = (p.lastNick || '').toLowerCase();
+                    if (name === qLow || nick === qLow) return 0;
+                    if (name.startsWith(qLow) || nick.startsWith(qLow)) return 1;
+                    return 2;
+                };
+                filtered = filtered
+                    .map((p, i) => ({ p, i, s: _score(p) }))
+                    .sort((a, b) => a.s - b.s || a.i - b.i)
+                    .map(x => x.p);
+            }
             if (isNumId) {
                 const mn = parseInt(q);
                 const exactMatch = allProfiles.find(p => p.memberNumber === mn);
@@ -835,7 +851,7 @@ import { wpsShareProfile } from './wps-share.js';
         else if (roomSubTab === 'white') mns = [...(ChatRoomData.Whitelist || [])];
         else if (roomSubTab === 'ban')   mns = [...(ChatRoomData.Ban || [])];
 
-        if (roomSearchQ.trim()) { const q = roomSearchQ.trim().toLowerCase(); mns = mns.filter(mn => getDisplayName(mn).toLowerCase().includes(q) || String(mn).includes(q)); }
+        if (roomSearchQ.trim()) { const q = roomSearchQ.trim(); mns = mns.filter(mn => matchesSearch(mn, q)); }
 
         switch (roomSortMode) {
             case 'id':   mns.sort((a, b) => a - b); break;
