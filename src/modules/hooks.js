@@ -17,6 +17,17 @@ import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from './wps-share.
     let _relRegions = [];
     let _afcRegions = [];   // AFC 拓展戀人面板的可點區塊（透過 window.Liko.AFC 公開 API）
 
+    // 將 hex 顏色朝白色混合，用於 hover 時提亮底線（amt: 0~1）
+    function _lightenHex(hex, amt) {
+        try {
+            const h = String(hex).replace('#', '');
+            const n = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+            const r = parseInt(n.substr(0, 2), 16), g = parseInt(n.substr(2, 2), 16), b = parseInt(n.substr(4, 2), 16);
+            const mix = c => Math.round(c + (255 - c) * amt);
+            return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
+        } catch { return hex; }
+    }
+
     function _afcPanelOpen() {
         try { const A = window.Liko && window.Liko.AFC; return !!(A && typeof A.isProfilePanelOpen === 'function' && A.isProfilePanelOpen()); } catch { return false; }
     }
@@ -212,10 +223,10 @@ import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from './wps-share.
                 try {
                     for (const reg of _relRegions) {
                         const hov = typeof MouseIn === 'function' && MouseIn(reg.x, reg.y, reg.w, reg.h);
-                        // 只畫底線（貼合文字寬度），不畫按鈕外框；hover 時加粗變亮
-                        if (typeof MainCanvas !== 'undefined' && MainCanvas) {
+                        // 只畫底線（貼合文字寬度），不畫按鈕外框；hover 時加粗變亮；無色時不畫
+                        if (cfg.profileRelColor && typeof MainCanvas !== 'undefined' && MainCanvas) {
                             MainCanvas.save();
-                            MainCanvas.fillStyle = hov ? '#d0b0ff' : '#8868c0';
+                            MainCanvas.fillStyle = hov ? _lightenHex(cfg.profileRelColor, 0.4) : cfg.profileRelColor;
                             MainCanvas.fillRect(reg.x + 5, reg.y + reg.h - 6, Math.max(0, reg.w - 10), hov ? 3 : 2);
                             MainCanvas.restore();
                         }
@@ -267,9 +278,9 @@ import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from './wps-share.
                         const hit = { mn: parseInt(e.memberNumber), x: e.x - 5, y: e.y, w: w + 10, h: 46 };
                         _afcRegions.push(hit);
                         const hov = typeof MouseIn === 'function' && MouseIn(hit.x, hit.y, hit.w, hit.h);
-                        if (typeof MainCanvas !== 'undefined' && MainCanvas) {
+                        if (cfg.profileRelColor && typeof MainCanvas !== 'undefined' && MainCanvas) {
                             MainCanvas.save();
-                            MainCanvas.fillStyle = hov ? '#d0b0ff' : '#8868c0';
+                            MainCanvas.fillStyle = hov ? _lightenHex(cfg.profileRelColor, 0.4) : cfg.profileRelColor;
                             // AFC: region.y = 名稱行中心 - 26；底線畫在名稱文字正下方
                             MainCanvas.fillRect(e.x, e.y + 26 + fit.size * 0.5 + 1, w, hov ? 3 : 2);
                             MainCanvas.restore();

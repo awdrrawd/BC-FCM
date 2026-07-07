@@ -104,6 +104,8 @@ import { cfg } from './config.js';
             profileRelNote: '查看角色資料頁時，將主人／戀人等關係人的 ID 做成按鈕，點擊即開啟 FCM 人員查詢並帶入該 ID（須配合 Profile 保存功能）',
             profileRelTitle: '🔍 關係人快速查詢',
             noBeepNotFriend: '非好友，無法私信',
+            profileRelColorLabel: '修改顏色',
+            colorNone: '無色',
         },
         en: {
             panelTitle: '🎛 FCM ─ Friends and ChatRoom Manager', tabFriends: 'Relations', tabRoom: 'Room Mgmt', tabSettings: 'Settings',
@@ -204,6 +206,8 @@ import { cfg } from './config.js';
             profileRelNote: 'On a character profile page, turn related people (owner/lovers) IDs into buttons — click to open FCM People search prefilled with that ID (requires the Profile save feature)',
             profileRelTitle: '🔍 Quick Relation Lookup',
             noBeepNotFriend: 'Not a friend — cannot BEEP',
+            profileRelColorLabel: 'Color',
+            colorNone: 'No color',
         },
     };
 

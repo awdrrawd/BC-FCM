@@ -38,6 +38,7 @@ const MOD_VER = (typeof __FCM_VERSION__ !== 'undefined' && __FCM_VERSION__) || '
         btnShowMainHall: true,
         btnShowProfile: true,
         profileRelations: false,
+        profileRelColor: '#8868c0',   // Profile 關係人快速搜尋：底線顏色（null = 無色/不畫底線）
     };
     function loadCfg() { try { const s = localStorage.getItem('LikoFCM'); if (s) Object.assign(cfg, JSON.parse(s)); } catch {} }
     function saveCfg() { try { localStorage.setItem('LikoFCM', JSON.stringify(cfg)); } catch {} }

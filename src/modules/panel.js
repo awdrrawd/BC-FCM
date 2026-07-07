@@ -1431,10 +1431,63 @@ import { wpsShareProfile } from './wps-share.js';
         divider();
 
         // ── Profile 關係人快速搜尋 ──────────────────
-        wrap.appendChild(settingRow(T('profileRelLabel'), T('profileRelNote'), cfg.profileRelations, v => {
+        const prRow = settingRow(T('profileRelLabel'), T('profileRelNote'), cfg.profileRelations, v => {
             cfg.profileRelations = v; saveCfg();
-        }));
+        });
 
+        // 底線染色（邏輯與私聊/BEEP 提示色相同）：預設紫色，可選無色
+        const PRC_DEFAULT = '#8868c0';
+        const prcColorLabelBtn = document.createElement('span');
+        prcColorLabelBtn.style.cssText = 'font-size:11px;color:#a080c8;white-space:nowrap;flex-shrink:0;cursor:pointer;margin-left:auto;';
+        prcColorLabelBtn.textContent = T('profileRelColorLabel');
+        const _prcSwatchBg = c => c
+            ? c
+            : `#2a2048 linear-gradient(45deg, transparent 46%, #ff4040 46%, #ff4040 54%, transparent 54%)`;
+        const prcColorBtn = document.createElement('button');
+        prcColorBtn.style.cssText = `width:28px;height:28px;border-radius:50%;background:${_prcSwatchBg(cfg.profileRelColor)};border:2px solid #6040a0;cursor:pointer;flex-shrink:0;transition:border-color .15s;`;
+        let prcColorOpen = false;
+        const prcColorPanel = document.createElement('div'); prcColorPanel.style.cssText = 'display:none;padding:10px 0 4px 0;';
+        const prcSwatchRow = document.createElement('div'); prcSwatchRow.style.cssText = 'display:flex;align-items:center;gap:7px;flex-wrap:wrap;';
+        const prcPresets = ['#8868c0','#b070e8','#e870c0','#70aaff','#70e8b0','#f0c040','#e87070','#ff9040'];
+        const prcUpdateBtn = (color) => {
+            prcColorBtn.style.background = _prcSwatchBg(color);
+            prcColorBtn.style.boxShadow = color ? `0 0 0 3px ${color}55` : 'none';
+        };
+        const prcAllSwatches = [];
+        const prcCustomInp = document.createElement('input'); prcCustomInp.type = 'color'; prcCustomInp.value = cfg.profileRelColor || PRC_DEFAULT;
+        prcCustomInp.style.cssText = 'width:30px;height:24px;border-radius:6px;border:1px solid #5048a0;background:#1a1030;cursor:pointer;padding:1px;';
+        // 「無色」：圓形＋紅色對角線（不畫底線）
+        const prcNoneBtn = document.createElement('button');
+        prcNoneBtn.title = T('colorNone');
+        prcNoneBtn.style.cssText = `width:24px;height:24px;border-radius:50%;background:${_prcSwatchBg(null)};border:2.5px solid ${!cfg.profileRelColor ? '#fff' : 'transparent'};cursor:pointer;flex-shrink:0;transition:border .15s;`;
+        prcNoneBtn.addEventListener('click', () => {
+            cfg.profileRelColor = null; saveCfg(); prcUpdateBtn(null);
+            prcAllSwatches.forEach(s => s.style.borderColor = 'transparent'); prcNoneBtn.style.borderColor = '#fff';
+            prcCustomInp.value = PRC_DEFAULT;
+        });
+        prcSwatchRow.appendChild(prcNoneBtn);
+        prcPresets.forEach(color => {
+            const sw = document.createElement('button');
+            sw.style.cssText = `width:24px;height:24px;border-radius:50%;background:${color};border:2.5px solid ${cfg.profileRelColor===color?'#fff':'transparent'};cursor:pointer;flex-shrink:0;transition:border .15s;`;
+            sw.addEventListener('click', () => {
+                cfg.profileRelColor = color; saveCfg(); prcUpdateBtn(color);
+                prcNoneBtn.style.borderColor = 'transparent';
+                prcAllSwatches.forEach(s => s.style.borderColor = 'transparent'); sw.style.borderColor = '#fff';
+                prcCustomInp.value = color;
+            });
+            prcAllSwatches.push(sw); prcSwatchRow.appendChild(sw);
+        });
+        prcCustomInp.addEventListener('input', () => {
+            cfg.profileRelColor = prcCustomInp.value; saveCfg(); prcUpdateBtn(prcCustomInp.value);
+            prcNoneBtn.style.borderColor = 'transparent';
+            prcAllSwatches.forEach(s => s.style.borderColor = 'transparent');
+        });
+        prcSwatchRow.appendChild(prcCustomInp); prcColorPanel.appendChild(prcSwatchRow);
+        prcColorLabelBtn.addEventListener('click', () => prcColorBtn.click());
+        prcColorBtn.addEventListener('click', () => { prcColorOpen = !prcColorOpen; prcColorPanel.style.display = prcColorOpen ? 'block' : 'none'; prcColorBtn.style.borderColor = prcColorOpen ? '#d0a0ff' : '#6040a0'; });
+        prRow.appendChild(prcColorLabelBtn); prRow.appendChild(prcColorBtn);
+        wrap.appendChild(prRow);
+        wrap.appendChild(prcColorPanel);
 
         container.appendChild(wrap);
     }
