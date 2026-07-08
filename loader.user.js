@@ -19,7 +19,7 @@ if (window.Liko.FCM) {
     console.warn('🐈‍⬛ [FCM] ⚠️ 已載入，略過重複匯入。');
 } else {
     // Reserve the flag immediately so a second loader instance bails out here.
-    window.Liko.FCM = 'loading';
+    //window.Liko.FCM = 'loading';
     import(`https://awdrrawd.github.io/BC-FCM/assets/main.js?v=${Date.now()}`)
         .catch(e => console.error('🐈‍⬛ [FCM] 載入失敗:', e));
 }
