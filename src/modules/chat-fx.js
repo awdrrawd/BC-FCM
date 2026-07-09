@@ -1,6 +1,7 @@
 import { cfg } from './config.js';
-import { _getWhisperTargetMN, getDisplayName } from './data.js';
+import { _getWhisperTargetMN, getDisplayName, inRoomFn } from './data.js';
 import { Snapshot } from './profile-db.js';
+import { T } from './i18n.js';
 // ════════════════════════════════════════
 //  FCM module: chat-fx.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -92,13 +93,33 @@ import { Snapshot } from './profile-db.js';
             _roundRect(ctx, px - 4*scaleX, py - 20*scaleY, pw + 8*scaleX, ph + 24*scaleY, r);
             ctx.stroke();
 
-            // Avatar image
+            // Whether the whisper target has left the room (covers all three
+            // detection paths: clicked name, /w, /whisper, /beep — they all
+            // resolve to the same _wavLastMN, so a single inRoomFn check here
+            // is enough to cover every case).
+            const offline = !inRoomFn(_wavLastMN);
+
+            // Avatar image — grayscale it out when the target isn't in the room
+            if (offline) ctx.filter = 'grayscale(100%) brightness(0.55)';
             ctx.drawImage(_wavImageCache, px, py, pw, ph);
+            if (offline) ctx.filter = 'none';
+
+            if (offline) {
+                // Dim overlay + "No signal" label on top of the avatar
+                ctx.fillStyle = 'rgba(0,0,0,0.45)';
+                ctx.fillRect(px, py, pw, ph);
+                const nsFontSize = Math.max(9, Math.round(9 * Math.min(scaleX, scaleY) * 2));
+                ctx.fillStyle = '#c0c0c0';
+                ctx.font = `bold ${nsFontSize}px sans-serif`;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(T('whisperNoSignal'), px + pw / 2, py + ph / 2);
+            }
 
             // Name label
             const name = getDisplayName(_wavLastMN);
             const fontSize = Math.max(10, Math.round(11 * Math.min(scaleX, scaleY) * 2));
-            ctx.fillStyle = '#d0a8f0';
+            ctx.fillStyle = offline ? '#888888' : '#d0a8f0';
             ctx.font = `bold ${fontSize}px sans-serif`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
