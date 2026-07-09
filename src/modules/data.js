@@ -155,9 +155,8 @@ import { _pc } from './profile-db.js';
     // ─── Detect current whisper target MN ────────────────────────
     function _getWhisperTargetMN() {
         try {
-            // BC global: set when player clicks on someone in chat
-            if (typeof ChatRoomTargetMemberNumber !== 'undefined' && ChatRoomTargetMemberNumber > 0) return ChatRoomTargetMemberNumber;
-            // Check input value for /w /whisper /beep commands
+            // Check input value for /w /whisper /beep commands first —
+            // a resolved command target takes priority over a clicked name.
             const el = document.getElementById('InputChat');
             if (el) {
                 const v = el.value;
@@ -168,25 +167,31 @@ import { _pc } from './profile-db.js';
                 const mName = v.match(/^\/(w|whisper)\s+(.+)/i);
                 if (mName) {
                     const query = mName[2].trim().toLowerCase();
-                    if (!query) return null;
-                    // Search in current room
-                    if (ChatRoomCharacter) {
-                        const found = ChatRoomCharacter.find(c => {
-                            const nick = (typeof CharacterNickname === 'function' ? CharacterNickname(c) : '') || '';
-                            return c.Name.toLowerCase().startsWith(query) || nick.toLowerCase().startsWith(query);
-                        });
-                        if (found) return found.MemberNumber;
+                    if (query) {
+                        // Search in current room
+                        if (ChatRoomCharacter) {
+                            const found = ChatRoomCharacter.find(c => {
+                                const nick = (typeof CharacterNickname === 'function' ? CharacterNickname(c) : '') || '';
+                                return c.Name.toLowerCase().startsWith(query) || nick.toLowerCase().startsWith(query);
+                            });
+                            if (found) return found.MemberNumber;
+                        }
+                        // Search in online friends
+                        const ff = onlineFriends.find(f => (f.MemberName||'').toLowerCase().startsWith(query));
+                        if (ff) return ff.MemberNumber;
+                        // Search in profile cache (names)
+                        for (const [mn, p] of Object.entries(_pc)) {
+                            if (!p) continue;
+                            if ((p.name||'').toLowerCase().startsWith(query) || (p.lastNick||'').toLowerCase().startsWith(query)) return parseInt(mn);
+                        }
                     }
-                    // Search in online friends
-                    const ff = onlineFriends.find(f => (f.MemberName||'').toLowerCase().startsWith(query));
-                    if (ff) return ff.MemberNumber;
-                    // Search in profile cache (names)
-                    for (const [mn, p] of Object.entries(_pc)) {
-                        if (!p) continue;
-                        if ((p.name||'').toLowerCase().startsWith(query) || (p.lastNick||'').toLowerCase().startsWith(query)) return parseInt(mn);
-                    }
+                    // Command typed but no name matched yet — fall through to
+                    // ChatRoomTargetMemberNumber below instead of forcing null.
                 }
             }
+            // BC global: set when player clicks on someone in chat.
+            // Used as fallback when no /w /whisper /beep command resolved a target.
+            if (typeof ChatRoomTargetMemberNumber !== 'undefined' && ChatRoomTargetMemberNumber > 0) return ChatRoomTargetMemberNumber;
         } catch {}
         return null;
     }
