@@ -1,15 +1,34 @@
-
 // ════════════════════════════════════════
 //  FCM module: config.js
 //  (split from Plugins/liko-FCM.user.js)
 // ════════════════════════════════════════
 
+window.Liko = window.Liko ?? {};
+// Captured before main.js assigns window.Liko.FCM, so this is true on any
+// duplicate load regardless of how the second copy got in (loader, a
+// directly-installed full script, two loaders racing, etc.).
+const FCM_ALREADY_LOADED = !!window.Liko.FCM;
+
 const MOD_VER = (typeof __FCM_VERSION__ !== 'undefined' && __FCM_VERSION__) || '1.5.0';
-    const modApi = bcModSdk.registerMod({
-        name: 'Liko - FCM', fullName: 'Liko - Friends and ChatRoom Manager', version: MOD_VER,
-    });
+    // Avoid registering twice on a duplicate load (registerMod would throw).
+    const modApi = FCM_ALREADY_LOADED
+        ? createNoopModApi()
+        : bcModSdk.registerMod({
+            name: 'Liko - FCM', fullName: 'Liko - Friends and ChatRoom Manager', version: MOD_VER,
+        });
+    function createNoopModApi() {
+        return {
+            unload: () => {},
+            hookFunction: () => () => {},
+            callOriginal: () => undefined,
+            patchFunction: () => {},
+            removePatches: () => {},
+            getOriginalHash: () => '',
+        };
+    }
     const BTN_X = 955, BTN_Y = 455, BTN_W = 45, BTN_H = 45;
     // ── FCM icon (SVG → preloaded Image for DrawImageResize) ──────
+
     const FCM_ICON_SVG = `<svg version="1.2" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 90 90" width="90" height="90">
 		<style> .s0 { fill: #ffffff } .s1 { fill: #010101 } .s2 { fill: #ffe5d9 } </style>
 		<g id="图层 2 copy">
@@ -43,4 +62,4 @@ const MOD_VER = (typeof __FCM_VERSION__ !== 'undefined' && __FCM_VERSION__) || '
     function loadCfg() { try { const s = localStorage.getItem('LikoFCM'); if (s) Object.assign(cfg, JSON.parse(s)); } catch {} }
     function saveCfg() { try { localStorage.setItem('LikoFCM', JSON.stringify(cfg)); } catch {} }
 
-export { MOD_VER, modApi, BTN_X, BTN_Y, BTN_W, BTN_H, FCM_ICON_SVG, _fcmIconImg, cfg, loadCfg, saveCfg };
+export { FCM_ALREADY_LOADED, MOD_VER, modApi, BTN_X, BTN_Y, BTN_W, BTN_H, FCM_ICON_SVG, _fcmIconImg, cfg, loadCfg, saveCfg };
