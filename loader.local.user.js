@@ -16,7 +16,8 @@ window.Liko = window.Liko ?? {};
 if (window.Liko.FCM) {
     console.warn('🐈‍⬛ [FCM] ⚠️ 已載入，略過重複匯入。');
 } else {
-    window.Liko.FCM = 'loading';
+    // Reserve the flag immediately so a second loader instance bails out here.
+    //window.Liko.FCM = 'loading';
     import(`http://localhost:5176/assets/main.js?v=${Date.now()}`)
         .catch(e => console.error('🐈‍⬛ [FCM] 本地載入失敗（vite preview 有開嗎？）:', e));
 }
