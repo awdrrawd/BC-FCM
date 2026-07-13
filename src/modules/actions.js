@@ -181,7 +181,9 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
     //  參考 BC 的 HoldLeash：ServerSend("ChatRoomChat",{Type:"Hidden",Target})
     //  可送達同房間的任何人（含非好友），故「同意且通知」需與對方同房。
     // ═══════════════════════════════════════════════════════════
-    const FRIENDREQ_TAG = 'LikoFCMFriendReq';
+    // AccountBeep 自訂 BeepType：伺服器不限房間、不限好友即可送達（同 BC 牽繩跨房 beep 的做法）；
+    // BC 對未知 BeepType 不做任何處理，故沒裝 FCM 的人完全不會看到。
+    const FRIENDREQ_BEEP = 'FCMFriendReq';
 
     function showAddFriendConfirm(mn, dname, oneSided) {
         mn = parseInt(mn);
@@ -198,7 +200,6 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
         msgEl.textContent = T('addFriendTitle', dname) + (oneSided ? '\n\n' + T('peopleOneSidedWarn') : '');
         msgEl.appendChild(hint);
 
-        const inRoom = inRoomFn(mn);
         const cleanup = () => { document.removeEventListener('keydown', keyFn, true); };
         const close = () => { cleanup(); overlay.remove(); };
 
@@ -213,8 +214,7 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
 
         const okNotifyBtn = document.createElement('button'); okNotifyBtn.textContent = T('btnAgreeNotify');
         okNotifyBtn.style.cssText = 'flex:1.3;padding:11px;background:#1a3060;border:1.5px solid #4080d8;border-radius:10px;color:#90c8ff;font-size:13px;cursor:pointer;font-weight:700;';
-        if (!inRoom) { okNotifyBtn.disabled = true; okNotifyBtn.style.opacity = '.4'; okNotifyBtn.style.cursor = 'not-allowed'; okNotifyBtn.title = T('friendReqNeedRoom'); }
-        okNotifyBtn.addEventListener('click', () => { if (okNotifyBtn.disabled) return; close(); doAddFriend(mn); sendFriendReqNotify(mn); });
+        okNotifyBtn.addEventListener('click', () => { close(); doAddFriend(mn); sendFriendReqNotify(mn); });
 
         const keyFn = e => { e.stopPropagation(); if (e.key === 'Escape') close(); };
         document.addEventListener('keydown', keyFn, true);
@@ -227,9 +227,10 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
     function sendFriendReqNotify(mn) {
         mn = parseInt(mn);
         try {
-            ServerSend('ChatRoomChat', {
-                Type: 'Hidden', Content: FRIENDREQ_TAG, Target: mn,
-                Dictionary: [{ Tag: FRIENDREQ_TAG, SenderName: (Player && (Player.Nickname || Player.Name)) || String(Player?.MemberNumber) }],
+            // 藉由 AccountBeep 送出：跨房間、非好友、對方離線後上線都能收到（伺服器層級投遞）
+            ServerSend('AccountBeep', {
+                MemberNumber: mn, BeepType: FRIENDREQ_BEEP,
+                Message: (Player && (Player.Nickname || Player.Name)) || String(Player?.MemberNumber),
             });
             if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('friendReqSent', getDisplayName(mn)), 5000);
         } catch (e) { console.warn('🐈‍⬛ [FCM] sendFriendReqNotify:', e); }
@@ -376,4 +377,4 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
     }
 
 export { roomOp, doView, doBeep, doWhisper, doAddFriend, doToggleList, doRemoveFriend, navigateToRoom, showConfirm, makeIdCell,
-         showAddFriendConfirm, shareRoomToChat, handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_TAG, ROOMSHARE_TAG };
+         showAddFriendConfirm, shareRoomToChat, handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_BEEP, ROOMSHARE_TAG };

@@ -2,7 +2,7 @@
 // @name         Liko - FCM - 本地版
 // @name:zh      Liko的好友與房間管理 - 本地開發
 // @namespace    https://github.com/awdrrawd/liko-Plugin-Repository
-// @version      1.5.0
+// @version      1.5.1
 // @description  FCM 本地開發載入器（從 vite preview 讀取，npm run dev，port 5176）
 // @author       Likolisu
 // @include      /^https:\/\/(www\.)?bondage(projects\.elementfx|-(europe|asia))\.com\/.*/
