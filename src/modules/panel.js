@@ -2,7 +2,7 @@ import { cfg, MOD_VER, saveCfg } from './config.js';
 import { isZh, T, FCM_LANGS, FCM_LANG_NAMES } from './i18n.js';
 import { PDB, _pc, Snapshot, _avQueue, _avBusy, _processAvQueue, loadAvatarFromBundle, _captureSnapshotDelayed, detectWCESave, setAvStatusEl } from './profile-db.js';
 import { onlineFriends, showNickname, setShowNickname, getDisplayName, matchesSearch, buildFriendList, getRel, getAllRels, REL_ORDER, getZone, getRoomInfo, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep } from './data.js';
-import { roomOp, doView, doBeep, doWhisper, doAddFriend, doToggleList, doRemoveFriend, navigateToRoom, showConfirm, makeIdCell } from './actions.js';
+import { roomOp, doView, doBeep, doWhisper, doToggleList, doRemoveFriend, navigateToRoom, showConfirm, showAddFriendConfirm, shareRoomToChat, makeIdCell } from './actions.js';
 import { injectStyles } from './styles.js';
 import { _removeWhisperAvatar, startWhisperIndicator, stopWhisperIndicator, _installOocProtect, _uninstallOocProtect, applyGhostHide } from './chat-fx.js';
 import { wpsShareProfile } from './wps-share.js';
@@ -81,7 +81,7 @@ import { wpsShareProfile } from './wps-share.js';
         mn = parseInt(mn);
         const el = document.createElement('div'); el.className = 'fcm-av'; el.dataset.mn = mn;
         el.style.cursor = 'pointer';
-        el.title = isZh() ? '點擊重新抓取頭像' : 'Click to reload avatar';
+        el.title = T('avReloadTitle');
         el.addEventListener('click', e => { e.stopPropagation(); _forceLoadAvatar(mn, el); });
 
         if (cfg.avatars) {
@@ -182,14 +182,14 @@ import { wpsShareProfile } from './wps-share.js';
         wrap.appendChild(mkBtn(isWht ? T('btnRmWhite') : T('btnAddWhite'), isWht ? 'fcm-btn-red' : 'fcm-btn-green', () => roomOp(mn, isWht ? 'rmWhite' : 'addWhite')));
         if (isBan) wrap.appendChild(mkBtn(T('btnRmBan'), 'fcm-btn-green', () => roomOp(mn, 'unban')));
         else wrap.appendChild(mkBtn(T('btnAddBan'), 'fcm-btn-red', () => roomOp(mn, 'ban')));
-        if (context === 'members' && inRoomFn(mn)) wrap.appendChild(mkBtn(T('btnKick'), 'fcm-btn-red', () => showConfirm(T('confirmKick', getDisplayName(mn)), () => roomOp(mn, 'kick'), isZh() ? '逐出' : 'Kick')));
+        if (context === 'members' && inRoomFn(mn)) wrap.appendChild(mkBtn(T('btnKick'), 'fcm-btn-red', () => showConfirm(T('confirmKick', getDisplayName(mn)), () => roomOp(mn, 'kick'), T('btnKick'))));
         return wrap;
     }
 
     // ─── Shared: build action buttons for a person ─────────────────
     // Bug fix: showConfirm is the ONLY place confirmations appear.
     // doToggleList and doRemoveFriend no longer call showConfirm themselves.
-    function buildPersonOps(mn, { isInRoom = false, isMe = false, oneSided = false } = {}) {
+    function buildPersonOps(mn, { isInRoom = false, isMe = false, oneSided = false, whisper = true } = {}) {
         mn = parseInt(mn);
         const ops = document.createElement('div'); ops.className = 'fcm-btns';
         const profile = _pc[mn] || null;
@@ -200,7 +200,7 @@ import { wpsShareProfile } from './wps-share.js';
         ops.appendChild(vb);
 
         if (!isMe) {
-            if (isInRoom) ops.appendChild(mkBtn(T('btnWhisper'), '', () => doWhisper(mn)));
+            if (isInRoom && whisper) ops.appendChild(mkBtn(T('btnWhisper'), '', () => doWhisper(mn)));
             if (canBeep(mn)) {
                 // BEEP/私信 只有真正的好友（含主人／戀人／奴隸關係）才可用，非好友時顯示為灰色停用
                 const beepBtn = mkBtn(T('btnBeep'), 'fcm-btn-blue', () => doBeep(mn));
@@ -218,26 +218,26 @@ import { wpsShareProfile } from './wps-share.js';
             const osSuffix = oneSided ? '\n\n' + T('peopleOneSidedWarn') : '';
 
             if (!isFriend) ops.appendChild(mkBtn(T('btnAddFriend'), 'fcm-btn-green',
-                                                 () => showConfirm((isZh() ? `添加「${_dname}」為好友？` : `Add "${_dname}" as friend?`) + osSuffix, () => doAddFriend(mn))));
+                                                 () => showAddFriendConfirm(mn, _dname, oneSided)));
             else ops.appendChild(mkBtn(T('btnRmFriend'), 'fcm-btn-red',
-                                       () => showConfirm(T('confirmDel', _dname), () => doRemoveFriend(mn), isZh() ? '移除' : 'Remove')));
+                                       () => showConfirm(T('confirmDel', _dname), () => doRemoveFriend(mn), T('btnRemove'))));
 
             ops.appendChild(mkBtn(_isWhl ? T('btnRmWhite') : T('btnAddWhite'), _isWhl ? 'fcm-btn-red' : 'fcm-btn-green',
                                   () => showConfirm(_isWhl
-                                                    ? (isZh() ? `移除「${_dname}」白名單？` : `Remove "${_dname}" from whitelist?`)
-                                                    : (isZh() ? `將「${_dname}」加入白名單？` : `Add "${_dname}" to whitelist?`) + osSuffix,
+                                                    ? T('confirmRmWhite', _dname)
+                                                    : T('confirmAddWhite', _dname) + osSuffix,
                                                     () => doToggleList(mn, 'white', !_isWhl))));
 
             ops.appendChild(mkBtn(_isBl ? T('btnRmBlack') : T('btnAddBlack'), 'fcm-btn-red',
                                   () => showConfirm(_isBl
-                                                    ? (isZh() ? `移除「${_dname}」黑名單？` : `Remove "${_dname}" from blacklist?`)
+                                                    ? T('confirmRmBlack', _dname)
                                                     : T('confirmAddBan', _dname) + osSuffix,
                                                     () => doToggleList(mn, 'black', !_isBl),
-                                                    _isBl ? undefined : (isZh() ? '加入' : 'Add'))));
+                                                    _isBl ? undefined : T('btnAddConfirm'))));
 
-            ops.appendChild(mkBtn(_isGh ? (isZh() ? '－幽靈' : '－Ghost') : (isZh() ? '＋幽靈' : '＋Ghost'), _isGh ? 'fcm-btn-red' : 'fcm-btn-purple',
+            ops.appendChild(mkBtn(_isGh ? T('btnRmGhost') : T('btnAddGhost'), _isGh ? 'fcm-btn-red' : 'fcm-btn-purple',
                                   () => showConfirm(_isGh
-                                                    ? (isZh() ? `移除「${_dname}」幽靈？` : `Remove "${_dname}" from ghost?`)
+                                                    ? T('confirmRmGhost', _dname)
                                                     : T('confirmAddGhost', _dname) + osSuffix,
                                                     () => doToggleList(mn, 'ghost', !_isGh))));
         }
@@ -416,16 +416,16 @@ import { wpsShareProfile } from './wps-share.js';
 
         toolbar.appendChild(Object.assign(document.createElement('span'), { className: 'fcm-spacer' }));
         const nickBtn = document.createElement('button'); nickBtn.className = 'fcm-nick-tog'; nickBtn.textContent = showNickname ? T('togNick') : T('togName');
-        nickBtn.title = isZh() ? (showNickname ? '切換為BC名稱' : '切換為暱稱') : (showNickname ? 'Switch to BC name' : 'Switch to nickname');
+        nickBtn.title = showNickname ? T('togNickToBCName') : T('togNickToNick');
         nickBtn.addEventListener('click', () => { setShowNickname(!showNickname); renderCurrent(); });
         toolbar.appendChild(nickBtn);
         const { lbl: sl, sel: sortSel } = makeSortSel(sortMode, [['rel', T('sortRel')], ['id', T('sortId')], ['name', T('sortName')], ['added', T('sortAdded')]], v => { sortMode = v; renderCurrent(); });
         toolbar.appendChild(sl); toolbar.appendChild(sortSel);
         const rBtn = mkBtn('↻', 'fcm-btn', () => renderCurrent());
-        rBtn.title = isZh() ? '重新整理' : 'Refresh'; rBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
+        rBtn.title = T('btnRefresh'); rBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
         toolbar.appendChild(rBtn);
         const avBtn = mkBtn('📸', 'fcm-btn', () => { const curMns = friends.map(f => f.mn); refreshSnapshotsForList(curMns); });
-        avBtn.title = isZh() ? '快照目前名單（強制重建頭像）' : 'Snapshot current list (force rebuild)';
+        avBtn.title = T('btnSnapshotTitle');
         avBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
         toolbar.appendChild(avBtn);
         container.appendChild(toolbar);
@@ -488,14 +488,15 @@ import { wpsShareProfile } from './wps-share.js';
                 const roomFull = mc !== null && ml !== null && mc >= ml;
                 const rl = document.createElement('span'); rl.className = 'fcm-room-link';
                 rl.textContent = rcStr;
-                rl.title = (ri2.isPrivate ? (isZh() ? '[私人] ' : '[Private] ') : '') + rcStr + (roomFull ? ('\n' + (isZh() ? '⚠ 房間已滿' : '⚠ Full')) : ('\n' + (isZh() ? '前往此房間？' : 'Go to room?')));
+                rl.title = (ri2.isPrivate ? T('roomPrivPrefix') : '') + rcStr + (roomFull ? ('\n' + T('roomFull')) : ('\n' + T('roomGoPrompt')));
                 if (!roomFull) rl.addEventListener('click', () => navigateToRoom(ri2.name)); else rl.style.color = '#808080';
-                if (ri2.isPrivate) { const b2 = document.createElement('span'); b2.style.cssText = 'font-size:10px;color:#c090f0;margin-left:2px;'; b2.textContent = isZh() ? '(私人)' : '(Priv)'; rl.appendChild(b2); }
+                if (ri2.isPrivate) { const b2 = document.createElement('span'); b2.style.cssText = 'font-size:10px;color:#c090f0;margin-left:2px;'; b2.textContent = T('roomPrivShort'); rl.appendChild(b2); }
                 return rl;
             }
             if (ri && ri.name) {
                 let mc = null, ml = null;
                 if (ri.isCurrent && typeof ChatRoomCharacter !== 'undefined') { mc = ChatRoomCharacter.length; ml = ChatRoomData?.MemberLimit ?? null; }
+                else if (ri.memberCount !== null && ri.memberCount !== undefined) { mc = ri.memberCount; ml = ri.memberLimit ?? null; }
                 else { const cd = getCachedRoomInfo(ri.name); if (cd) { mc = cd.MemberCount; ml = cd.MemberLimit; } }
                 rt.appendChild(_buildRoomLink(ri, mc, ml));
                 if (!ri.isCurrent && mc === null) {
@@ -504,12 +505,13 @@ import { wpsShareProfile } from './wps-share.js';
                 }
             } else if (ri && !ri.name && ri.isPrivate) {
                 const sp = document.createElement('span'); sp.style.cssText = 'font-size:11px;color:#c090f0;font-weight:600;';
-                sp.textContent = isZh() ? '(私密)' : '(Private)'; rt.appendChild(sp);
+                sp.textContent = T('roomPrivateHidden'); rt.appendChild(sp);
             } else { rt.innerHTML = '<span class="fcm-room">—</span>'; }
             tr.appendChild(rt);
 
             const opsTd = document.createElement('td');
-            opsTd.appendChild(buildPersonOps(f.mn, { isInRoom, oneSided: false }));
+            // 個人關係頁不需要悄悄話按鈕
+            opsTd.appendChild(buildPersonOps(f.mn, { isInRoom, oneSided: false, whisper: false }));
             tr.appendChild(opsTd);
 
             if (inARoom) {
@@ -532,7 +534,7 @@ import { wpsShareProfile } from './wps-share.js';
         container.innerHTML = '';
         if (!PDB.db) {
             const em = document.createElement('div'); em.className = 'fcm-empty';
-            em.textContent = isZh() ? '資料庫未連線，請確認儲存模式已設定' : 'DB not connected — set a save mode in Settings';
+            em.textContent = T('peopleDbNotConnected');
             container.appendChild(em); return;
         }
 
@@ -544,7 +546,7 @@ import { wpsShareProfile } from './wps-share.js';
         clrX.addEventListener('click', () => { inp.value = ''; _peopleQ = ''; _peoplePage = 0; runSearch(''); });
         sw.appendChild(inp); sw.appendChild(clrX); toolbar.appendChild(sw);
 
-        const srchBtn = mkBtn(isZh() ? '搜尋' : 'Search', 'fcm-btn', () => { _peoplePage = 0; runSearch(inp.value); });
+        const srchBtn = mkBtn(T('btnSearch'), 'fcm-btn', () => { _peoplePage = 0; runSearch(inp.value); });
         srchBtn.style.cssText = 'padding:5px 12px;font-size:12px;flex-shrink:0;';
         toolbar.appendChild(srchBtn);
         toolbar.appendChild(Object.assign(document.createElement('span'), { className: 'fcm-spacer' }));
@@ -700,23 +702,23 @@ import { wpsShareProfile } from './wps-share.js';
                 const _isBl2  = (Player.BlackList || []).includes(mn);
                 const _isGh2  = (() => { try { return (Player.GhostList || []).includes(mn); } catch { return false; } })();
                 if (!isFriendOf(mn)) opsWrap.appendChild(mkBtn(T('btnAddFriend'), 'fcm-btn-green',
-                                                               () => showConfirm((isZh() ? `添加「${_dname2}」為好友？` : `Add "${_dname2}" as friend?`) + osSuffix, () => doAddFriend(mn))));
+                                                               () => showAddFriendConfirm(mn, _dname2, oneSided)));
                 else opsWrap.appendChild(mkBtn(T('btnRmFriend'), 'fcm-btn-red',
-                                               () => showConfirm(T('confirmDel', _dname2), () => doRemoveFriend(mn), isZh() ? '移除' : 'Remove')));
+                                               () => showConfirm(T('confirmDel', _dname2), () => doRemoveFriend(mn), T('btnRemove'))));
                 opsWrap.appendChild(mkBtn(_isWhl2 ? T('btnRmWhite') : T('btnAddWhite'), _isWhl2 ? 'fcm-btn-red' : 'fcm-btn-green',
                                           () => showConfirm(_isWhl2
-                                                            ? (isZh() ? `移除「${_dname2}」白名單？` : `Remove "${_dname2}" from whitelist?`)
-                                                            : (isZh() ? `將「${_dname2}」加入白名單？` : `Add "${_dname2}" to whitelist?`) + osSuffix,
+                                                            ? T('confirmRmWhite', _dname2)
+                                                            : T('confirmAddWhite', _dname2) + osSuffix,
                                                             () => doToggleList(mn, 'white', !_isWhl2))));
                 opsWrap.appendChild(mkBtn(_isBl2 ? T('btnRmBlack') : T('btnAddBlack'), 'fcm-btn-red',
                                           () => showConfirm(_isBl2
-                                                            ? (isZh() ? `移除「${_dname2}」黑名單？` : `Remove "${_dname2}" from blacklist?`)
+                                                            ? T('confirmRmBlack', _dname2)
                                                             : T('confirmAddBan', _dname2) + osSuffix,
                                                             () => doToggleList(mn, 'black', !_isBl2),
-                                                            _isBl2 ? undefined : (isZh() ? '加入' : 'Add'))));
-                opsWrap.appendChild(mkBtn(_isGh2 ? (isZh() ? '-幽靈' : '-Ghost') : (isZh() ? '+幽靈' : '+Ghost'), _isGh2 ? 'fcm-btn-red' : 'fcm-btn-purple',
+                                                            _isBl2 ? undefined : T('btnAddConfirm'))));
+                opsWrap.appendChild(mkBtn(_isGh2 ? T('btnRmGhost') : T('btnAddGhost'), _isGh2 ? 'fcm-btn-red' : 'fcm-btn-purple',
                                           () => showConfirm(_isGh2
-                                                            ? (isZh() ? `移除「${_dname2}」幽靈？` : `Remove "${_dname2}" from ghost?`)
+                                                            ? T('confirmRmGhost', _dname2)
                                                             : T('confirmAddGhost', _dname2) + osSuffix,
                                                             () => doToggleList(mn, 'ghost', !_isGh2))));
                 opsTd.appendChild(opsWrap); tr.appendChild(opsTd);
@@ -736,7 +738,7 @@ import { wpsShareProfile } from './wps-share.js';
                     const shareBtn = mkBtn(T('btnShare'), 'fcm-btn-purple', () => wpsShareProfile(mn));
                     if (!inRoomFn(parseInt(Player?.MemberNumber)) && !(typeof ChatRoomData !== 'undefined' && ChatRoomData)) {
                         shareBtn.disabled = true;
-                        shareBtn.title = isZh() ? '需在聊天室中才能分享' : 'Must be in a chat room to share';
+                        shareBtn.title = T('shareNeedRoom');
                     }
                     shareTd.appendChild(shareBtn);
                 } else {
@@ -756,7 +758,7 @@ import { wpsShareProfile } from './wps-share.js';
                 nextBtn.disabled = _peoplePage >= totalPages - 1;
                 const pageInfo = document.createElement('span');
                 pageInfo.style.cssText = 'font-size:11px;color:#9080b8;';
-                pageInfo.textContent = isZh() ? `第 ${_peoplePage+1} / ${totalPages} 頁` : `Page ${_peoplePage+1} / ${totalPages}`;
+                pageInfo.textContent = T('pageInfo', _peoplePage+1, totalPages);
                 pageBar.appendChild(prevBtn); pageBar.appendChild(pageInfo); pageBar.appendChild(nextBtn);
                 if (totalPages <= 7) {
                     pageBar.innerHTML = ''; pageBar.appendChild(prevBtn);
@@ -840,7 +842,7 @@ import { wpsShareProfile } from './wps-share.js';
         rBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
         toolbar.appendChild(rBtn);
         const avBtnR = mkBtn('📸', 'fcm-btn', () => { refreshSnapshotsForList(mns); });
-        avBtnR.title = isZh() ? '快照目前名單（強制重建頭像）' : 'Snapshot current list (force rebuild)';
+        avBtnR.title = T('btnSnapshotTitle');
         avBtnR.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
         toolbar.appendChild(avBtnR);
         container.appendChild(toolbar);
@@ -892,7 +894,8 @@ import { wpsShareProfile } from './wps-share.js';
             const permTd = document.createElement('td'); const pd = document.createElement('div'); pd.className = 'fcm-perms'; perms.forEach(p => pd.appendChild(makePermEl(p))); permTd.appendChild(pd); tr.appendChild(permTd);
 
             const opsTd = document.createElement('td');
-            opsTd.appendChild(buildPersonOps(mn, { isInRoom, isMe }));
+            // 悄悄話僅在「房內人員」子頁顯示；管理者／白名單／黑名單子頁不需要
+            opsTd.appendChild(buildPersonOps(mn, { isInRoom, isMe, whisper: roomSubTab === 'members' }));
             tr.appendChild(opsTd);
 
             const mgmtTd = document.createElement('td'); mgmtTd.className = 'fcm-td-mgmt' + (isAdmin && !isMe ? '' : ' no-perm');
@@ -962,9 +965,9 @@ import { wpsShareProfile } from './wps-share.js';
         tb.appendChild(srchBtn);
 
         const zoneColors = {
-            'X': { bg: '#1e1635', active: '#2e2650', label: isZh() ? '混合' : 'Mixed' },
-            '':  { bg: '#2a1020', active: '#7a2040', label: isZh() ? '女性' : 'Female' },
-            'M': { bg: '#101828', active: '#1a4070', label: isZh() ? '男性' : 'Male' }
+            'X': { bg: '#1e1635', active: '#2e2650', label: T('roomMixed') },
+            '':  { bg: '#2a1020', active: '#7a2040', label: T('roomFemale') },
+            'M': { bg: '#101828', active: '#1a4070', label: T('roomMale') }
         };
         const zoneGroup = document.createElement('div'); zoneGroup.style.cssText = 'display:flex;gap:3px;';
         Object.entries(zoneColors).forEach(([z, info]) => {
@@ -986,7 +989,7 @@ import { wpsShareProfile } from './wps-share.js';
         tb.appendChild(Object.assign(document.createElement('span'), { className: 'fcm-spacer' }));
         const sLbl = document.createElement('span'); sLbl.className = 'fcm-lbl-sm'; sLbl.textContent = T('sortBy') + ':'; tb.appendChild(sLbl);
         const sortSel = document.createElement('select'); sortSel.className = 'fcm-sel';
-        [['fav', isZh() ? '最愛優先' : 'Fav First'], ['friend', isZh() ? '好友優先' : 'Friends First'], ['name', isZh() ? '名稱優先' : 'Name']].forEach(([v, l]) => {
+        [['fav', T('sortFavFirst')], ['friend', T('sortFriendFirst')], ['name', T('sortNameOnly')]].forEach(([v, l]) => {
             const o = document.createElement('option'); o.value = v; o.textContent = l; if (v === _roomSortMode) o.selected = true; sortSel.appendChild(o);
         });
         sortSel.addEventListener('change', () => { _roomSortMode = sortSel.value; renderResults(); });
@@ -1050,6 +1053,12 @@ import { wpsShareProfile } from './wps-share.js';
                 card.style.cssText = `display:flex;align-items:center;gap:10px;padding:10px 12px;transition:background .1s;${cardBorder}`;
                 card.addEventListener('mouseenter', () => { if (!isFav && !friendsHere.length && !isCurrent) card.style.background = '#261a4a'; });
                 card.addEventListener('mouseleave', () => { if (!isFav && !friendsHere.length && !isCurrent) card.style.background = ''; });
+                // 房間屬性判定（依 BC 原碼：Access/Visibility 非 ["All"] 即上鎖/私人；MapType 判類型）
+                const isLocked = !!(room.Access && !(room.Access.length === 1 && room.Access[0] === 'All'));
+                const canJoinRoom = room.CanJoin !== false;
+                const isPriv = !!(room.Visibility && !(room.Visibility.length === 1 && room.Visibility[0] === 'All'));
+                const typeLbl = room.MapType === 'Always' ? T('roomTypeMap') : room.MapType === 'Hybrid' ? T('roomTypeMix') : '';
+
                 const info = document.createElement('div'); info.style.cssText = 'flex:1;min-width:0;';
                 const line1 = document.createElement('div'); line1.style.cssText = 'display:flex;align-items:center;gap:5px;flex-wrap:wrap;';
                 const favBtn = document.createElement('button');
@@ -1057,29 +1066,45 @@ import { wpsShareProfile } from './wps-share.js';
                 favBtn.textContent = isFav ? '★' : '☆';
                 favBtn.addEventListener('click', e => { e.stopPropagation(); if (_favRooms.has(room.Name)) _favRooms.delete(room.Name); else _favRooms.add(room.Name); saveFavRooms(); renderResults(); });
                 line1.appendChild(favBtn);
+                // 🔒/🔓：只有上鎖的房間才顯示（依你的權限，可進為🔓、不可進為🔒）
+                if (isLocked) { const lk = document.createElement('span'); lk.style.cssText = 'font-size:13px;flex-shrink:0;'; lk.textContent = canJoinRoom ? '🔓' : '🔒'; lk.title = canJoinRoom ? T('roomLockedCanJoin') : T('roomLockedNoAccess'); line1.appendChild(lk); }
                 const nm = document.createElement('span'); nm.style.cssText = 'color:#e8c8ff;font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px;'; nm.textContent = room.Name || '?'; nm.title = room.Name; line1.appendChild(nm);
-                if (room.Private) { const priv = document.createElement('span'); priv.style.cssText = 'font-size:11px;background:#2a1048;border:1px solid #8060b0;color:#c090f0;border-radius:6px;padding:2px 7px;flex-shrink:0;'; priv.textContent = T('roomPrivateLabel'); line1.appendChild(priv); }
-                if (room.Creator) { const cr = document.createElement('span'); cr.style.cssText = 'font-size:14px;color:#e8c8ff;font-weight:700;flex-shrink:0;'; cr.textContent = '- ' + room.Creator; line1.appendChild(cr); }                if (cStr) { const cnt = document.createElement('span'); cnt.style.cssText = 'color:#9878b8;font-size:12px;flex-shrink:0;'; cnt.textContent = cStr; line1.appendChild(cnt); }
-                if (isCurrent) { const hereBadge = document.createElement('span'); hereBadge.style.cssText = 'font-size:11px;background:#3a0828;border:1px solid #e060a0;color:#ff90c0;border-radius:6px;padding:2px 7px;flex-shrink:0;font-weight:700;'; hereBadge.textContent = isZh() ? '🏠 你' : '🏠 You'; line1.appendChild(hereBadge); }
+                if (room.Creator) { const cr = document.createElement('span'); cr.style.cssText = 'font-size:14px;color:#e8c8ff;font-weight:700;flex-shrink:0;'; cr.textContent = '- ' + room.Creator; line1.appendChild(cr); }
+                if (cStr) { const cnt = document.createElement('span'); cnt.style.cssText = 'color:#9878b8;font-size:12px;flex-shrink:0;'; cnt.textContent = cStr; line1.appendChild(cnt); }
+                // 私人標籤移到人數之後
+                if (isPriv) { const priv = document.createElement('span'); priv.style.cssText = 'font-size:11px;background:#2a1048;border:1px solid #8060b0;color:#c090f0;border-radius:6px;padding:2px 7px;flex-shrink:0;'; priv.textContent = T('roomPrivateLabel'); line1.appendChild(priv); }
+                if (isCurrent) { const hereBadge = document.createElement('span'); hereBadge.style.cssText = 'font-size:11px;background:#3a0828;border:1px solid #e060a0;color:#ff90c0;border-radius:6px;padding:2px 7px;flex-shrink:0;font-weight:700;'; hereBadge.textContent = T('roomHereBadge'); line1.appendChild(hereBadge); }
                 if (friendsHere.length > 0) { const fb = document.createElement('span'); fb.style.cssText = 'font-size:11px;background:#102038;border:1px solid #4080d8;color:#80c8ff;border-radius:6px;padding:2px 7px;flex-shrink:0;'; fb.textContent = `👥${friendsHere.length}: ${friendsHere.map(f => f.MemberName||'#'+f.MemberNumber).join(', ')}`; line1.appendChild(fb); }
                 info.appendChild(line1);
-                if (room.Description) { const desc = document.createElement('div'); desc.style.cssText = 'color:#7060a0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-top:2px;'; desc.textContent = room.Description; info.appendChild(desc); }
+                // 第二行：類型標籤（地圖／混合，普通不顯示）＋ 描述
+                if (typeLbl || room.Description) {
+                    const line2 = document.createElement('div'); line2.style.cssText = 'display:flex;align-items:center;gap:6px;margin-top:2px;min-width:0;';
+                    if (typeLbl) { const tg = document.createElement('span'); tg.style.cssText = 'font-size:10px;background:#182a1a;border:1px solid #3a7048;color:#78d090;border-radius:5px;padding:1px 6px;flex-shrink:0;'; tg.textContent = typeLbl; line2.appendChild(tg); }
+                    if (room.Description) { const desc = document.createElement('span'); desc.style.cssText = 'color:#7060a0;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;'; desc.textContent = room.Description; line2.appendChild(desc); }
+                    info.appendChild(line2);
+                }
                 card.appendChild(info);
                 // Join/Re-enter button
-                const joinLabel = isCurrent ? (isZh() ? '重新進入' : 'Re-enter') : T('roomJoin');
+                const joinLabel = isCurrent ? T('roomReenter') : T('roomJoin');
                 const joinCls   = isCurrent ? 'fcm-btn-orange' : 'fcm-btn-blue';
                 const joinBtn = mkBtn(joinLabel, joinCls, () => {
                     if (isCurrent) {
-                        const msg = isZh()
-                        ? `你已經在「${room.Name}」中了。\n確定要重新進入嗎？`
-                        : `You are already in "${room.Name}".\nRe-enter the room?`;
-                        showConfirm(msg, () => navigateToRoom(room.Name), isZh() ? '重新進入' : 'Re-enter');
+                        showConfirm(T('roomReenterConfirm', room.Name), () => navigateToRoom(room.Name), T('roomReenter'));
                     } else {
                         navigateToRoom(room.Name);
                     }
                 });
                 joinBtn.style.cssText += ';padding:7px 16px;font-size:13px;font-weight:700;flex-shrink:0;';
-                card.appendChild(joinBtn);
+                const btnRow2 = document.createElement('div'); btnRow2.style.cssText = 'display:flex;flex-direction:row;gap:5px;flex-shrink:0;';
+                btnRow2.appendChild(joinBtn);
+                // 分享按鈕：僅在聊天室中顯示，把房間資訊發送到聊天室（含 FCM 專屬加入按鈕）
+                if (typeof ChatRoomData !== 'undefined' && ChatRoomData) {
+                    const shareBtn = mkBtn(T('roomShareBtn'), 'fcm-btn-purple', () => shareRoomToChat(room));
+                    shareBtn.style.cssText += ';padding:7px 16px;font-size:13px;font-weight:700;flex-shrink:0;';
+                    shareBtn.title = T('roomShareBtn');
+                    btnRow2.appendChild(shareBtn);
+                }
+                card.appendChild(btnRow2);
                 scroll.appendChild(card);
             });
         }
@@ -1224,7 +1249,7 @@ import { wpsShareProfile } from './wps-share.js';
         // ══════════════════════════════════════════
         //  GROUP A: UI 管理
         // ══════════════════════════════════════════
-        sectionHeader(isZh() ? '⚙ UI 管理' : '⚙ UI Management');
+        sectionHeader(T('setSecUI'));
 
         // ── Language ──────────────────────────────
         const langRow = document.createElement('div'); langRow.className = 'fcm-set-row'; langRow.style.alignItems = 'center';
@@ -1269,12 +1294,12 @@ import { wpsShareProfile } from './wps-share.js';
         const clearNote = document.createElement('div'); clearNote.className = 'fcm-set-note'; clearNote.textContent = T('clearAvatarCacheNote');
         clearInfo.appendChild(clearLbl); clearInfo.appendChild(clearNote);
         const clearExecBtn = document.createElement('button'); clearExecBtn.className = 'fcm-btn fcm-btn-red';
-        clearExecBtn.textContent = isZh() ? '清除' : 'Clear'; clearExecBtn.style.cssText = 'flex-shrink:0;padding:5px 12px;';
+        clearExecBtn.textContent = T('btnClear'); clearExecBtn.style.cssText = 'flex-shrink:0;padding:5px 12px;';
         clearExecBtn.addEventListener('click', async () => {
-            clearExecBtn.disabled = true; clearExecBtn.textContent = isZh() ? '清除中...' : 'Clearing...';
+            clearExecBtn.disabled = true; clearExecBtn.textContent = T('btnClearing');
             await Snapshot.clear(); renderCurrent();
-            avStatus.textContent = isZh() ? '✓ 頭像快取已清除' : '✓ Cache cleared';
-            clearExecBtn.disabled = false; clearExecBtn.textContent = isZh() ? '清除' : 'Clear';
+            avStatus.textContent = T('avCacheCleared');
+            clearExecBtn.disabled = false; clearExecBtn.textContent = T('btnClear');
             setTimeout(() => { avStatus.textContent = ''; }, 3000);
         });
         clearRow.appendChild(clearInfo); clearRow.appendChild(clearExecBtn);
@@ -1291,7 +1316,7 @@ import { wpsShareProfile } from './wps-share.js';
             loadExecBtn.disabled = true;
             const friendMns = buildFriendList().map(f => f.mn).filter(mn => { const snap = Snapshot._cache[mn]; return !snap || snap.length <= 800; });
             const total = friendMns.length;
-            if (total === 0) { avStatus.textContent = isZh() ? '沒有需要載入的好友' : 'No friends need loading'; loadExecBtn.disabled = false; setTimeout(() => { avStatus.textContent = ''; }, 3000); return; }
+            if (total === 0) { avStatus.textContent = T('noFriendsToLoad'); loadExecBtn.disabled = false; setTimeout(() => { avStatus.textContent = ''; }, 3000); return; }
             const waitMs = Math.min(30000, Math.max(5000, total * 150));
             await PDB.batchGet(friendMns);
             for (const mn of friendMns) {
@@ -1300,8 +1325,8 @@ import { wpsShareProfile } from './wps-share.js';
                 await new Promise(r => setTimeout(r, 20));
             }
             let remaining = waitMs;
-            const tick = setInterval(() => { remaining -= 1000; avStatus.textContent = remaining > 0 ? (isZh() ? `等待 BC 緩存外觀... 剩餘 ${(remaining/1000).toFixed(0)} 秒` : `Waiting for BC... ${(remaining/1000).toFixed(0)}s left`) : (isZh() ? '開始截圖...' : 'Snapshotting...'); }, 1000);
-            avStatus.textContent = isZh() ? `等待 BC 緩存外觀... ${(waitMs/1000).toFixed(0)} 秒` : `Waiting for BC... ${(waitMs/1000).toFixed(0)}s`;
+            const tick = setInterval(() => { remaining -= 1000; avStatus.textContent = remaining > 0 ? T('avWaitLeft', (remaining/1000).toFixed(0)) : T('avSnapshotting'); }, 1000);
+            avStatus.textContent = T('avWait', (waitMs/1000).toFixed(0));
             await new Promise(r => setTimeout(r, waitMs));
             clearInterval(tick);
             await refreshSnapshotsForList(friendMns);
@@ -1353,7 +1378,7 @@ import { wpsShareProfile } from './wps-share.js';
         const smInfo = document.createElement('div'); smInfo.style.flex = '1'; smInfo.style.display = 'flex'; smInfo.style.alignItems = 'center'; smInfo.style.flexWrap = 'wrap'; smInfo.style.gap = '6px';
         const smLbl = document.createElement('div'); smLbl.className = 'fcm-set-label'; smLbl.textContent = T('saveModeLabel'); smInfo.appendChild(smLbl);
         const wceTag = document.createElement('span'); wceTag.style.display = 'none';
-        detectWCESave().then(wceOn => { if (wceOn) { wceTag.className = 'fcm-wce-tag fcm-wce-tag-yes'; wceTag.textContent = isZh() ? '偵測到 WCE Profiles' : 'WCE detected'; wceTag.style.display = 'inline-block'; } });
+        detectWCESave().then(wceOn => { if (wceOn) { wceTag.className = 'fcm-wce-tag fcm-wce-tag-yes'; wceTag.textContent = T('wceTagDetected'); wceTag.style.display = 'inline-block'; } });
         smInfo.appendChild(wceTag);
         const smSel = document.createElement('select'); smSel.className = 'fcm-sel'; smSel.style.flexShrink = '0';
         [['off', T('saveModeOff')], ['name', T('saveModeName')], ['avatar', T('saveModeAvatar')], ['full', T('saveModeFull')]].forEach(([v, l]) => {
@@ -1388,7 +1413,7 @@ import { wpsShareProfile } from './wps-share.js';
         // ══════════════════════════════════════════
         //  GROUP B: 聊天室管理
         // ══════════════════════════════════════════
-        sectionHeader(isZh() ? '⚙ 聊天室管理' : '⚙ Chat Room');
+        sectionHeader(T('setSecChat'));
 
         // ── Whisper Indicator (color) ─────────────
         const wiWrap = document.createElement('div');
@@ -1401,7 +1426,7 @@ import { wpsShareProfile } from './wps-share.js';
         wiInfo.appendChild(wiLbl); wiInfo.appendChild(wiNote);
         const wiColorLabelBtn = document.createElement('span');
         wiColorLabelBtn.style.cssText = 'font-size:11px;color:#a080c8;white-space:nowrap;flex-shrink:0;cursor:pointer;';
-        wiColorLabelBtn.textContent = isZh() ? '修改顏色' : 'Color';
+        wiColorLabelBtn.textContent = T('colorEditLabel');
         const wiColorBtn = document.createElement('button');
         wiColorBtn.style.cssText = `width:28px;height:28px;border-radius:50%;background:${cfg.whisperColor||'#b070e8'};border:2px solid #6040a0;cursor:pointer;flex-shrink:0;transition:border-color .15s;`;
         let wiColorOpen = false;
@@ -1526,7 +1551,9 @@ import { wpsShareProfile } from './wps-share.js';
         if (panelEl) panelEl.classList.add('hidden');
         if (miniEl) miniEl.classList.remove('visible');
         panelOpen = false; panelMini = false;
+        // 關閉時一併清空所有搜尋欄位狀態
         _peopleQ = ''; _peoplePage = 0;
+        searchQ = ''; roomSearchQ = ''; _roomSearchQ2 = '';
         _removeWhisperAvatar();
         document.getElementById('fcm-beep-overlay')?.remove();
         document.getElementById('fcm-confirm-overlay')?.remove();
@@ -1537,7 +1564,7 @@ import { wpsShareProfile } from './wps-share.js';
         if (typeof CommandCombine === 'function') {
             CommandCombine([{
                 Tag: 'profiles',
-                Description: isZh() ? '<篩選> - 開啟人員查詢（依名稱或 ID 篩選）' : '<filter> - Open People search (filter by name or ID)',
+                Description: T('cmdProfilesDesc'),
                 Action: arg => { _peopleQ = arg ? arg.trim() : ''; _peoplePage = 0; uiTab = 'people'; openPanel(); },
             }]);
         }

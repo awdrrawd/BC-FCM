@@ -1,4 +1,4 @@
-import { T, isZh } from './i18n.js';
+import { T } from './i18n.js';
 import { PDB } from './profile-db.js';
 import { amAdmin, inRoomFn, getDisplayName, isFriendOf } from './data.js';
 import { renderCurrent, minimizePanel, closePanel } from './panel.js';
@@ -69,9 +69,7 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
         summonBtn.textContent = T('beepSummon');
         summonBtn.style.cssText = 'flex:1;padding:14px;background:#182a10;border:1.5px solid #40a030;border-radius:10px;color:#80e860;font-size:14px;cursor:pointer;font-weight:700;';
         summonBtn.addEventListener('click', () => {
-            const msg = (isZh()
-                         ? `請確定您有召喚對方的權限，否則對方只會收到文字 "summon"。\n\n確定要召喚「${name}」嗎？`
-                         : `Make sure you have permission to summon them, otherwise they will only receive the text "summon".\n\nSummon "${name}"?`);
+            const msg = T('beepSummonConfirm', name);
             showConfirm(msg, () => {
                 try {
                     ServerSend('AccountBeep', {
@@ -83,7 +81,7 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
                 } catch(e) { console.warn('🐈‍⬛ [FCM] summon error:', e); }
                 if (typeof FriendListBeepLog !== 'undefined') FriendListBeepLog.push({ MemberNumber: mn, MemberName: name, Sent: true, Time: new Date(), Message: '[summon]' });
                 overlay.remove();
-            }, isZh() ? '召喚' : 'Summon');
+            }, T('beepSummon'));
         });
         if (typeof ChatRoomData === 'undefined' || !ChatRoomData) {
             summonBtn.disabled = true; summonBtn.style.opacity = '0.35'; summonBtn.style.cursor = 'not-allowed';
@@ -133,7 +131,7 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
                 try { ChatSearchLastQueryJoin = roomName; } catch {}
                 ServerSend('ChatRoomJoin', { Name: roomName });
             } catch (e) { console.warn('🐈‍⬛ [FCM] navigateToRoom:', e); }
-        }, isZh() ? '🚪 前往' : '🚪 Go');
+        }, T('roomGo'));
     }
 
     // ── Bug fix: showConfirm — stopPropagation on Enter to prevent
@@ -148,9 +146,9 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
         box.addEventListener('click', e => e.stopPropagation());
         const msgEl = document.createElement('div'); msgEl.style.cssText = 'color:#e8d0ff;font-size:14px;text-align:center;line-height:1.7;white-space:pre-wrap;'; msgEl.textContent = msg;
         const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex;gap:12px;';
-        const cancelBtn = document.createElement('button'); cancelBtn.textContent = isZh() ? '取消' : 'Cancel';
+        const cancelBtn = document.createElement('button'); cancelBtn.textContent = T('btnCancel');
         cancelBtn.style.cssText = 'flex:1;padding:12px;background:#1e1635;border:1.5px solid #5a48a8;border-radius:10px;color:#c4a0e0;font-size:13px;cursor:pointer;font-weight:600;'; cancelBtn.addEventListener('click', () => { cleanup(); overlay.remove(); });
-        const okBtn = document.createElement('button'); okBtn.textContent = okLabel || (isZh() ? '確認' : 'Confirm');
+        const okBtn = document.createElement('button'); okBtn.textContent = okLabel || T('btnConfirm');
         okBtn.style.cssText = 'flex:2;padding:12px;background:#1a3060;border:1.5px solid #4080d8;border-radius:10px;color:#90c8ff;font-size:13px;cursor:pointer;font-weight:700;';
 
         // Bug fix: one-shot guard prevents double-fire on rapid double-click
@@ -178,6 +176,197 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
         overlay.appendChild(box); document.body.appendChild(overlay); setTimeout(() => okBtn.focus(), 50);
     }
 
+    // ═══════════════════════════════════════════════════════════
+    //  ADD FRIEND — 三選一確認 + 通知對方（藉由 Leash 式 Hidden 訊息）
+    //  參考 BC 的 HoldLeash：ServerSend("ChatRoomChat",{Type:"Hidden",Target})
+    //  可送達同房間的任何人（含非好友），故「同意且通知」需與對方同房。
+    // ═══════════════════════════════════════════════════════════
+    const FRIENDREQ_TAG = 'LikoFCMFriendReq';
+
+    function showAddFriendConfirm(mn, dname, oneSided) {
+        mn = parseInt(mn);
+        const ex = document.getElementById('fcm-confirm-overlay'); if (ex) ex.remove();
+        const overlay = document.createElement('div'); overlay.id = 'fcm-confirm-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center;';
+        const box = document.createElement('div');
+        box.style.cssText = 'background:#241840;border:2px solid #7060c0;border-radius:14px;padding:26px 24px;width:min(400px,90vw);box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:18px;font-family:-apple-system,sans-serif;';
+        box.addEventListener('click', e => e.stopPropagation());
+
+        const msgEl = document.createElement('div'); msgEl.style.cssText = 'color:#e8d0ff;font-size:14px;text-align:center;line-height:1.7;white-space:pre-wrap;';
+        const hint = document.createElement('span'); hint.style.cssText = 'display:block;color:#9a86c8;font-size:12px;margin-top:6px;';
+        hint.textContent = T('addFriendNotifyHint');
+        msgEl.textContent = T('addFriendTitle', dname) + (oneSided ? '\n\n' + T('peopleOneSidedWarn') : '');
+        msgEl.appendChild(hint);
+
+        const inRoom = inRoomFn(mn);
+        const cleanup = () => { document.removeEventListener('keydown', keyFn, true); };
+        const close = () => { cleanup(); overlay.remove(); };
+
+        const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex;gap:10px;';
+        const cancelBtn = document.createElement('button'); cancelBtn.textContent = T('btnCancel');
+        cancelBtn.style.cssText = 'flex:1;padding:11px;background:#1e1635;border:1.5px solid #5a48a8;border-radius:10px;color:#c4a0e0;font-size:13px;cursor:pointer;font-weight:600;';
+        cancelBtn.addEventListener('click', close);
+
+        const okBtn = document.createElement('button'); okBtn.textContent = T('btnAgree');
+        okBtn.style.cssText = 'flex:1;padding:11px;background:#123a20;border:1.5px solid #40a860;border-radius:10px;color:#90f0b0;font-size:13px;cursor:pointer;font-weight:700;';
+        okBtn.addEventListener('click', () => { close(); doAddFriend(mn); });
+
+        const okNotifyBtn = document.createElement('button'); okNotifyBtn.textContent = T('btnAgreeNotify');
+        okNotifyBtn.style.cssText = 'flex:1.3;padding:11px;background:#1a3060;border:1.5px solid #4080d8;border-radius:10px;color:#90c8ff;font-size:13px;cursor:pointer;font-weight:700;';
+        if (!inRoom) { okNotifyBtn.disabled = true; okNotifyBtn.style.opacity = '.4'; okNotifyBtn.style.cursor = 'not-allowed'; okNotifyBtn.title = T('friendReqNeedRoom'); }
+        okNotifyBtn.addEventListener('click', () => { if (okNotifyBtn.disabled) return; close(); doAddFriend(mn); sendFriendReqNotify(mn); });
+
+        const keyFn = e => { e.stopPropagation(); if (e.key === 'Escape') close(); };
+        document.addEventListener('keydown', keyFn, true);
+        overlay.addEventListener('click', close);
+        btnRow.appendChild(cancelBtn); btnRow.appendChild(okBtn); btnRow.appendChild(okNotifyBtn);
+        box.appendChild(msgEl); box.appendChild(btnRow);
+        overlay.appendChild(box); document.body.appendChild(overlay);
+    }
+
+    function sendFriendReqNotify(mn) {
+        mn = parseInt(mn);
+        try {
+            ServerSend('ChatRoomChat', {
+                Type: 'Hidden', Content: FRIENDREQ_TAG, Target: mn,
+                Dictionary: [{ Tag: FRIENDREQ_TAG, SenderName: (Player && (Player.Nickname || Player.Name)) || String(Player?.MemberNumber) }],
+            });
+            if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('friendReqSent', getDisplayName(mn)), 5000);
+        } catch (e) { console.warn('🐈‍⬛ [FCM] sendFriendReqNotify:', e); }
+    }
+
+    // 接收端：在聊天記錄疊一張卡（參考 AFC 戀人申請卡），提供 同意／取消／查看
+    function handleIncomingFriendReq(fromNum, fromName) {
+        fromNum = parseInt(fromNum);
+        if (!fromNum || fromNum === parseInt(Player?.MemberNumber)) return;
+        const uiId = 'fcm-friendreq-' + fromNum;
+        if (document.getElementById(uiId)) return;   // 已有一張，避免重複
+        const dname = fromName || getDisplayName(fromNum);
+
+        const el = _appendChatCard(uiId);
+        if (!el) return;
+        const title = document.createElement('div');
+        title.style.cssText = 'font-weight:bold;font-size:1.02em;margin-bottom:8px;color:#ffd0e6;';
+        title.textContent = T('friendReqIncoming', `${dname} (${fromNum})`);
+        const row = document.createElement('div'); row.style.cssText = 'display:flex;align-items:center;gap:8px;flex-wrap:wrap;';
+        const mkCardBtn = (label, bg, brd, col, cb) => {
+            const b = document.createElement('button');
+            b.style.cssText = `padding:4px 16px;background:${bg};color:${col};border:1px solid ${brd};border-radius:5px;cursor:pointer;font-size:.95em;white-space:nowrap;`;
+            b.textContent = label; b.addEventListener('click', cb); return b;
+        };
+        row.appendChild(mkCardBtn(T('btnAgree'), '#123a20', '#40a860', '#90f0b0', () => {
+            doAddFriend(fromNum);
+            if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('friendReqAdded', dname), 5000);
+            el.remove();
+        }));
+        row.appendChild(mkCardBtn(T('btnCancel'), 'transparent', '#555', '#bbb', () => el.remove()));
+        row.appendChild(mkCardBtn(T('btnViewProfile'), '#241848', '#7060c0', '#c8a8f0', () => doView(fromNum)));
+        el.appendChild(title); el.appendChild(row);
+        _scrollChatToEnd();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  ROOM SHARE — 分享房間資訊到聊天室（Action 可見）＋ FCM 專屬加入按鈕
+    // ═══════════════════════════════════════════════════════════
+    const ROOMSHARE_TAG = 'LikoFCMRoomShare';
+    // BC 佔位法：Content 用未知 tag 會顯示 MISSING TEXT IN "Interface.csv": <tag>，
+    // 再以同名 Text 字典項替換整段字串，即可顯示自訂內容而不報錯。
+    const SYS_ACTION_TAG = 'MISSING TEXT IN "Interface.csv": CUSTOM_SYSTEM_ACTION';
+
+    function _arrEq(a, b) { if (!Array.isArray(a) || !Array.isArray(b) || a.length !== b.length) return false; return a.every((x, i) => x === b[i]); }
+    function _roomIsPrivate(room) { return !!room && !!room.Visibility && !_arrEq(room.Visibility, ['All']); }
+    function _roomTypeLabel(room) {
+        const mt = room && room.MapType;
+        if (mt === 'Always') return T('roomTypeMap');
+        if (mt === 'Hybrid') return T('roomTypeMix');
+        return '';
+    }
+
+    function shareRoomToChat(room) {
+        if (typeof ChatRoomData === 'undefined' || !ChatRoomData) return;
+        if (!room || !room.Name) return;
+        const sharer = (Player && (Player.Nickname || Player.Name)) || String(Player?.MemberNumber);
+        const priv = _roomIsPrivate(room) ? `(${T('roomPrivateLabel')})` : '';
+        const typeLbl = _roomTypeLabel(room); const typeTag = typeLbl ? `(${typeLbl})` : '';
+        const line2 = `${room.Name} - ${room.Creator || '?'} ${priv}${typeTag}`.trim();
+        const desc = (room.Description || '').trim();
+        const systemMessage = T('roomShareIntro', sharer) + '\n' + line2 + (desc ? '\n' + desc : '');
+        try {
+            ServerSend('ChatRoomChat', {
+                Type: 'Action', Content: 'CUSTOM_SYSTEM_ACTION',
+                Dictionary: [
+                    { Tag: SYS_ACTION_TAG, Text: systemMessage },     // 顯示文字（所有人可見）
+                    { Tag: ROOMSHARE_TAG, Room: room.Name },          // 隱藏屬性：FCM 專屬（無 Text，BC 會忽略）
+                ],
+            });
+            if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('roomShareLocalDone', room.Name), 5000);
+        } catch (e) { console.warn('🐈‍⬛ [FCM] shareRoomToChat:', e); }
+    }
+
+    // 接收端（FCM 專屬）：把「這一則」剛渲染好的 Action 訊息就地轉換成資訊卡，
+    //  右下角加「加入房間」。沒插件的人讀不到 ROOMSHARE_TAG，只會看到普通系統訊息。
+    function _mkRoomJoinBtn(roomName) {
+        const b = document.createElement('button');
+        b.style.cssText = 'padding:5px 16px;background:#1a3860;color:#90d0ff;border:1px solid #4090d8;border-radius:6px;cursor:pointer;font-size:.9em;font-weight:700;white-space:nowrap;';
+        b.textContent = '🚪 ' + T('roomJoinRoomBtn');
+        b.addEventListener('click', () => navigateToRoom(roomName));
+        return b;
+    }
+    function handleIncomingRoomShare(data) {
+        try {
+            const entry = (data.Dictionary || []).find(e => e && e.Tag === ROOMSHARE_TAG);
+            if (!entry || !entry.Room) return;
+            // 自己分享的也一併轉成房卡（含加入按鈕）
+            const roomName = entry.Room;
+            // 找出剛剛（next(args) 已同步渲染）這則 Action 訊息元素
+            const log = document.getElementById('TextAreaChatLog');
+            let msgEl = null;
+            if (log) {
+                const nodes = log.querySelectorAll(`.ChatMessageAction[data-sender="${data.Sender}"]`);
+                for (let i = nodes.length - 1; i >= 0; i--) { if (nodes[i].dataset.fcmRoomshare !== '1') { msgEl = nodes[i]; break; } }
+            }
+            if (msgEl) {
+                msgEl.dataset.fcmRoomshare = '1';
+                // 就地套上資訊卡外觀
+                msgEl.style.background = 'rgba(40,15,55,.55)';
+                msgEl.style.border = '1px solid #6a4da8';
+                msgEl.style.borderRadius = '8px';
+                msgEl.style.padding = '8px 12px';
+                msgEl.style.textAlign = 'left';
+                const foot = document.createElement('div');
+                foot.style.cssText = 'display:flex;justify-content:flex-end;margin-top:6px;';
+                foot.appendChild(_mkRoomJoinBtn(roomName));
+                msgEl.appendChild(foot);
+            } else {
+                // 退回：找不到訊息元素（例如沙盒環境）→ 疊一張獨立卡片
+                const uiId = 'fcm-roomjoin-' + data.Sender + '-' + Date.now().toString(36);
+                const el = _appendChatCard(uiId); if (!el) return;
+                const row = document.createElement('div'); row.style.cssText = 'display:flex;justify-content:flex-end;';
+                row.appendChild(_mkRoomJoinBtn(roomName)); el.appendChild(row);
+            }
+            _scrollChatToEnd();
+        } catch (e) { console.warn('🐈‍⬛ [FCM] handleIncomingRoomShare:', e); }
+    }
+
+    // ── 聊天記錄卡片輔助（參考 AFC createProposalUI）─────────────────
+    function _appendChatCard(uiId) {
+        if (document.getElementById(uiId)) return null;
+        let container = document.getElementById('TextAreaChatLog') || document.getElementById('chat-room-chat-log');
+        const floating = !container;
+        if (floating) container = document.body;
+        if (!container) return null;
+        const el = document.createElement('div'); el.id = uiId;
+        el.style.cssText = floating
+            ? 'position:fixed;bottom:120px;left:50%;transform:translateX(-50%);z-index:99999;max-width:600px;width:90vw;background:rgba(40,15,55,.97);border:2px solid #9060d0;border-radius:10px;padding:12px 16px;font-size:1em;line-height:1.6;color:#eee;box-shadow:0 4px 24px rgba(0,0,0,.7);'
+            : 'background:rgba(40,15,55,.93);border:2px solid #9060d0;border-radius:8px;padding:10px 14px;margin:6px 4px;font-size:1em;line-height:1.5;color:#eee;';
+        container.appendChild(el);
+        return el;
+    }
+    function _scrollChatToEnd() {
+        const c = document.getElementById('TextAreaChatLog') || document.getElementById('chat-room-chat-log');
+        if (c) c.scrollTop = c.scrollHeight;
+    }
+
     function makeIdCell(mn) {
         const td = document.createElement('td'); td.className = 'fcm-id fcm-id-copy'; td.textContent = String(mn); td.title = T('copyId');
         td.addEventListener('click', async () => {
@@ -186,4 +375,5 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
         return td;
     }
 
-export { roomOp, doView, doBeep, doWhisper, doAddFriend, doToggleList, doRemoveFriend, navigateToRoom, showConfirm, makeIdCell };
+export { roomOp, doView, doBeep, doWhisper, doAddFriend, doToggleList, doRemoveFriend, navigateToRoom, showConfirm, makeIdCell,
+         showAddFriendConfirm, shareRoomToChat, handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_TAG, ROOMSHARE_TAG };

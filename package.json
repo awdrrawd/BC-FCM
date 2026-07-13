@@ -1,7 +1,7 @@
 {
   "name": "bc-fcm",
   "private": true,
-  "version": "1.5.0",
+  "version": "1.5.1",
   "type": "module",
   "description": "Liko - FCM (Friends and ChatRoom Manager) for Bondage Club",
   "scripts": {

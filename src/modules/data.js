@@ -131,7 +131,9 @@ import { _pc } from './profile-db.js';
         if (inRoomC && ChatRoomData) return { name: ChatRoomData.Name, isPrivate: !!(ChatRoomData.Private), isCurrent: true };
         const f = onlineFriends.find(f => f.MemberNumber === mn);
         if (!f) return null;
-        if (f.ChatRoomName) return { name: f.ChatRoomName, isPrivate: !!(f.Private), isCurrent: false };
+        // 依 BC ServerFriendInfo：房間人數/上限已隨線上好友資料一併回傳，直接採用可省去額外查詢
+        const mc = f.ChatRoomMemberCount ?? null, ml = f.ChatRoomLimit ?? null;
+        if (f.ChatRoomName) return { name: f.ChatRoomName, isPrivate: !!(f.Private), isCurrent: false, memberCount: mc, memberLimit: ml };
         if (f.Private) return { name: null, isPrivate: true, isCurrent: false };
         return null;
     }
