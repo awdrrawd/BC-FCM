@@ -1,5 +1,5 @@
 import { cfg, MOD_VER, saveCfg, THEME_DEFAULTS } from './config.js';
-import { isZh, T, FCM_LANGS, FCM_LANG_NAMES } from './i18n.js';
+import { isZh, T, FCM_LANGS, FCM_LANG_NAMES, ensureI18n } from './i18n.js';
 import { PDB, _pc, Snapshot, _avQueue, _avBusy, _processAvQueue, loadAvatarFromBundle, _captureSnapshotDelayed, detectWCESave, setAvStatusEl } from './profile-db.js';
 import { onlineFriends, showNickname, setShowNickname, getDisplayName, matchesSearch, buildFriendList, getRel, getAllRels, REL_ORDER, getZone, getRoomInfo, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep } from './data.js';
 import { roomOp, doView, doBeep, doWhisper, doToggleList, doRemoveFriend, navigateToRoom, showConfirm, showAddFriendConfirm, shareRoomToChat, makeIdCell } from './actions.js';
@@ -1259,8 +1259,10 @@ import { wpsShareProfile } from './wps-share.js';
         FCM_LANGS.forEach(v => {
             const o = document.createElement('option'); o.value = v; o.textContent = FCM_LANG_NAMES[v] || v; if (v === _curLang) o.selected = true; langSel.appendChild(o);
         });
-        langSel.addEventListener('change', () => {
+        langSel.addEventListener('change', async () => {
             cfg.lang = langSel.value; saveCfg();
+            // 一國一檔：切換語言時按需抓取新選語言的字庫（TW/CN/EN 已在內建後備，其餘需 fetch）
+            await ensureI18n();
             if (panelEl) { panelEl.remove(); panelEl = null; }
             if (miniEl) { miniEl.remove(); miniEl = null; }
             panelOpen = false; panelMini = false;
