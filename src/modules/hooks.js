@@ -256,9 +256,9 @@ import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_BEEP, ROOMS
                   (InformationSheetSelection === Player.MemberNumber || InformationSheetSelection?.MemberNumber === Player.MemberNumber);
             if (viewingSelf && cfg.btnShowProfile && typeof DrawButton === 'function') {
                 const btnColor = (panelOpen && !panelMini) ? '#3a1858' : 'White';
-                DrawButton(1705, 420, 90, 90, '', btnColor, '', 'FCM');
+                DrawButton(1715, 420, 90, 90, '', btnColor, '', 'FCM');
                 if (_fcmIconImg && typeof DrawImageResize === 'function') {
-                    DrawImageResize(_fcmIconImg, 1713, 428, 74, 74);
+                    DrawImageResize(_fcmIconImg, 1725, 428, 74, 74);
                 }
             }
             return r;
@@ -266,7 +266,7 @@ import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_BEEP, ROOMS
         modApi.hookFunction('InformationSheetClick', 5, (args, next) => {
             const viewingSelf = (typeof InformationSheetSelection !== 'undefined') &&
                   (InformationSheetSelection === Player.MemberNumber || InformationSheetSelection?.MemberNumber === Player.MemberNumber);
-            if (viewingSelf && cfg.btnShowProfile && typeof MouseIn === 'function' && MouseIn(1705, 420, 90, 90)) { openPanel(); return; }
+        if (viewingSelf && cfg.btnShowProfile && typeof MouseIn === 'function' && MouseIn(1715, 420, 90, 90)) { openPanel(); return; }
             // Profile 關係人快速搜尋：點到某一關係列（主人／戀人）→ 開啟人員查詢並帶入該 ID
             if (cfg.profileRelations) {
                 try {
