@@ -1,10 +1,10 @@
 // ==UserScript==
-// @name         Liko - FCM - 本地版
-// @name:zh      Liko的好友與房間管理 - 本地開發
-// @namespace    https://github.com/awdrrawd/liko-Plugin-Repository
-// @version      1.5.1
-// @description  FCM 本地開發載入器（從 vite preview 讀取，npm run dev，port 5176）
+// @name         本地測試 - FCM
+// @namespace    https://github.com/awdrrawd/BC-FCM
+// @version      0.1
+// @description  FCM 本地開發載入器
 // @author       Likolisu
+// @supportURL   https://github.com/awdrrawd/BC-FCM
 // @include      /^https:\/\/(www\.)?bondage(projects\.elementfx|-(europe|asia))\.com\/.*/
 // @icon         https://raw.githubusercontent.com/awdrrawd/liko-tool-Image-storage/refs/heads/main/Images/LOGO_2.png
 // @grant        none
@@ -16,8 +16,6 @@ window.Liko = window.Liko ?? {};
 if (window.Liko.FCM) {
     console.warn('🐈‍⬛ [FCM] ⚠️ 已載入，略過重複匯入。');
 } else {
-    // Reserve the flag immediately so a second loader instance bails out here.
-    //window.Liko.FCM = 'loading';
     import(`http://localhost:5176/assets/main.js?v=${Date.now()}`)
         .catch(e => console.error('🐈‍⬛ [FCM] 本地載入失敗（vite preview 有開嗎？）:', e));
 }
