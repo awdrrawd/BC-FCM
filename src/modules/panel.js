@@ -1,9 +1,9 @@
-import { cfg, MOD_VER, saveCfg } from './config.js';
+import { cfg, MOD_VER, saveCfg, THEME_DEFAULTS } from './config.js';
 import { isZh, T, FCM_LANGS, FCM_LANG_NAMES } from './i18n.js';
 import { PDB, _pc, Snapshot, _avQueue, _avBusy, _processAvQueue, loadAvatarFromBundle, _captureSnapshotDelayed, detectWCESave, setAvStatusEl } from './profile-db.js';
 import { onlineFriends, showNickname, setShowNickname, getDisplayName, matchesSearch, buildFriendList, getRel, getAllRels, REL_ORDER, getZone, getRoomInfo, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep } from './data.js';
 import { roomOp, doView, doBeep, doWhisper, doToggleList, doRemoveFriend, navigateToRoom, showConfirm, showAddFriendConfirm, shareRoomToChat, makeIdCell } from './actions.js';
-import { injectStyles } from './styles.js';
+import { injectStyles, applyTheme } from './styles.js';
 import { _removeWhisperAvatar, startWhisperIndicator, stopWhisperIndicator, _installOocProtect, _uninstallOocProtect, applyGhostHide } from './chat-fx.js';
 import { wpsShareProfile } from './wps-share.js';
 // ════════════════════════════════════════
@@ -182,34 +182,40 @@ import { wpsShareProfile } from './wps-share.js';
         wrap.appendChild(mkBtn(isWht ? T('btnRmWhite') : T('btnAddWhite'), isWht ? 'fcm-btn-red' : 'fcm-btn-green', () => roomOp(mn, isWht ? 'rmWhite' : 'addWhite')));
         if (isBan) wrap.appendChild(mkBtn(T('btnRmBan'), 'fcm-btn-green', () => roomOp(mn, 'unban')));
         else wrap.appendChild(mkBtn(T('btnAddBan'), 'fcm-btn-red', () => roomOp(mn, 'ban')));
-        if (context === 'members' && inRoomFn(mn)) wrap.appendChild(mkBtn(T('btnKick'), 'fcm-btn-red', () => showConfirm(T('confirmKick', getDisplayName(mn)), () => roomOp(mn, 'kick'), T('btnKick'))));
+        if (context === 'members' && inRoomFn(mn)) {
+            // 黑單與逐出之間空一格，避免誤觸
+            const _sep = document.createElement('span'); _sep.style.cssText = 'width:8px;display:inline-block;'; wrap.appendChild(_sep);
+            wrap.appendChild(mkBtn(T('btnKick'), 'fcm-btn-red', () => showConfirm(T('confirmKick', getDisplayName(mn)), () => roomOp(mn, 'kick'), T('btnKick'))));
+        }
         return wrap;
     }
 
     // ─── Shared: build action buttons for a person ─────────────────
     // Bug fix: showConfirm is the ONLY place confirmations appear.
     // doToggleList and doRemoveFriend no longer call showConfirm themselves.
-    function buildPersonOps(mn, { isInRoom = false, isMe = false, oneSided = false, whisper = true } = {}) {
+    // 回傳兩組按鈕：actions（查看／悄悄話／私訊）與 manage（好友／白單／黑單／幽靈），
+    //  分別放在「動作」與「管理」兩個表格欄位。
+    function buildPersonOps(mn, { isInRoom = false, isMe = false, oneSided = false, whisper = true, forceBeep = false } = {}) {
         mn = parseInt(mn);
-        const ops = document.createElement('div'); ops.className = 'fcm-btns';
+        const actions = document.createElement('div'); actions.className = 'fcm-btns';
+        const manage = document.createElement('div'); manage.className = 'fcm-btns';
         const profile = _pc[mn] || null;
         const isFriend = isFriendOf(mn);
         const hasProfile = !!(profile && profile.characterBundle);
         const vb = mkBtn(T('btnView'), '', () => doView(mn));
         if (!isInRoom && !hasProfile) vb.disabled = true;
-        ops.appendChild(vb);
+        actions.appendChild(vb);
 
         if (!isMe) {
-            if (isInRoom && whisper) ops.appendChild(mkBtn(T('btnWhisper'), '', () => doWhisper(mn)));
-            if (canBeep(mn)) {
-                // BEEP/私信 只有真正的好友（含主人／戀人／奴隸關係）才可用，非好友時顯示為灰色停用
+            if (isInRoom && whisper) actions.appendChild(mkBtn(T('btnWhisper'), '', () => doWhisper(mn)));
+            // forceBeep：一律顯示私訊按鈕。私訊/BEEP 僅真正的好友（含主人／戀人／奴隸）可用，
+            //  「同房間」不算可私訊條件，非好友時反灰停用。
+            if (canBeep(mn) || forceBeep) {
                 const beepBtn = mkBtn(T('btnBeep'), 'fcm-btn-blue', () => doBeep(mn));
                 const beepable = isFriendOf(mn) || ['owner', 'lover', 'sub'].includes(getRel(mn));
                 if (!beepable) { beepBtn.disabled = true; beepBtn.title = T('noBeepNotFriend'); }
-                ops.appendChild(beepBtn);
+                actions.appendChild(beepBtn);
             }
-
-            const _sep = document.createElement('span'); _sep.style.cssText = 'width:6px;display:inline-block;'; ops.appendChild(_sep);
 
             const _dname = getDisplayName(mn);
             const _isWhl = (Player.WhiteList || []).includes(mn);
@@ -217,31 +223,31 @@ import { wpsShareProfile } from './wps-share.js';
             const _isGh  = (() => { try { return (Player.GhostList || []).includes(mn); } catch { return false; } })();
             const osSuffix = oneSided ? '\n\n' + T('peopleOneSidedWarn') : '';
 
-            if (!isFriend) ops.appendChild(mkBtn(T('btnAddFriend'), 'fcm-btn-green',
+            if (!isFriend) manage.appendChild(mkBtn(T('btnAddFriend'), 'fcm-btn-green',
                                                  () => showAddFriendConfirm(mn, _dname, oneSided)));
-            else ops.appendChild(mkBtn(T('btnRmFriend'), 'fcm-btn-red',
+            else manage.appendChild(mkBtn(T('btnRmFriend'), 'fcm-btn-red',
                                        () => showConfirm(T('confirmDel', _dname), () => doRemoveFriend(mn), T('btnRemove'))));
 
-            ops.appendChild(mkBtn(_isWhl ? T('btnRmWhite') : T('btnAddWhite'), _isWhl ? 'fcm-btn-red' : 'fcm-btn-green',
+            manage.appendChild(mkBtn(_isWhl ? T('btnRmWhite') : T('btnAddWhite'), _isWhl ? 'fcm-btn-red' : 'fcm-btn-green',
                                   () => showConfirm(_isWhl
                                                     ? T('confirmRmWhite', _dname)
                                                     : T('confirmAddWhite', _dname) + osSuffix,
                                                     () => doToggleList(mn, 'white', !_isWhl))));
 
-            ops.appendChild(mkBtn(_isBl ? T('btnRmBlack') : T('btnAddBlack'), 'fcm-btn-red',
+            manage.appendChild(mkBtn(_isBl ? T('btnRmBlack') : T('btnAddBlack'), 'fcm-btn-red',
                                   () => showConfirm(_isBl
                                                     ? T('confirmRmBlack', _dname)
                                                     : T('confirmAddBan', _dname) + osSuffix,
                                                     () => doToggleList(mn, 'black', !_isBl),
                                                     _isBl ? undefined : T('btnAddConfirm'))));
 
-            ops.appendChild(mkBtn(_isGh ? T('btnRmGhost') : T('btnAddGhost'), _isGh ? 'fcm-btn-red' : 'fcm-btn-purple',
+            manage.appendChild(mkBtn(_isGh ? T('btnRmGhost') : T('btnAddGhost'), _isGh ? 'fcm-btn-red' : 'fcm-btn-purple',
                                   () => showConfirm(_isGh
                                                     ? T('confirmRmGhost', _dname)
                                                     : T('confirmAddGhost', _dname) + osSuffix,
                                                     () => doToggleList(mn, 'ghost', !_isGh))));
         }
-        return ops;
+        return { actions, manage };
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -286,9 +292,10 @@ import { wpsShareProfile } from './wps-share.js';
         mini.innerHTML = `<span style="font-size:16px">🎛</span><div class="fcm-mini-pill"></div><span class="fcm-mini-lbl">${T('miniLabel')}</span>`;
         mini.addEventListener('click', restorePanel); document.body.appendChild(mini); miniEl = mini;
         let md = { on: false, ox: 0, oy: 0, moved: false };
-        mini.addEventListener('mousedown', e => { md.on = true; md.moved = false; const r = mini.getBoundingClientRect(); md.ox = e.clientX - r.left; md.oy = e.clientY - r.top; mini.style.bottom = 'auto'; mini.style.transform = 'none'; mini.style.left = r.left + 'px'; mini.style.top = r.top + 'px'; e.preventDefault(); });
+        // 拖曳期間關閉 CSS transition（#fcm-mini 有 transition:all .15s，否則每次 mousemove 都會補間造成拖曳卡頓）
+        mini.addEventListener('mousedown', e => { md.on = true; md.moved = false; const r = mini.getBoundingClientRect(); md.ox = e.clientX - r.left; md.oy = e.clientY - r.top; mini.style.transition = 'none'; mini.style.bottom = 'auto'; mini.style.transform = 'none'; mini.style.left = r.left + 'px'; mini.style.top = r.top + 'px'; e.preventDefault(); });
         document.addEventListener('mousemove', e => { if (!md.on) return; md.moved = true; mini.style.left = (e.clientX - md.ox) + 'px'; mini.style.top = (e.clientY - md.oy) + 'px'; });
-        document.addEventListener('mouseup', () => { if (md.on && !md.moved) restorePanel(); md.on = false; });
+        document.addEventListener('mouseup', () => { if (md.on) { mini.style.transition = ''; if (!md.moved) restorePanel(); } md.on = false; });
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -457,7 +464,7 @@ import { wpsShareProfile } from './wps-share.js';
 
         const tbl = document.createElement('table'); tbl.className = 'fcm-tbl';
         const thRow = document.createElement('tr');
-        [['', 'width:42px'], [T('colName'), 'min-width:120px', 'fcm-th-left'], [T('colId'), ''], [T('colRel'), ''], [T('colZone'), ''], [T('colRoom'), 'min-width:100px'], [T('colOps'), 'min-width:150px']].forEach(([text, style, cls]) => {
+        [['', 'width:42px'], [T('colName'), 'min-width:120px', 'fcm-th-left'], [T('colId'), ''], [T('colRel'), ''], [T('colZone'), ''], [T('colRoom'), 'min-width:100px'], [T('colOps'), 'min-width:120px'], [T('colManage'), 'min-width:130px']].forEach(([text, style, cls]) => {
             const th = document.createElement('th'); th.textContent = text; if (style) th.style.cssText = style; if (cls) th.className = cls; thRow.appendChild(th);
         });
         if (inARoom) { const th = document.createElement('th'); th.textContent = isAdmin ? T('colMgmt') : T('colMgmtNoPerm'); th.className = (isAdmin ? 'fcm-th-mgmt' : 'fcm-th-mgmt-off'); th.style.cssText = 'min-width:140px;max-width:155px;width:150px;'; thRow.appendChild(th); }
@@ -509,10 +516,10 @@ import { wpsShareProfile } from './wps-share.js';
             } else { rt.innerHTML = '<span class="fcm-room">—</span>'; }
             tr.appendChild(rt);
 
-            const opsTd = document.createElement('td');
-            // 個人關係頁不需要悄悄話按鈕
-            opsTd.appendChild(buildPersonOps(f.mn, { isInRoom, oneSided: false, whisper: false }));
-            tr.appendChild(opsTd);
+            // 動作（查看／私訊）與 管理（好友／白單／黑單／幽靈）分兩欄；個人關係頁不需要悄悄話
+            const { actions: fActions, manage: fManage } = buildPersonOps(f.mn, { isInRoom, oneSided: false, whisper: false });
+            const opsTd = document.createElement('td'); opsTd.appendChild(fActions); tr.appendChild(opsTd);
+            const mngTd = document.createElement('td'); mngTd.appendChild(fManage); tr.appendChild(mngTd);
 
             if (inARoom) {
                 const mgmtTd = document.createElement('td'); mgmtTd.className = 'fcm-td-mgmt' + (isAdmin ? '' : ' no-perm');
@@ -660,7 +667,7 @@ import { wpsShareProfile } from './wps-share.js';
             const thRow = document.createElement('tr');
             [
                 ['', 'width:42px'], [T('colName'), 'min-width:130px', 'fcm-th-left'], [T('colId'), ''],
-                [T('colRel'), ''], [T('colOps'), 'min-width:200px'],
+                [T('colRel'), ''], [T('colOps'), 'min-width:110px'], [T('colManage'), 'min-width:130px'],
                 ...((!!(typeof ChatRoomData !== 'undefined' && ChatRoomData)) ? [[T('colMgmt'), 'min-width:130px']] : []),
                 [T('colSeen'), 'min-width:80px'], [T('colShare'), 'min-width:60px'],
             ].forEach(([text, style, cls]) => {
@@ -687,41 +694,14 @@ import { wpsShareProfile } from './wps-share.js';
                 tr.appendChild(nameTd);
                 tr.appendChild(makeIdCell(mn));
                 const relTd = document.createElement('td'); relTd.style.textAlign = 'center'; relTd.appendChild(makeRelEl(getAllRels(mn))); tr.appendChild(relTd);
-                const opsTd = document.createElement('td');
                 const freshProf = _pc[mn] || null;
                 const hasBundle = !!(freshProf && freshProf.characterBundle);
-                const opsWrap = document.createElement('div'); opsWrap.className = 'fcm-btns';
-                const vb = mkBtn(T('btnView'), '', () => doView(mn));
-                if (!isInRoom && !hasBundle) vb.disabled = true;
-                opsWrap.appendChild(vb);
-                if (canBeep(mn)) opsWrap.appendChild(mkBtn(T('btnBeep'), 'fcm-btn-blue', () => doBeep(mn)));
-                const _psep = document.createElement('span'); _psep.style.cssText = 'width:6px;display:inline-block;'; opsWrap.appendChild(_psep);
-                const _dname2 = nickName || bcName;
-                const osSuffix = oneSided ? '\n\n' + T('peopleOneSidedWarn') : '';
-                const _isWhl2 = (Player.WhiteList || []).includes(mn);
-                const _isBl2  = (Player.BlackList || []).includes(mn);
-                const _isGh2  = (() => { try { return (Player.GhostList || []).includes(mn); } catch { return false; } })();
-                if (!isFriendOf(mn)) opsWrap.appendChild(mkBtn(T('btnAddFriend'), 'fcm-btn-green',
-                                                               () => showAddFriendConfirm(mn, _dname2, oneSided)));
-                else opsWrap.appendChild(mkBtn(T('btnRmFriend'), 'fcm-btn-red',
-                                               () => showConfirm(T('confirmDel', _dname2), () => doRemoveFriend(mn), T('btnRemove'))));
-                opsWrap.appendChild(mkBtn(_isWhl2 ? T('btnRmWhite') : T('btnAddWhite'), _isWhl2 ? 'fcm-btn-red' : 'fcm-btn-green',
-                                          () => showConfirm(_isWhl2
-                                                            ? T('confirmRmWhite', _dname2)
-                                                            : T('confirmAddWhite', _dname2) + osSuffix,
-                                                            () => doToggleList(mn, 'white', !_isWhl2))));
-                opsWrap.appendChild(mkBtn(_isBl2 ? T('btnRmBlack') : T('btnAddBlack'), 'fcm-btn-red',
-                                          () => showConfirm(_isBl2
-                                                            ? T('confirmRmBlack', _dname2)
-                                                            : T('confirmAddBan', _dname2) + osSuffix,
-                                                            () => doToggleList(mn, 'black', !_isBl2),
-                                                            _isBl2 ? undefined : T('btnAddConfirm'))));
-                opsWrap.appendChild(mkBtn(_isGh2 ? T('btnRmGhost') : T('btnAddGhost'), _isGh2 ? 'fcm-btn-red' : 'fcm-btn-purple',
-                                          () => showConfirm(_isGh2
-                                                            ? T('confirmRmGhost', _dname2)
-                                                            : T('confirmAddGhost', _dname2) + osSuffix,
-                                                            () => doToggleList(mn, 'ghost', !_isGh2))));
-                opsTd.appendChild(opsWrap); tr.appendChild(opsTd);
+                const isMe_p = mn === parseInt(Player?.MemberNumber);
+                // 動作（查看／私訊）與 管理（好友／白單／黑單／幽靈）分兩欄；
+                //  人員查詢一律顯示私訊（forceBeep），僅好友可用、同房間不算可私訊條件
+                const { actions: pActions, manage: pManage } = buildPersonOps(mn, { isInRoom, isMe: isMe_p, oneSided, whisper: false, forceBeep: true });
+                const opsTd = document.createElement('td'); opsTd.appendChild(pActions); tr.appendChild(opsTd);
+                const mngTd = document.createElement('td'); mngTd.appendChild(pManage); tr.appendChild(mngTd);
                 // ── Room admin column ─────────────────────────────────────────
                 const _inARoom_p = !!(typeof ChatRoomData !== 'undefined' && ChatRoomData);
                 if (_inARoom_p) {
@@ -871,16 +851,20 @@ import { wpsShareProfile } from './wps-share.js';
 
         const tbl = document.createElement('table'); tbl.className = 'fcm-tbl';
         const thRow = document.createElement('tr');
-        [['', 'width:42px'], [T('colName'), 'min-width:120px', 'fcm-th-left'], [T('colId'), ''], [T('colRel'), ''], [T('colPerm'), 'min-width:80px'], [T('colOps'), 'min-width:150px']].forEach(([text, style, cls]) => {
+        [['', 'width:42px'], [T('colName'), 'min-width:120px', 'fcm-th-left'], [T('colId'), ''], [T('colRel'), ''], [T('colPerm'), 'min-width:80px'], [T('colOps'), 'min-width:120px'], [T('colManage'), 'min-width:130px']].forEach(([text, style, cls]) => {
             const th = document.createElement('th'); th.textContent = text; if (style) th.style.cssText = style; if (cls) th.className = cls; thRow.appendChild(th);
         });
         const thMgmt = document.createElement('th'); thMgmt.textContent = isAdmin ? T('colMgmt') : T('colMgmtNoPerm'); thMgmt.className = isAdmin ? 'fcm-th-mgmt' : 'fcm-th-mgmt-off'; thMgmt.style.cssText = 'min-width:140px;max-width:155px;width:150px;'; thRow.appendChild(thMgmt);
+        // 分享欄（房管之後）；house 一定在房間內，故恆可分享
+        const thShare = document.createElement('th'); thShare.textContent = T('colShare'); thShare.style.cssText = 'min-width:56px;width:56px;'; thRow.appendChild(thShare);
+        // 尾端彈性空白欄：吸收表格 100% 寬的多餘空間，讓關係／動作等欄位緊貼內容、避免間距過大
+        const thSpacer = document.createElement('th'); thSpacer.style.cssText = 'width:100%;padding:0;'; thRow.appendChild(thSpacer);
         const thead = document.createElement('thead'); thead.appendChild(thRow); tbl.appendChild(thead);
         const tbody = document.createElement('tbody');
 
         for (const mn of mns) {
             const tr = document.createElement('tr'); tr.className = 'fcm-row';
-            const name = getDisplayName(mn), rel = getRel(mn), perms = getRoomPerms(mn);
+            const name = getDisplayName(mn), rel = getAllRels(mn), perms = getRoomPerms(mn);
             const snapshotUrl = Snapshot._cache[mn] || null;
             const isInRoom = inRoomFn(mn), isMe = mn === Player.MemberNumber;
 
@@ -893,14 +877,27 @@ import { wpsShareProfile } from './wps-share.js';
             const relTd = document.createElement('td'); relTd.style.textAlign = 'center'; relTd.appendChild(makeRelEl(rel)); tr.appendChild(relTd);
             const permTd = document.createElement('td'); const pd = document.createElement('div'); pd.className = 'fcm-perms'; perms.forEach(p => pd.appendChild(makePermEl(p))); permTd.appendChild(pd); tr.appendChild(permTd);
 
-            const opsTd = document.createElement('td');
-            // 悄悄話僅在「房內人員」子頁顯示；管理者／白名單／黑名單子頁不需要
-            opsTd.appendChild(buildPersonOps(mn, { isInRoom, isMe, whisper: roomSubTab === 'members' }));
-            tr.appendChild(opsTd);
+            // 動作（查看／悄悄話／私訊）與 管理（好友／白單／黑單／幽靈）分兩欄；
+            //  悄悄話僅「房內人員」子頁顯示；管理者／白名單／黑名單子頁一律顯示私訊（forceBeep）
+            const { actions: rActions, manage: rManage } = buildPersonOps(mn, { isInRoom, isMe, whisper: roomSubTab === 'members', forceBeep: roomSubTab !== 'members' });
+            const opsTd = document.createElement('td'); opsTd.appendChild(rActions); tr.appendChild(opsTd);
+            const mngTd = document.createElement('td'); mngTd.appendChild(rManage); tr.appendChild(mngTd);
 
             const mgmtTd = document.createElement('td'); mgmtTd.className = 'fcm-td-mgmt' + (isAdmin && !isMe ? '' : ' no-perm');
             if (!isMe) { const mb = buildMgmtBtns(mn, roomSubTab); if (mb) mgmtTd.appendChild(mb); }
             tr.appendChild(mgmtTd);
+
+            // 分享欄：有完整 Profile（characterBundle）才能分享，否則顯示「—」
+            const shareTd = document.createElement('td'); shareTd.style.textAlign = 'center';
+            const _hasBundle = !!(_pc[mn] && _pc[mn].characterBundle);
+            if (_hasBundle && !isMe) {
+                shareTd.appendChild(mkBtn(T('btnShare'), 'fcm-btn-purple', () => wpsShareProfile(mn)));
+            } else {
+                shareTd.innerHTML = '<span style="color:#4a3870;font-size:11px;">—</span>';
+            }
+            tr.appendChild(shareTd);
+
+            const spacerTd = document.createElement('td'); tr.appendChild(spacerTd);
             tbody.appendChild(tr);
         }
         tbl.appendChild(tbody); scroll.appendChild(tbl);
@@ -1255,9 +1252,7 @@ import { wpsShareProfile } from './wps-share.js';
         const langRow = document.createElement('div'); langRow.className = 'fcm-set-row'; langRow.style.alignItems = 'center';
         const langInfo = document.createElement('div'); langInfo.style.flex = '1';
         const langLbl = document.createElement('div'); langLbl.className = 'fcm-set-label'; langLbl.textContent = T('langLabel');
-        const langNote2 = document.createElement('div'); langNote2.className = 'fcm-set-note';
-        try { const tl = (typeof TranslationLanguage !== 'undefined' ? TranslationLanguage : ''); langNote2.textContent = T('langNote') + '  ' + T('langDetected', tl); } catch { langNote2.textContent = T('langNote'); }
-        langInfo.appendChild(langLbl); langInfo.appendChild(langNote2);
+        langInfo.appendChild(langLbl);   // 語言不需要說明文字
         const langSel = document.createElement('select'); langSel.className = 'fcm-sel'; langSel.style.flexShrink = '0';
         // 舊值相容：把已存的 zh/en 映射回 TW/EN 供下拉選單正確選取
         const _curLang = cfg.lang === 'zh' ? 'TW' : cfg.lang === 'en' ? 'EN' : (cfg.lang || 'auto');
@@ -1273,6 +1268,36 @@ import { wpsShareProfile } from './wps-share.js';
         });
         langRow.appendChild(langInfo); langRow.appendChild(langSel);
         wrap.appendChild(langRow);
+        divider();
+
+        // ── Theme Colors (面板底色 / 字體顏色 / 強調色) ──
+        const themeRow = document.createElement('div'); themeRow.className = 'fcm-set-row'; themeRow.style.alignItems = 'flex-start';
+        const themeInfo = document.createElement('div'); themeInfo.style.flex = '1';
+        const themeLbl = document.createElement('div'); themeLbl.className = 'fcm-set-label'; themeLbl.textContent = T('themeColorLabel');
+        const themeNote = document.createElement('div'); themeNote.className = 'fcm-set-note'; themeNote.textContent = T('themeColorNote');
+        const pickers = document.createElement('div'); pickers.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:9px;';
+        const colorField = (labelKey, cfgKey) => {
+            const box = document.createElement('label'); box.style.cssText = 'display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#a090c8;cursor:pointer;';
+            const inp = document.createElement('input'); inp.type = 'color'; inp.value = cfg[cfgKey] || THEME_DEFAULTS[cfgKey];
+            inp.style.cssText = 'width:32px;height:24px;border-radius:6px;border:1px solid #5048a0;background:#1a1030;cursor:pointer;padding:1px;';
+            inp.addEventListener('input', () => { cfg[cfgKey] = inp.value; saveCfg(); applyTheme(); });
+            const span = document.createElement('span'); span.textContent = T(labelKey);
+            box.appendChild(inp); box.appendChild(span); box._inp = inp;
+            return box;
+        };
+        const fPanel = colorField('themePanelColor', 'panelColor');
+        const fFont  = colorField('themeFontColor', 'fontColor');
+        const fAccent = colorField('themeAccentColor', 'accentColor');
+        const themeReset = mkBtn(T('themeReset'), 'fcm-btn', () => {
+            cfg.panelColor = THEME_DEFAULTS.panelColor; cfg.fontColor = THEME_DEFAULTS.fontColor; cfg.accentColor = THEME_DEFAULTS.accentColor;
+            saveCfg(); applyTheme();
+            fPanel._inp.value = THEME_DEFAULTS.panelColor; fFont._inp.value = THEME_DEFAULTS.fontColor; fAccent._inp.value = THEME_DEFAULTS.accentColor;
+        });
+        themeReset.style.cssText = 'font-size:11px;padding:5px 10px;';
+        pickers.appendChild(fPanel); pickers.appendChild(fFont); pickers.appendChild(fAccent); pickers.appendChild(themeReset);
+        themeInfo.appendChild(themeLbl); themeInfo.appendChild(themeNote); themeInfo.appendChild(pickers);
+        themeRow.appendChild(themeInfo);
+        wrap.appendChild(themeRow);
         divider();
 
         // ── Avatars ───────────────────────────────
@@ -1415,6 +1440,10 @@ import { wpsShareProfile } from './wps-share.js';
         // ══════════════════════════════════════════
         sectionHeader(T('setSecChat'));
 
+        // ── Profile 關係人快速搜尋（置於聊天室管理最上方）──
+        buildProfileRelSetting();
+        divider();
+
         // ── Whisper Indicator (color) ─────────────
         const wiWrap = document.createElement('div');
         const wiToggleRow = document.createElement('div'); wiToggleRow.style.cssText = 'display:flex;align-items:center;gap:14px;';
@@ -1469,18 +1498,17 @@ import { wpsShareProfile } from './wps-share.js';
 
         // ── Ghost Hide ────────────────────────────
         wrap.appendChild(settingRow(T('ghostHideLabel'), T('ghostHideNote'), cfg.ghostHide, v => { cfg.ghostHide = v; saveCfg(); applyGhostHide(v); }));
-        divider();
 
-        // ── Profile 關係人快速搜尋 ──────────────────
+        // Profile 關係人快速搜尋：本體以 buildProfileRelSetting() 建立、於「聊天室管理」最上方呼叫（函式宣告會提升）
+        function buildProfileRelSetting() {
+        // 底線染色（邏輯與私聊/BEEP 提示色相同）：預設紫色，可選無色
+        const PRC_DEFAULT = '#8868c0';
         const prRow = settingRow(T('profileRelLabel'), T('profileRelNote'), cfg.profileRelations, v => {
             cfg.profileRelations = v; saveCfg();
         });
-
-        // 底線染色（邏輯與私聊/BEEP 提示色相同）：預設紫色，可選無色
-        const PRC_DEFAULT = '#8868c0';
         const prcColorLabelBtn = document.createElement('span');
         prcColorLabelBtn.style.cssText = 'font-size:11px;color:#a080c8;white-space:nowrap;flex-shrink:0;cursor:pointer;margin-left:auto;';
-        prcColorLabelBtn.textContent = T('profileRelColorLabel');
+        prcColorLabelBtn.textContent = T('colorEditLabel');   // 與私聊提示色共用「修改顏色」字串
         const _prcSwatchBg = c => c
             ? c
             : `#2a2048 linear-gradient(45deg, transparent 46%, #ff4040 46%, #ff4040 54%, transparent 54%)`;
@@ -1529,6 +1557,7 @@ import { wpsShareProfile } from './wps-share.js';
         prRow.appendChild(prcColorLabelBtn); prRow.appendChild(prcColorBtn);
         wrap.appendChild(prRow);
         wrap.appendChild(prcColorPanel);
+        }   // end buildProfileRelSetting
 
         container.appendChild(wrap);
     }

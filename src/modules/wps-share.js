@@ -1,4 +1,5 @@
 import { PDB } from './profile-db.js';
+import { cfg } from './config.js';
 import { T } from './i18n.js';
 // ════════════════════════════════════════
 //  FCM module: wps-share.js
@@ -59,7 +60,9 @@ import { T } from './i18n.js';
                 if (!isSelf && typeof ChatRoomSendLocal === 'function') {
                     ChatRoomSendLocal(T('shareRecvMsg', fromName, `${openToken} ${displayName} (${p.memberNumber})`, seenText), 0);
                 }
-                if (PDB.db) {
+                // 只在有啟用儲存（saveMode !== 'off'）時才寫入 DB；未開 Profiles 者仍可透過
+                // 記憶體快取（_wpsCache）＋下方的「開啟」按鈕檢視分享內容，但不落地儲存。
+                if (PDB.db && cfg.saveMode !== 'off') {
                     const tx = PDB.db.transaction('profiles', 'readwrite');
                     const store = tx.objectStore('profiles');
                     const req = store.get(p.memberNumber);
@@ -98,7 +101,8 @@ import { T } from './i18n.js';
                     if (!payload) return;
                     const p = payload.profile;
                     try { const C = CharacterLoadOnline(JSON.parse(p.characterBundle), p.memberNumber); InformationSheetLoadCharacter(C); } catch {}
-                    if (PDB.db) { const tx = PDB.db.transaction('profiles', 'readwrite'); const store = tx.objectStore('profiles'); const req = store.get(p.memberNumber); req.onsuccess = () => { const local = req.result; if (!local || p.seen > local.seen) store.put(p); }; }
+                    // 檢視恆可（資料已在分享時完整送達、存於記憶體）；僅在啟用儲存時才落地寫入 DB
+                    if (PDB.db && cfg.saveMode !== 'off') { const tx = PDB.db.transaction('profiles', 'readwrite'); const store = tx.objectStore('profiles'); const req = store.get(p.memberNumber); req.onsuccess = () => { const local = req.result; if (!local || p.seen > local.seen) store.put(p); }; }
                 });
             });
         }

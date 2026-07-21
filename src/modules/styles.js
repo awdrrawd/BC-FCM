@@ -1,8 +1,64 @@
-
+import { cfg, THEME_DEFAULTS } from './config.js';
 // ════════════════════════════════════════
 //  FCM module: styles.js
 //  (split from Plugins/liko-FCM.user.js)
 // ════════════════════════════════════════
+
+    // ── 主題顏色覆蓋 ─────────────────────────────────────────────
+    //  由三個基色（面板底色 / 字體顏色 / 強調色）以 color-mix 推導出整套深淺色，
+    //  注入一份 id="fcm-theme" 的覆蓋樣式；三者皆為預設時移除覆蓋、保留原生配色。
+    //  ★ 語意化的關係／權限標籤與彩色按鈕（紅／綠／紫…）刻意不覆蓋，維持辨識度。
+    function applyTheme() {
+        const p = (cfg && cfg.panelColor)  || THEME_DEFAULTS.panelColor;
+        const t = (cfg && cfg.fontColor)   || THEME_DEFAULTS.fontColor;
+        const a = (cfg && cfg.accentColor) || THEME_DEFAULTS.accentColor;
+        let el = document.getElementById('fcm-theme');
+        const isDefault = p === THEME_DEFAULTS.panelColor && t === THEME_DEFAULTS.fontColor && a === THEME_DEFAULTS.accentColor;
+        if (isDefault) { if (el) el.remove(); return; }
+        if (!el) { el = document.createElement('style'); el.id = 'fcm-theme'; document.head.appendChild(el); }
+        const mix = (c1, pct, c2) => `color-mix(in srgb, ${c1} ${pct}%, ${c2})`;
+        const panel2     = mix(p, 88, '#000');          // 稍深：分隔線
+        const panel1     = mix(p, 80, '#000');          // 更深：工具列 / 分頁列 / 計數列底
+        const panelHead  = mix(p, 78, a);               // 帶強調色的表頭
+        const rowHover   = mix(p, 82, a);               // 列 hover
+        const inputBg    = mix(p, 70, '#000');          // 輸入框底
+        const border     = mix(a, 55, '#000');          // 邊框（較深強調色）
+        const borderSoft = mix(a, 40, p);               // 柔邊框
+        const textDim    = mix(t, 62, p);               // 次要文字
+        const accentB    = mix(a, 72, '#fff');          // 亮強調（標題 / 選中分頁）
+        const hdrGrad    = mix(p, 84, a);               // 標題列漸層起點
+        el.textContent = `
+#fcm-panel{background:${p}!important;border-color:${border}!important;color:${t}!important;}
+#fcm-mini{background:${p}!important;border-color:${border}!important;color:${textDim}!important;}
+#fcm-mini:hover{background:${rowHover}!important;border-color:${a}!important;}
+.fcm-mini-pill{background:${border}!important;}
+#fcm-hdr{background:linear-gradient(135deg, ${hdrGrad}, ${p})!important;border-bottom-color:${border}!important;}
+#fcm-title{color:${accentB}!important;}
+.fcm-hbtn{background:${panel1}!important;border-color:${border}!important;color:${textDim}!important;}
+.fcm-hbtn:hover{background:${rowHover}!important;color:${accentB}!important;border-color:${a}!important;}
+#fcm-tabs{background:${panel1}!important;border-bottom-color:${border}!important;}
+.fcm-tab{color:${textDim}!important;}
+.fcm-tab:hover{color:${accentB}!important;background:${rowHover}!important;}
+.fcm-tab.active{color:${accentB}!important;border-bottom-color:${a}!important;background:${p}!important;}
+.fcm-toolbar{background:${panel1}!important;border-bottom-color:${borderSoft}!important;}
+.fcm-subtabs{background:${panel1}!important;border-bottom-color:${borderSoft}!important;}
+.fcm-stab{color:${textDim}!important;}
+.fcm-stab.active{color:${accentB}!important;border-bottom-color:${a}!important;}
+.fcm-count{background:${panel1}!important;color:${textDim}!important;border-top-color:${panel2}!important;}
+.fcm-scroll{background:${p}!important;}
+.fcm-tbl th{background:${panelHead}!important;color:${textDim}!important;border-bottom-color:${border}!important;}
+.fcm-tbl td{border-bottom-color:${panel2}!important;}
+.fcm-row:hover td{background:${rowHover}!important;}
+.fcm-name{color:${t}!important;}
+.fcm-search{background:${inputBg}!important;border-color:${border}!important;color:${t}!important;}
+.fcm-sel{background:${inputBg}!important;border-color:${border}!important;color:${textDim}!important;}
+.fcm-btn{background:${p}!important;border-color:${border}!important;color:${textDim}!important;}
+.fcm-btn:hover{background:${rowHover}!important;border-color:${a}!important;color:${accentB}!important;}
+.fcm-set-label{color:${t}!important;}
+.fcm-set-note{color:${textDim}!important;}
+.fcm-set-desc,.fcm-dbstat{background:${panel1}!important;color:${textDim}!important;}
+`;
+    }
 
     function injectStyles() {
         if (document.getElementById('fcm-css')) return;
@@ -125,6 +181,7 @@
 .fcm-chk-row label.fcm-chk-disabled{color:#ff8080;}
         `;
         document.head.appendChild(s);
+        applyTheme();   // 套用使用者主題顏色（若非預設）
     }
 
-export { injectStyles };
+export { injectStyles, applyTheme };

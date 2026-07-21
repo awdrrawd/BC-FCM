@@ -47,6 +47,8 @@ const MOD_VER = (typeof __FCM_VERSION__ !== 'undefined' && __FCM_VERSION__) || '
     // ═══════════════════════════════════════════════════════════
     //  SETTINGS
     // ═══════════════════════════════════════════════════════════
+    // 主題顏色預設值（＝原本精心調校的深紫配色）；三者皆為預設時不套用覆蓋、保留原生外觀
+    const THEME_DEFAULTS = { panelColor: '#1e1635', fontColor: '#f0e4ff', accentColor: '#a078e8' };
     let cfg = {
         avatars: false, lang: 'auto', saveMode: 'off',
         whisperIndicator: false, whisperColor: '#b070e8',
@@ -58,8 +60,12 @@ const MOD_VER = (typeof __FCM_VERSION__ !== 'undefined' && __FCM_VERSION__) || '
         btnShowProfile: true,
         profileRelations: false,
         profileRelColor: '#8868c0',   // Profile 關係人快速搜尋：底線顏色（null = 無色/不畫底線）
+        // ── 主題顏色（面板底色 / 字體顏色 / 強調色）──
+        panelColor: THEME_DEFAULTS.panelColor,
+        fontColor: THEME_DEFAULTS.fontColor,
+        accentColor: THEME_DEFAULTS.accentColor,
     };
     function loadCfg() { try { const s = localStorage.getItem('LikoFCM'); if (s) Object.assign(cfg, JSON.parse(s)); } catch {} }
     function saveCfg() { try { localStorage.setItem('LikoFCM', JSON.stringify(cfg)); } catch {} }
 
-export { FCM_ALREADY_LOADED, MOD_VER, modApi, BTN_X, BTN_Y, BTN_W, BTN_H, FCM_ICON_SVG, _fcmIconImg, cfg, loadCfg, saveCfg };
+export { FCM_ALREADY_LOADED, MOD_VER, modApi, BTN_X, BTN_Y, BTN_W, BTN_H, FCM_ICON_SVG, _fcmIconImg, cfg, loadCfg, saveCfg, THEME_DEFAULTS };

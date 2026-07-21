@@ -137,7 +137,7 @@ import { inRoomFn } from './data.js';
     async function _processAvQueue() {
         if (_avBusy || _avQueue.length === 0) return;
         _avBusy = true;
-        function updateStatus() { const n = _avQueue.length + 1; if (_avStatusEl) _avStatusEl.textContent = T('reloadStatus', n); }
+        function updateStatus() { const n = _avQueue.length + 1; if (_avStatusEl) _avStatusEl.textContent = T('reloadStatusLoading', n); }
         while (_avQueue.length > 0) {
             const { mn, profile, onDone } = _avQueue.shift();
             updateStatus();
@@ -148,7 +148,7 @@ import { inRoomFn } from './data.js';
             await new Promise(r => setTimeout(r, 80));
         }
         _avBusy = false;
-        if (_avStatusEl) { _avStatusEl.textContent = T('reloadStatus', 0); setTimeout(() => { if (_avStatusEl) _avStatusEl.textContent = ''; }, 3000); }
+        if (_avStatusEl) { _avStatusEl.textContent = T('reloadStatusDone'); setTimeout(() => { if (_avStatusEl) _avStatusEl.textContent = ''; }, 3000); }
     }
 
     async function loadAvatarFromBundle(mn, profile) {
