@@ -619,15 +619,16 @@ import { wpsShareProfile } from './wps-share.js';
                     const boxTitle = document.createElement('div'); boxTitle.className = 'fcm-unknown-id-title';
                     boxTitle.textContent = T('peopleUnknownId', mn);
                     box.appendChild(boxTitle);
-                    const allBtns = buildPersonOps(mn, { isInRoom: inRoomFn(mn), oneSided: true });
+                    // buildPersonOps 回傳 { actions, manage } 兩組按鈕；這裡把它們攤平到同一列
+                    const { actions: uActions, manage: uManage } = buildPersonOps(mn, { isInRoom: inRoomFn(mn), oneSided: true });
+                    const allBtns = document.createElement('div'); allBtns.className = 'fcm-btns'; allBtns.style.flexWrap = 'wrap';
+                    Array.from(uActions.children).forEach(b => allBtns.appendChild(b));
+                    Array.from(uManage.children).forEach(b => allBtns.appendChild(b));
                     // 如果在房間裡，把房管按鈕直接加到同一個 fcm-btns div
                     if (typeof ChatRoomData !== 'undefined' && ChatRoomData) {
                         const sep = document.createElement('span');
                         sep.style.cssText = 'display:inline-block;width:1px;height:14px;background:#3a2870;margin:0 6px;vertical-align:middle;';
                         allBtns.appendChild(sep);
-                        const boxMgmtWrap = document.createElement('div');
-                        boxMgmtWrap.className = 'fcm-td-mgmt' + (amAdmin() ? '' : ' no-perm');
-                        boxMgmtWrap.style.display = 'contents'; // 讓子元素直接流入父 flex
                         const boxMb = buildMgmtBtns(mn, 'people');
                         if (boxMb) {
                             // 把 boxMb 裡的按鈕一個個搬進 allBtns
