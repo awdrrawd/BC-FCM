@@ -27,6 +27,9 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
         const textDim    = mix(t, 62, p);               // 次要文字
         const accentB    = mix(a, 72, '#fff');          // 亮強調（標題 / 選中分頁）
         const hdrGrad    = mix(p, 84, a);               // 標題列漸層起點
+        // 只主題化「純色」按鈕（查看／悄悄話／重新整理…）；語意化的彩色按鈕
+        //  （私訊藍／好友綠／黑單紅／幽靈紫／管理橘…）排除在外，保留辨識色。
+        const _plainBtn = ':not(.fcm-btn-red):not(.fcm-btn-green):not(.fcm-btn-purple):not(.fcm-btn-blue):not(.fcm-btn-orange)';
         el.textContent = `
 #fcm-panel{background:${p}!important;border-color:${border}!important;color:${t}!important;}
 #fcm-mini{background:${p}!important;border-color:${border}!important;color:${textDim}!important;}
@@ -52,8 +55,8 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-name{color:${t}!important;}
 .fcm-search{background:${inputBg}!important;border-color:${border}!important;color:${t}!important;}
 .fcm-sel{background:${inputBg}!important;border-color:${border}!important;color:${textDim}!important;}
-.fcm-btn{background:${p}!important;border-color:${border}!important;color:${textDim}!important;}
-.fcm-btn:hover{background:${rowHover}!important;border-color:${a}!important;color:${accentB}!important;}
+.fcm-btn${_plainBtn}{background:${p}!important;border-color:${border}!important;color:${textDim}!important;}
+.fcm-btn${_plainBtn}:hover{background:${rowHover}!important;border-color:${a}!important;color:${accentB}!important;}
 .fcm-set-label{color:${t}!important;}
 .fcm-set-note{color:${textDim}!important;}
 .fcm-set-desc,.fcm-dbstat{background:${panel1}!important;color:${textDim}!important;}
