@@ -1,12 +1,12 @@
 // ════════════════════════════════════════
 //  FCM entry (bundled by vite → assets/main.js)
 //  Loader (loader.user.js / loader.local.user.js) dynamically imports this file.
-//  Splits the former single-file userscript (Plugins/liko-FCM.user.js) into ./modules/*.js.
+//  Splits the former single-file userscript (Plugins/liko-FCM.user.js) into ./{core,panel,chat,data,i18n}/*.js.
 // ════════════════════════════════════════
 
-import { MOD_VER, FCM_ALREADY_LOADED } from './modules/config.js';
-import { openPanel, closePanel, togglePanel } from './modules/panel.js';
-import { init } from './modules/core-init.js';
+import { MOD_VER, FCM_ALREADY_LOADED } from './core/config.js';
+import { openPanel, closePanel, togglePanel } from './panel/panel.js';
+import { init } from './core/core-init.js';
 
 window.Liko = window.Liko ?? {};
 

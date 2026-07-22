@@ -14,7 +14,7 @@ const MOD_VER = (typeof __FCM_VERSION__ !== 'undefined' && __FCM_VERSION__) || '
     const modApi = FCM_ALREADY_LOADED
         ? createNoopModApi()
         : bcModSdk.registerMod({
-            name: 'Liko - FCM', fullName: 'Liko - Friends and ChatRoom Manager', version: MOD_VER,
+            name: 'Liko - FCM', fullName: 'Friends and ChatRoom Manager', version: MOD_VER, repository: "https://github.com/awdrrawd/BC-FCM"
         });
     function createNoopModApi() {
         return {

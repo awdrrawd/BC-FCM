@@ -1,7 +1,7 @@
-import { T } from './i18n.js';
-import { PDB } from './profile-db.js';
-import { amAdmin, inRoomFn, getDisplayName, isFriendOf } from './data.js';
-import { renderCurrent, minimizePanel, closePanel } from './panel.js';
+import { T } from '../i18n/i18n.js';
+import { PDB } from '../data/profile-db.js';
+import { amAdmin, inRoomFn, getDisplayName, isFriendOf } from '../data/data.js';
+import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
 // ════════════════════════════════════════
 //  FCM module: actions.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -118,20 +118,24 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
     }
     function doRemoveFriend(mn) { mn = parseInt(mn); if (typeof ChatRoomListManipulation === 'function') { ChatRoomListManipulation(Player.FriendList, false, mn.toString()); setTimeout(renderCurrent, 400); } }
 
+    // 實際加入房間（無確認）。供簡易確認（navigateToRoom）與詳細資訊確認（showRoomJoinConfirm）共用。
+    function _doJoinRoom(roomName) {
+        // Blur all FCM search inputs to prevent their keydown handlers from
+        // leaking Enter/Shift+Enter events into the new room context (Nami bug fix)
+        document.querySelectorAll('.fcm-search, .fcm-room-search').forEach(el => el.blur());
+        closePanel();
+        try {
+            if (typeof ChatRoomLeave === 'function') ChatRoomLeave();
+            if (typeof CommonSetScreen === 'function') CommonSetScreen('Online', 'ChatSearch');
+            try { ChatSearchLastQueryJoinTime = typeof CommonTime === 'function' ? CommonTime() : Date.now(); } catch {}
+            try { ChatSearchLastQueryJoin = roomName; } catch {}
+            ServerSend('ChatRoomJoin', { Name: roomName });
+        } catch (e) { console.warn('🐈‍⬛ [FCM] joinRoom:', e); }
+    }
+
+    // 只知道房名時的簡易文字確認（例如好友列表的房間連結）。
     function navigateToRoom(roomName) {
-        showConfirm(T('confirmRoom', roomName), () => {
-            // Blur all FCM search inputs to prevent their keydown handlers from
-            // leaking Enter/Shift+Enter events into the new room context (Nami bug fix)
-            document.querySelectorAll('.fcm-search, .fcm-room-search').forEach(el => el.blur());
-            closePanel();
-            try {
-                if (typeof ChatRoomLeave === 'function') ChatRoomLeave();
-                if (typeof CommonSetScreen === 'function') CommonSetScreen('Online', 'ChatSearch');
-                try { ChatSearchLastQueryJoinTime = typeof CommonTime === 'function' ? CommonTime() : Date.now(); } catch {}
-                try { ChatSearchLastQueryJoin = roomName; } catch {}
-                ServerSend('ChatRoomJoin', { Name: roomName });
-            } catch (e) { console.warn('🐈‍⬛ [FCM] navigateToRoom:', e); }
-        }, T('roomGo'));
+        showConfirm(T('confirmRoom', roomName), () => _doJoinRoom(roomName), T('roomGo'));
     }
 
     // ── Bug fix: showConfirm — stopPropagation on Enter to prevent
@@ -289,7 +293,10 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
         const sharer = (Player && (Player.Nickname || Player.Name)) || String(Player?.MemberNumber);
         const priv = _roomIsPrivate(room) ? `(${T('roomPrivateLabel')})` : '';
         const typeLbl = _roomTypeLabel(room); const typeTag = typeLbl ? `(${typeLbl})` : '';
-        const line2 = `${room.Name} - ${room.Creator || '?'} ${priv}${typeTag}`.trim();
+        const mc = room.MemberCount ?? room.NbMember ?? null;
+        const ml = room.MemberLimit ?? room.Limit ?? null;
+        const cStr = mc !== null ? ` (${mc}${ml !== null ? '/' + ml : ''})` : '';
+        const line2 = `${room.Name} - ${room.Creator || '?'}${cStr} ${priv}${typeTag}`.trim();
         const desc = (room.Description || '').trim();
         const systemMessage = T('roomShareIntro', sharer) + '\n' + line2 + (desc ? '\n' + desc : '');
         try {
@@ -297,7 +304,9 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
                 Type: 'Action', Content: 'CUSTOM_SYSTEM_ACTION',
                 Dictionary: [
                     { Tag: SYS_ACTION_TAG, Text: systemMessage },     // 顯示文字（所有人可見）
-                    { Tag: ROOMSHARE_TAG, Room: room.Name },          // 隱藏屬性：FCM 專屬（無 Text，BC 會忽略）
+                    // 隱藏屬性：FCM 專屬（無 Text，BC 會忽略但會原樣轉發給其他 FCM 使用者）
+                    { Tag: ROOMSHARE_TAG, Room: room.Name, Sharer: sharer, Creator: room.Creator || '',
+                        Count: mc, Limit: ml, Desc: desc, Priv: _roomIsPrivate(room) ? 1 : 0, Type: typeLbl || '' },
                 ],
             });
             if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('roomShareLocalDone', room.Name), 5000);
@@ -306,19 +315,140 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
 
     // 接收端（FCM 專屬）：把「這一則」剛渲染好的 Action 訊息就地轉換成資訊卡，
     //  右下角加「加入房間」。沒插件的人讀不到 ROOMSHARE_TAG，只會看到普通系統訊息。
-    function _mkRoomJoinBtn(roomName) {
+    function _mkRoomJoinBtn(info) {
         const b = document.createElement('button');
-        b.style.cssText = 'padding:5px 16px;background:#1a3860;color:#90d0ff;border:1px solid #4090d8;border-radius:6px;cursor:pointer;font-size:.9em;font-weight:700;white-space:nowrap;';
+        b.style.cssText = 'padding:6px 20px;background:#1a3860;color:#90d0ff;border:1px solid #4090d8;border-radius:6px;cursor:pointer;font-size:.9em;font-weight:700;white-space:nowrap;';
         b.textContent = '🚪 ' + T('roomJoinRoomBtn');
-        b.addEventListener('click', () => navigateToRoom(roomName));
+        // 點加入 → 先跳出詳細資訊確認框（房名／作者／人數／資訊），再實際加入
+        b.addEventListener('click', () => showRoomJoinConfirm(info));
         return b;
     }
+
+    // 房間資訊卡的內文（房名-作者 ┄ 人數 ／ 資訊描述），不含按鈕。
+    //  聊天室房卡與「加入房間」確認框共用。
+    //  pending=true 時（資料尚在載入）：未知的人數／描述顯示淡色「⋯」佔位，載入後由外層抽換。
+    function _buildRoomDetail(info, pending) {
+        const detail = document.createElement('div');
+        detail.style.cssText = 'display:flex;flex-direction:column;gap:8px;min-width:0;';
+
+        // 標題列：左＝房名-作者(＋私人/類型標籤)，右＝人數
+        const head = document.createElement('div');
+        head.style.cssText = 'display:flex;align-items:baseline;justify-content:space-between;gap:12px;';
+        const titleWrap = document.createElement('div');
+        titleWrap.style.cssText = 'min-width:0;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;';
+        const nameEl = document.createElement('span');
+        nameEl.style.cssText = 'color:#e8c8ff;font-size:1.05em;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px;';
+        nameEl.textContent = info.room; nameEl.title = info.room;
+        titleWrap.appendChild(nameEl);
+        if (info.creator) { const cr = document.createElement('span'); cr.style.cssText = 'color:#c8a0e8;font-size:.95em;font-weight:600;'; cr.textContent = '- ' + info.creator; titleWrap.appendChild(cr); }
+        if (info.priv) { const pv = document.createElement('span'); pv.style.cssText = 'font-size:.72em;background:#2a1048;border:1px solid #8060b0;color:#c090f0;border-radius:6px;padding:1px 6px;'; pv.textContent = T('roomPrivateLabel'); titleWrap.appendChild(pv); }
+        if (info.type) { const tp = document.createElement('span'); tp.style.cssText = 'font-size:.72em;background:#182a1a;border:1px solid #3a7048;color:#78d090;border-radius:5px;padding:1px 6px;'; tp.textContent = info.type; titleWrap.appendChild(tp); }
+        head.appendChild(titleWrap);
+        const cntEl = document.createElement('span');
+        cntEl.style.cssText = 'color:#90d0ff;font-size:.95em;font-weight:700;white-space:nowrap;flex-shrink:0;';
+        if (info.count != null) cntEl.textContent = `👥 ${info.count}${info.limit != null ? '/' + info.limit : ''}`;
+        else if (pending) { cntEl.textContent = '⋯'; cntEl.style.opacity = '.4'; }
+        head.appendChild(cntEl);
+        detail.appendChild(head);
+
+        // 資訊（描述）：有才顯示；pending 時保留一列淡色佔位，過長時卡內捲動
+        if (info.desc || pending) {
+            const body = document.createElement('div');
+            body.style.cssText = 'color:#b8a8d8;font-size:.9em;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:120px;overflow-y:auto;border-top:1px solid #3a2a5a;border-bottom:1px solid #3a2a5a;padding:6px 0;';
+            if (info.desc) body.textContent = info.desc;
+            else { body.textContent = '⋯'; body.style.opacity = '.4'; }
+            detail.appendChild(body);
+        }
+        return detail;
+    }
+
+    // 依 ROOMSHARE_TAG 攜帶的欄位組出結構化房卡（內文＋右下「前往房間」按鈕）。
+    function _buildRoomShareCard(info) {
+        const card = document.createElement('div');
+        card.style.cssText = 'display:flex;flex-direction:column;gap:8px;min-width:0;';
+        card.appendChild(_buildRoomDetail(info));
+        const foot = document.createElement('div');
+        foot.style.cssText = 'display:flex;justify-content:flex-end;';
+        foot.appendChild(_mkRoomJoinBtn(info));
+        card.appendChild(foot);
+        return card;
+    }
+
+    // 「加入房間」詳細資訊確認框：顯示房名／作者／人數／資訊，確認後才實際加入。
+    //  分享房卡與房間搜尋頁的「加入」按鈕共用。
+    //  infoPromise（選填）：資料尚未齊全時傳入，會先以 info 立即開框（其餘欄位顯示佔位），
+    //  待 Promise 解析出完整 info 後就地抽換內容。使用者可在載入完成前就按「加入」。
+    function showRoomJoinConfirm(info, infoPromise) {
+        if (!info || !info.room) return;
+        const ex = document.getElementById('fcm-confirm-overlay'); if (ex) ex.remove();
+        const overlay = document.createElement('div'); overlay.id = 'fcm-confirm-overlay';
+        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center;';
+        const box = document.createElement('div');
+        box.style.cssText = 'background:rgb(36,24,64);border:2px solid rgb(112,96,192);border-radius:14px;padding:28px 24px;width:min(380px,88vw);box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:20px;font-family:-apple-system,sans-serif;';
+        box.addEventListener('click', e => e.stopPropagation());
+        const detailWrap = document.createElement('div');
+        detailWrap.appendChild(_buildRoomDetail(info, !!infoPromise));
+        box.appendChild(detailWrap);
+        // 完整資料回來後就地抽換（若對話框已關閉則忽略）
+        if (infoPromise) {
+            Promise.resolve(infoPromise)
+                .then(full => { if (overlay.isConnected) detailWrap.replaceChildren(_buildRoomDetail((full && full.room) ? full : info, false)); })
+                .catch(() => { if (overlay.isConnected) detailWrap.replaceChildren(_buildRoomDetail(info, false)); });
+        }
+
+        const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex;gap:12px;';
+        const cancelBtn = document.createElement('button'); cancelBtn.textContent = T('btnCancel');
+        cancelBtn.style.cssText = 'flex:1;padding:12px;background:#1e1635;border:1.5px solid #5a48a8;border-radius:10px;color:#c4a0e0;font-size:13px;cursor:pointer;font-weight:600;';
+        cancelBtn.addEventListener('click', () => { cleanup(); overlay.remove(); });
+        const okBtn = document.createElement('button'); okBtn.textContent = '🚪 ' + T('roomJoinRoomBtn');
+        okBtn.style.cssText = 'flex:2;padding:12px;background:#1a3060;border:1.5px solid #4080d8;border-radius:10px;color:#90c8ff;font-size:13px;cursor:pointer;font-weight:700;';
+        let _confirmed = false;
+        okBtn.addEventListener('click', () => { if (_confirmed) return; _confirmed = true; cleanup(); overlay.remove(); _doJoinRoom(info.room); });
+
+        const keyFn = e => {
+            e.stopPropagation();
+            if (e.key === 'Escape') { cleanup(); overlay.remove(); }
+            if (e.key === 'Enter') { if (_confirmed) return; _confirmed = true; cleanup(); overlay.remove(); _doJoinRoom(info.room); }
+        };
+        function cleanup() { document.removeEventListener('keydown', keyFn, true); }
+        document.addEventListener('keydown', keyFn, true);
+        overlay.addEventListener('click', () => { cleanup(); overlay.remove(); });
+        btnRow.appendChild(cancelBtn); btnRow.appendChild(okBtn);
+        box.appendChild(btnRow);
+        overlay.appendChild(box); document.body.appendChild(overlay); setTimeout(() => okBtn.focus(), 50);
+    }
+
+    function _roomShareInfoFromEntry(entry) {
+        return {
+            room: entry.Room,
+            creator: entry.Creator || '',
+            count: (entry.Count != null) ? entry.Count : null,
+            limit: (entry.Limit != null) ? entry.Limit : null,
+            desc: (entry.Desc || '').trim(),
+            priv: !!entry.Priv,
+            type: entry.Type || '',
+        };
+    }
+
+    // 由房間搜尋結果物件組出 showRoomJoinConfirm 需要的 info 形狀。
+    function roomInfoFromResult(room) {
+        return {
+            room: room.Name,
+            creator: room.Creator || '',
+            count: room.MemberCount ?? room.NbMember ?? null,
+            limit: room.MemberLimit ?? room.Limit ?? null,
+            desc: (room.Description || '').trim(),
+            priv: _roomIsPrivate(room),
+            type: _roomTypeLabel(room),
+        };
+    }
+
     function handleIncomingRoomShare(data) {
         try {
             const entry = (data.Dictionary || []).find(e => e && e.Tag === ROOMSHARE_TAG);
             if (!entry || !entry.Room) return;
             // 自己分享的也一併轉成房卡（含加入按鈕）
-            const roomName = entry.Room;
+            const info = _roomShareInfoFromEntry(entry);
             // 找出剛剛（next(args) 已同步渲染）這則 Action 訊息元素
             const log = document.getElementById('TextAreaChatLog');
             let msgEl = null;
@@ -328,22 +458,25 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
             }
             if (msgEl) {
                 msgEl.dataset.fcmRoomshare = '1';
-                // 就地套上資訊卡外觀
+                // 就地換成結構化房卡外觀（清掉原本純文字，改用房卡）
                 msgEl.style.background = 'rgba(40,15,55,.55)';
                 msgEl.style.border = '1px solid #6a4da8';
                 msgEl.style.borderRadius = '8px';
-                msgEl.style.padding = '8px 12px';
+                msgEl.style.padding = '10px 12px';
                 msgEl.style.textAlign = 'left';
-                const foot = document.createElement('div');
-                foot.style.cssText = 'display:flex;justify-content:flex-end;margin-top:6px;';
-                foot.appendChild(_mkRoomJoinBtn(roomName));
-                msgEl.appendChild(foot);
+                msgEl.innerHTML = '';
+                if (entry.Sharer) {
+                    const intro = document.createElement('div');
+                    intro.style.cssText = 'color:#a890c8;font-size:.82em;margin-bottom:6px;';
+                    intro.textContent = T('roomShareIntro', entry.Sharer);
+                    msgEl.appendChild(intro);
+                }
+                msgEl.appendChild(_buildRoomShareCard(info));
             } else {
                 // 退回：找不到訊息元素（例如沙盒環境）→ 疊一張獨立卡片
                 const uiId = 'fcm-roomjoin-' + data.Sender + '-' + Date.now().toString(36);
                 const el = _appendChatCard(uiId); if (!el) return;
-                const row = document.createElement('div'); row.style.cssText = 'display:flex;justify-content:flex-end;';
-                row.appendChild(_mkRoomJoinBtn(roomName)); el.appendChild(row);
+                el.appendChild(_buildRoomShareCard(info));
             }
             _scrollChatToEnd();
         } catch (e) { console.warn('🐈‍⬛ [FCM] handleIncomingRoomShare:', e); }
@@ -377,4 +510,4 @@ import { renderCurrent, minimizePanel, closePanel } from './panel.js';
     }
 
 export { roomOp, doView, doBeep, doWhisper, doAddFriend, doToggleList, doRemoveFriend, navigateToRoom, showConfirm, makeIdCell,
-         showAddFriendConfirm, shareRoomToChat, handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_BEEP, ROOMSHARE_TAG };
+         showAddFriendConfirm, shareRoomToChat, showRoomJoinConfirm, roomInfoFromResult, handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_BEEP, ROOMSHARE_TAG };

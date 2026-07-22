@@ -1,7 +1,7 @@
-import { cfg } from './config.js';
-import { _getWhisperTargetMN, getDisplayName, inRoomFn } from './data.js';
-import { Snapshot } from './profile-db.js';
-import { T } from './i18n.js';
+import { cfg } from '../core/config.js';
+import { _getWhisperTargetMN, getDisplayName, inRoomFn } from '../data/data.js';
+import { Snapshot } from '../data/profile-db.js';
+import { T } from '../i18n/i18n.js';
 // ════════════════════════════════════════
 //  FCM module: chat-fx.js
 //  (split from Plugins/liko-FCM.user.js)

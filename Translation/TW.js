@@ -108,7 +108,7 @@
         "confirmRoom": { "TW": "🚪 前往房間「{0}」？" },
         "confirmAddBan": { "TW": "確定將「{0}」加入黑名單？\n對方將無法與你互動。" },
         "confirmAddGhost": { "TW": "確定將「{0}」加入幽靈名單？\n你將不會再收到任何該玩家的信息。" },
-        "tabRoomSearch": { "TW": "查詢房間" },
+        "tabRoomSearch": { "TW": "房間查詢" },
         "roomSearch2": { "TW": "搜尋房間..." },
         "roomSearchBtn": { "TW": "搜尋" },
         "roomSearching": { "TW": "搜尋中..." },

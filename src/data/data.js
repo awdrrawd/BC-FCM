@@ -1,4 +1,4 @@
-import { T } from './i18n.js';
+import { T } from '../i18n/i18n.js';
 import { _pc } from './profile-db.js';
 // ════════════════════════════════════════
 //  FCM module: data.js

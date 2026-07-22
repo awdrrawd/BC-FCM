@@ -1,10 +1,10 @@
 import { modApi, cfg, BTN_X, BTN_Y, BTN_W, BTN_H, _fcmIconImg } from './config.js';
-import { setOnlineFriends } from './data.js';
-import { PDB, _captureSnapshotDelayed } from './profile-db.js';
-import { renderCurrent, panelOpen, panelMini, uiTab, buildPanel, togglePanel, closePanel, openPanel, openPeopleSearch } from './panel.js';
-import { _applyWhisperStyle, _updateWhisperAvatar, _drawWavOnCanvas } from './chat-fx.js';
-import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from './wps-share.js';
-import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_BEEP, ROOMSHARE_TAG } from './actions.js';
+import { setOnlineFriends } from '../data/data.js';
+import { PDB, _captureSnapshotDelayed } from '../data/profile-db.js';
+import { renderCurrent, panelOpen, panelMini, uiTab, buildPanel, togglePanel, closePanel, openPanel, openPeopleSearch } from '../panel/panel.js';
+import { _applyWhisperStyle, _updateWhisperAvatar, _drawWavOnCanvas } from '../chat/chat-fx.js';
+import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from '../chat/wps-share.js';
+import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_BEEP, ROOMSHARE_TAG } from '../chat/actions.js';
 // ════════════════════════════════════════
 //  FCM module: hooks.js
 //  (split from Plugins/liko-FCM.user.js)

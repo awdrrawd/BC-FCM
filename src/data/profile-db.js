@@ -1,5 +1,5 @@
-import { cfg } from './config.js';
-import { T } from './i18n.js';
+import { cfg } from '../core/config.js';
+import { T } from '../i18n/i18n.js';
 import { inRoomFn } from './data.js';
 // ════════════════════════════════════════
 //  FCM module: profile-db.js

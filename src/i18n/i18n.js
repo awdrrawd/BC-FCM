@@ -1,4 +1,4 @@
-import { cfg } from './config.js';
+import { cfg } from '../core/config.js';
 import './i18n-engine.js';     // 執行共用引擎 IIFE：window.Liko.__Sys_i18n__ / __Sys_L10N__（自帶防重載）
 import './i18n-fallback.js';   // 內建後備字庫（TW+EN）同步註冊，離線／fetch 失敗時可用
 // ════════════════════════════════════════

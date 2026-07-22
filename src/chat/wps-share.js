@@ -1,6 +1,6 @@
-import { PDB } from './profile-db.js';
-import { cfg } from './config.js';
-import { T } from './i18n.js';
+import { PDB } from '../data/profile-db.js';
+import { cfg } from '../core/config.js';
+import { T } from '../i18n/i18n.js';
 // ════════════════════════════════════════
 //  FCM module: wps-share.js
 //  (split from Plugins/liko-FCM.user.js)

@@ -1,4 +1,4 @@
-import { cfg, THEME_DEFAULTS } from './config.js';
+import { cfg, THEME_DEFAULTS } from '../core/config.js';
 // ════════════════════════════════════════
 //  FCM module: styles.js
 //  (split from Plugins/liko-FCM.user.js)

@@ -108,7 +108,7 @@
         "confirmRoom": { "CN": "🚪 前往房间「{0}」？" },
         "confirmAddBan": { "CN": "确定将「{0}」加入黑名单？\n对方将无法与你互动。" },
         "confirmAddGhost": { "CN": "确定将「{0}」加入幽灵名单？\n你将不会再收到任何该玩家的信息。" },
-        "tabRoomSearch": { "CN": "查询房间" },
+        "tabRoomSearch": { "CN": "房间查询" },
         "roomSearch2": { "CN": "搜索房间..." },
         "roomSearchBtn": { "CN": "搜索" },
         "roomSearching": { "CN": "搜索中..." },

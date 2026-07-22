@@ -1,8 +1,8 @@
 import { MOD_VER, cfg, loadCfg } from './config.js';
-import { ensureI18n } from './i18n.js';
-import { PDB, Snapshot, detectWCESave } from './profile-db.js';
-import { buildPanel, registerCommand } from './panel.js';
-import { _installOocProtect } from './chat-fx.js';
+import { ensureI18n } from '../i18n/i18n.js';
+import { PDB, Snapshot, detectWCESave } from '../data/profile-db.js';
+import { buildPanel, registerCommand } from '../panel/panel.js';
+import { _installOocProtect } from '../chat/chat-fx.js';
 import { registerHooks } from './hooks.js';
 // ════════════════════════════════════════
 //  FCM module: core-init.js
