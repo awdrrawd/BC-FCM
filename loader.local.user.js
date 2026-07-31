@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         本地測試 - FCM
 // @namespace    https://github.com/awdrrawd/BC-FCM
-// @version      0.1
+// @version      1.5.3
 // @description  FCM 本地開發載入器
 // @author       Likolisu
 // @supportURL   https://github.com/awdrrawd/BC-FCM

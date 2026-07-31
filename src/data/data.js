@@ -9,7 +9,24 @@ import { _pc } from './profile-db.js';
     // ═══════════════════════════════════════════════════════════
     //  DATA HELPERS
     // ═══════════════════════════════════════════════════════════
-    function parseAFC() { try { let afc = Player && Player.ExtensionSettings && Player.ExtensionSettings.AFC; if (!afc) return []; if (typeof afc === 'string') afc = JSON.parse(afc); return (afc.l || []).map(e => ({ MemberNumber: parseInt(e[0]), Name: e[1] || '', addedAt: e[3] || 0 })); } catch { return []; } }
+    // AFC 戀人清單：優先用 AFC 公開 API（window.Liko.AFC）；退而讀 OnlineSharedSettings.AFC.lovers；
+    //  最後才回退舊版 ExtensionSettings.AFC.l（AFC v0.7.0 起戀人已不存於此，僅為相容舊資料）。
+    function parseAFC() {
+        try {
+            const A = window.Liko && window.Liko.AFC;
+            if (A && typeof A.getLovers === 'function') {
+                return A.getLovers().map(e => ({ MemberNumber: parseInt(e.memberNumber), Name: e.name || '', addedAt: e.startDate || 0 }));
+            }
+            const shared = Player && Player.OnlineSharedSettings && Player.OnlineSharedSettings.AFC;
+            if (shared && Array.isArray(shared.lovers)) {
+                return shared.lovers.map(e => ({ MemberNumber: parseInt(e.memberNumber), Name: e.name || '', addedAt: e.startDate || 0 }));
+            }
+            let afc = Player && Player.ExtensionSettings && Player.ExtensionSettings.AFC;
+            if (!afc) return [];
+            if (typeof afc === 'string') afc = JSON.parse(afc);
+            return (afc.l || []).map(e => ({ MemberNumber: parseInt(e[0]), Name: e[1] || '', addedAt: e[3] || 0 }));
+        } catch { return []; }
+    }
     function getSubSet() {
         const s = new Set();
         try { const list = Player && Player.SubmissivesList; if (list) { const arr = Array.isArray(list) ? list : (list instanceof Set ? Array.from(list) : []); arr.forEach(x => { const mn = parseInt(typeof x === 'object' ? (x.MemberNumber || x) : x); if (mn) s.add(mn); }); } } catch {}
@@ -134,7 +151,15 @@ import { _pc } from './profile-db.js';
         // 依 BC ServerFriendInfo：房間人數/上限已隨線上好友資料一併回傳，直接採用可省去額外查詢
         const mc = f.ChatRoomMemberCount ?? null, ml = f.ChatRoomLimit ?? null;
         if (f.ChatRoomName) return { name: f.ChatRoomName, isPrivate: !!(f.Private), isCurrent: false, memberCount: mc, memberLimit: ml };
-        if (f.Private) return { name: null, isPrivate: true, isCurrent: false };
+        if (f.Private) {
+            // 私人房伺服器隱藏房名；若對方是 AFC 戀人且已分享房名，改用 AFC 公開 API 取得 → 可顯示並加入
+            try {
+                const lr = window.Liko && window.Liko.AFC && typeof window.Liko.AFC.getLoverRoom === 'function'
+                    ? window.Liko.AFC.getLoverRoom(mn) : null;
+                if (lr && lr.ChatRoomName) return { name: lr.ChatRoomName, isPrivate: true, isCurrent: false, memberCount: mc, memberLimit: ml };
+            } catch {}
+            return { name: null, isPrivate: true, isCurrent: false };
+        }
         return null;
     }
     function getRoomName(mn) { const r = getRoomInfo(mn); return r ? r.name : null; }
