@@ -98,7 +98,7 @@ async function renderFriends(container, _myToken) {
     const tbl = document.createElement('table'); tbl.className = 'fcm-tbl';
     const thRow = document.createElement('tr');
     // 個人關係頁無悄悄話，動作僅查看／私訊兩顆，動作欄不設 min-width 交由內容決定。
-    [['', 'width:42px'], [T('colName'), 'width:160px;min-width:160px', 'fcm-th-left'], [T('colId'), ''], [T('colRel'), ''], [T('colZone'), ''], [T('colRoom'), 'min-width:100px'], [T('colOps'), ''], [T('colManage'), 'min-width:130px']].forEach(([text, style, cls]) => {
+    [['', 'width:42px'], [T('colName'), 'width:160px;min-width:160px', 'fcm-th-left'], [T('colId'), ''], [T('colRel'), 'width:70px;min-width:70px'], [T('colZone'), ''], [T('colRoom'), 'min-width:100px'], [T('colOps'), ''], [T('colManage'), 'min-width:130px']].forEach(([text, style, cls]) => {
         const th = document.createElement('th'); th.textContent = text; if (style) th.style.cssText = style; if (cls) th.className = cls; thRow.appendChild(th);
     });
     if (inARoom) { const th = document.createElement('th'); th.textContent = isAdmin ? T('colMgmt') : T('colMgmtNoPerm'); th.className = (isAdmin ? 'fcm-th-mgmt' : 'fcm-th-mgmt-off'); th.style.cssText = 'min-width:140px;max-width:155px;width:150px;'; thRow.appendChild(th); }
@@ -116,7 +116,7 @@ async function renderFriends(container, _myToken) {
         const sd = document.createElement('div'); sd.className = 'fcm-sta ' + (online ? 'fcm-online' : 'fcm-offline'); sd.textContent = online ? T('online') : T('offline');
         nameTd.appendChild(nd); nameTd.appendChild(sd); tr.appendChild(nameTd);
         tr.appendChild(makeIdCell(f.mn));
-        const relTd = document.createElement('td'); relTd.style.textAlign = 'center'; relTd.style.minWidth = '60px'; relTd.appendChild(makeRelEl(getAllRels(f.mn))); tr.appendChild(relTd);
+        const relTd = document.createElement('td'); relTd.style.cssText = 'text-align:center;width:70px;min-width:70px;'; relTd.appendChild(makeRelEl(getAllRels(f.mn))); tr.appendChild(relTd);
         const zt = document.createElement('td'); zt.style.textAlign = 'center';
         const zs = document.createElement('span'); zs.className = 'fcm-zone';
         const riZone = getRoomInfo(f.mn);
