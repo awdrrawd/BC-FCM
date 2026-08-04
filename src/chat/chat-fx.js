@@ -209,8 +209,4 @@ import { T } from '../i18n/i18n.js';
             }
         } catch {}
     }
-    function startWhisperIndicator() { _applyWhisperStyle(); }
-    function stopWhisperIndicator() { try { const el = document.getElementById('InputChat'); if (el) { el.style.removeProperty('box-shadow'); el.style.removeProperty('border'); el.style.removeProperty('outline'); } } catch {} }
-    function applyGhostHide(v) { /* toggled via cfg, DrawCharacter hook reads cfg at draw time */ }
-
-export { _removeWhisperAvatar, _updateWhisperAvatar, _drawWavOnCanvas, _applyWhisperStyle, startWhisperIndicator, stopWhisperIndicator, _installOocProtect, _uninstallOocProtect, applyGhostHide };
+export { _removeWhisperAvatar, _updateWhisperAvatar, _drawWavOnCanvas, _applyWhisperStyle, _installOocProtect, _uninstallOocProtect };

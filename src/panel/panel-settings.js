@@ -5,7 +5,7 @@ import { PDB, _pc, Snapshot, detectWCESave, setAvStatusEl } from '../data/profil
 import { buildFriendList } from '../data/data.js';
 import { mkBtn, mkToggle, refreshSnapshotsForList } from './panel-widgets.js';
 import { exportProfiles, importProfiles } from './panel-people.js';
-import { startWhisperIndicator, stopWhisperIndicator, _removeWhisperAvatar, _installOocProtect, _uninstallOocProtect, applyGhostHide } from '../chat/chat-fx.js';
+import { _applyWhisperStyle, _removeWhisperAvatar, _installOocProtect, _uninstallOocProtect } from '../chat/chat-fx.js';
 import { renderCurrent, reopenForLang } from './panel.js';
 // ════════════════════════════════════════
 //  FCM module: panel-settings.js  (split from panel.js)
@@ -233,7 +233,7 @@ function renderSettings(container) {
     // ── Whisper Indicator (color) ─────────────
     const wiWrap = document.createElement('div');
     const wiToggleRow = document.createElement('div'); wiToggleRow.style.cssText = 'display:flex;align-items:center;gap:14px;';
-    const wiTog = mkToggle(cfg.whisperIndicator, v => { cfg.whisperIndicator = v; saveCfg(); if (v) startWhisperIndicator(); else stopWhisperIndicator(); });
+    const wiTog = mkToggle(cfg.whisperIndicator, v => { cfg.whisperIndicator = v; saveCfg(); _applyWhisperStyle(); });
     wiTog.style.flexShrink = '0';
     const wiInfo = document.createElement('div'); wiInfo.style.flex = '1';
     const wiLbl = document.createElement('div'); wiLbl.className = 'fcm-set-label'; wiLbl.textContent = T('whisperIndicatorLabel');
@@ -283,7 +283,7 @@ function renderSettings(container) {
     divider();
 
     // ── Ghost Hide ────────────────────────────
-    wrap.appendChild(settingRow(T('ghostHideLabel'), T('ghostHideNote'), cfg.ghostHide, v => { cfg.ghostHide = v; saveCfg(); applyGhostHide(v); }));
+    wrap.appendChild(settingRow(T('ghostHideLabel'), T('ghostHideNote'), cfg.ghostHide, v => { cfg.ghostHide = v; saveCfg(); }));
 
     // Profile 關係人快速搜尋：本體以 buildProfileRelSetting() 建立、於「聊天室管理」最上方呼叫（函式宣告會提升）
     function buildProfileRelSetting() {

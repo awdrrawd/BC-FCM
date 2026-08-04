@@ -12,10 +12,10 @@ import './i18n-fallback.js';   // 內建後備字庫（TW+EN）同步註冊，�
 
 const I18N_NS = 'FCM';
 // 手動語言選單（auto + 各語系）；auto 依 BC TranslationLanguage
-const FCM_LANGS = ['auto', 'TW', 'CN', 'EN', 'JP', 'KR', 'DE', 'FR', 'RU', 'UA'];
-const FCM_LANG_NAMES = { auto: 'Auto', TW: '繁體中文', CN: '简体中文', EN: 'English', JP: '日本語', KR: '한국어', DE: 'Deutsch', FR: 'Français', RU: 'Русский', UA: 'Українська' };
+const FCM_LANGS = ['auto', 'TW', 'CN', 'EN', 'JA', 'KO', 'DE', 'FR', 'RU', 'UA'];
+const FCM_LANG_NAMES = { auto: 'Auto', TW: '繁體中文', CN: '简体中文', EN: 'English', JA: '日本語', KO: '한국어', DE: 'Deutsch', FR: 'Français', RU: 'Русский', UA: 'Українська' };
 // 執行期 fetch 的語言檔（一國一檔）；引擎只會抓「目前語言 + EN 後備」（CN 再加 TW）
-const T_LANGS = ['TW', 'CN', 'EN', 'JP', 'KR', 'DE', 'FR', 'RU', 'UA'];
+const T_LANGS = ['TW', 'CN', 'EN', 'JA', 'KO', 'DE', 'FR', 'RU', 'UA'];
 
 // 依 bundle（assets/main.js）位置解析同層根目錄的素材網址；本地 vite preview 與 Pages 皆適用。
 function assetUrl(path) {
@@ -37,18 +37,21 @@ async function ensureI18n() {
     } catch (e) { console.warn('🐈‍⬛ [FCM] 翻譯載入失敗，改用內建後備:', e.message); }
 }
 
-// 目前語言：玩家手動選 > 遊戲語系（ZH→TW）；相容舊值 zh/en
+// BC 遊戲語系碼 → 檔案碼：中文各寫法歸 TW；BC 的國家碼 JP/KR → ISO 639-1 語言碼 JA/KO
+function normLang(code) {
+    const c = String(code || '').toUpperCase().trim();
+    if (c === 'ZH') return 'TW';
+    if (c === 'JP') return 'JA';
+    if (c === 'KR') return 'KO';
+    return c;
+}
+// 目前語言：玩家手動選（選單值即檔案碼）> 遊戲語系（normLang 正規化）
 function fcmLang() {
     try {
-        let sel = (cfg && cfg.lang) || 'auto';
-        if (sel && sel !== 'auto') {
-            if (sel === 'zh') return 'TW';
-            if (sel === 'en') return 'EN';
-            return String(sel).toUpperCase();
-        }
+        const sel = (cfg && cfg.lang) || 'auto';
+        if (sel && sel !== 'auto') return String(sel).toUpperCase();
         const raw = (typeof TranslationLanguage !== 'undefined' ? TranslationLanguage : '') || 'EN';
-        const c = String(raw).toUpperCase().trim();
-        return c === 'ZH' ? 'TW' : (c || 'EN');
+        return normLang(raw) || 'EN';
     } catch { return 'EN'; }
 }
 

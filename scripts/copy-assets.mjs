@@ -1,7 +1,8 @@
 // Stage self-hosted assets into public/ (which vite deploys to dist/ → Pages):
-//   Translation/*.js -> public/Translation/   (i18n 引擎 BC_i18n.js + 一國一檔字庫 <LANG>.js)
+//   Translation/*.js -> public/Translation/   （一國一檔字庫 <LANG>.js，FCM 執行期 fetch）
 // Edit the sources in Translation/<LANG>.js（一國一檔）；build refreshes public/.
-// 引擎已隨 bundle 打包（src/modules/i18n-engine.js）；BC_i18n.js 仍部署供其他插件共用。
+// 共用引擎不在此部署：src/i18n/i18n-engine.js 是 liko-Plugin-Repository/Plugins/expand/BC_i18n.js
+// 的 vendored 副本，隨 bundle 打包供單裝 FCM 使用；其他插件則從 plugin-repo 的 canonical @require。
 import { copyFileSync, existsSync, mkdirSync, readdirSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 
