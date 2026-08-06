@@ -185,9 +185,11 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
     //  參考 BC 的 HoldLeash：ServerSend("ChatRoomChat",{Type:"Hidden",Target})
     //  可送達同房間的任何人（含非好友），故「同意且通知」需與對方同房。
     // ═══════════════════════════════════════════════════════════
-    // AccountBeep 自訂 BeepType：伺服器不限房間、不限好友即可送達（同 BC 牽繩跨房 beep 的做法）；
-    // BC 對未知 BeepType 不做任何處理，故沒裝 FCM 的人完全不會看到。
-    const FRIENDREQ_BEEP = 'FCMFriendReq';
+    // 一律走 leash 式 Hidden 訊息（ChatRoomChat + Type:"Hidden" + Target）：同房投遞、無需好友，
+    // 這才是本功能的本意。AccountBeep 反而受伺服器好友限制（雙方皆非好友時被丟棄）。
+    // Content 用自訂標記、且「絕不」攜帶任何房間欄位，避免被 BC 或其他 mod 的牽引處理器誤判成換房指令。
+    // BC 對未知 Hidden Content 不做任何處理，故沒裝 FCM 的人完全不會看到。
+    const FRIENDREQ_MSG = 'FCMFriendReq';
 
     function showAddFriendConfirm(mn, dname, oneSided) {
         mn = parseInt(mn);
@@ -230,11 +232,14 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
 
     function sendFriendReqNotify(mn) {
         mn = parseInt(mn);
+        // leash 走同房投遞：對方不在本房則無法送達，明確提示而非假裝已送出。
+        if (!inRoomFn(mn)) { if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('friendReqNeedRoom'), 5000); return; }
         try {
-            // 藉由 AccountBeep 送出：跨房間、非好友、對方離線後上線都能收到（伺服器層級投遞）
-            ServerSend('AccountBeep', {
-                MemberNumber: mn, BeepType: FRIENDREQ_BEEP,
-                Message: (Player && (Player.Nickname || Player.Name)) || String(Player?.MemberNumber),
+            // Hidden＋Target：只送給該成員，不帶任何房間資訊，故不會觸發真正的牽引/換房。
+            ServerSend('ChatRoomChat', {
+                Type: 'Hidden',
+                Content: FRIENDREQ_MSG,
+                Target: mn,
             });
             if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('friendReqSent', getDisplayName(mn)), 5000);
         } catch (e) { console.warn('🐈‍⬛ [FCM] sendFriendReqNotify:', e); }
@@ -510,4 +515,4 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
     }
 
 export { roomOp, doView, doBeep, doWhisper, doAddFriend, doToggleList, doRemoveFriend, navigateToRoom, showConfirm, makeIdCell,
-         showAddFriendConfirm, shareRoomToChat, showRoomJoinConfirm, roomInfoFromResult, handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_BEEP, ROOMSHARE_TAG };
+         showAddFriendConfirm, shareRoomToChat, showRoomJoinConfirm, roomInfoFromResult, handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSHARE_TAG };

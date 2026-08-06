@@ -4,7 +4,7 @@ import { PDB, _captureSnapshotDelayed } from '../data/profile-db.js';
 import { renderCurrent, panelOpen, panelMini, uiTab, buildPanel, togglePanel, closePanel, openPanel, openPeopleSearch } from '../panel/panel.js';
 import { _applyWhisperStyle, _updateWhisperAvatar, _drawWavOnCanvas } from '../chat/chat-fx.js';
 import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from '../chat/wps-share.js';
-import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_BEEP, ROOMSHARE_TAG } from '../chat/actions.js';
+import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSHARE_TAG } from '../chat/actions.js';
 // ════════════════════════════════════════
 //  FCM module: hooks.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -173,19 +173,14 @@ import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_BEEP, ROOMS
         return next(args);
     });
 
-    // 好友邀請通知：跨房 AccountBeep（自訂 BeepType）→ 顯示接收卡，抑制 BC 預設處理
-    modApi.hookFunction('ServerAccountBeep', 0, (args, next) => {
-        const data = args[0];
-        if (data && data.BeepType === FRIENDREQ_BEEP) {
-            try { handleIncomingFriendReq(data.MemberNumber, data.Message || data.MemberName); } catch {}
-            return;
-        }
-        return next(args);
-    });
-
     // WPS hidden share messages
     modApi.hookFunction('ChatRoomMessage', 0, (args, next) => {
         const data = args[0];
+        // 好友邀請通知：leash 式 Hidden 訊息（同房投遞）→ 顯示接收卡，抑制 BC 預設處理
+        if (data?.Type === 'Hidden' && data?.Content === FRIENDREQ_MSG) {
+            try { handleIncomingFriendReq(data.Sender); } catch {}
+            return;
+        }
         if (data?.Type === 'Hidden' && data?.Content?.startsWith(WPS_PREFIX)) {
             if (!window.LikoWPSInstance) { wpsHandleMessage(data); return; }
         }
