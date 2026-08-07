@@ -63,7 +63,7 @@ async function renderFriends(container, _myToken) {
     toolbar.appendChild(sl); toolbar.appendChild(sortSel);
     // 手動刷新：即刻抓最新資料，但有 5 秒冷卻（refreshPanel 回 false = 冷卻中，短暫變灰提示）
     const rBtn = mkBtn('↻', 'fcm-btn', () => {
-        if (!refreshPanel(true)) { rBtn.style.opacity = '0.35'; setTimeout(() => { rBtn.style.opacity = ''; }, 600); }
+        if (!refreshPanel()) { rBtn.style.opacity = '0.35'; setTimeout(() => { rBtn.style.opacity = ''; }, 600); }
     });
     rBtn.title = T('btnRefresh'); rBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
     toolbar.appendChild(rBtn);

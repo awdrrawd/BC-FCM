@@ -236,11 +236,4 @@ import { cfg, saveCfg } from '../core/config.js';
     function setOnlineFriends(v) { onlineFriends = v; }
     function setShowNickname(v) { showNickname = v; }
 
-    // ── 好友資料刷新閘門 ──────────────────────────────────────────
-    //  BC 會自行背景輪詢 OnlineFriends；我們只想在「FCM 主動請求」的結果回來時重繪，
-    //  故 send 時 mark、hook 收到結果時 consume：背景輪詢的結果只更新資料、不觸發重繪。
-    let _friendQueryPending = false;
-    function markFriendQuery() { _friendQueryPending = true; }
-    function consumeFriendQuery() { const v = _friendQueryPending; _friendQueryPending = false; return v; }
-
-export { onlineFriends, setOnlineFriends, showNickname, setShowNickname, parseAFC, getSubSet, getRel, getAllRels, REL_ORDER, getDisplayName, matchesSearch, buildFriendList, getZone, getRoomInfo, getRoomName, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep, _getWhisperTargetMN, isFav, toggleFav, markFriendQuery, consumeFriendQuery };
+export { onlineFriends, setOnlineFriends, showNickname, setShowNickname, parseAFC, getSubSet, getRel, getAllRels, REL_ORDER, getDisplayName, matchesSearch, buildFriendList, getZone, getRoomInfo, getRoomName, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep, _getWhisperTargetMN, isFav, toggleFav };

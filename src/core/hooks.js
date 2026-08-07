@@ -1,5 +1,5 @@
 import { modApi, cfg, BTN_X, BTN_Y, BTN_W, BTN_H, _fcmIconImg } from './config.js';
-import { setOnlineFriends, consumeFriendQuery } from '../data/data.js';
+import { setOnlineFriends } from '../data/data.js';
 import { PDB, _captureSnapshotDelayed } from '../data/profile-db.js';
 import { renderCurrent, panelOpen, panelMini, uiTab, buildPanel, togglePanel, closePanel, openPanel, openPeopleSearch } from '../panel/panel.js';
 import { _applyWhisperStyle, _updateWhisperAvatar, _drawWavOnCanvas } from '../chat/chat-fx.js';
@@ -82,9 +82,8 @@ import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSH
             setOnlineFriends(data.Result);
         }
         const r = next(args);
-        // 只在「FCM 主動請求」的結果回來時重繪；BC 背景輪詢的結果僅更新資料、不重繪，
-        //  避免面板隨 BC 輪詢節奏自行刷新（改由 開啟／切頁／30s／手動 控制）。
-        if (data?.Query === 'OnlineFriends' && consumeFriendQuery() && panelOpen && !panelMini && (uiTab === 'friends' || uiTab === 'room')) {
+        // BC 背景輪詢 OnlineFriends 相當頻繁，直接跟著它重繪即為即時更新（不另設計時器）。
+        if (data?.Query === 'OnlineFriends' && panelOpen && !panelMini && (uiTab === 'friends' || uiTab === 'room')) {
             renderCurrent();
         }
         return r;
