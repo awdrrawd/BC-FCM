@@ -69,7 +69,7 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
         s.textContent = `
 #fcm-panel,#fcm-panel *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
 #fcm-panel *{user-select:none;} #fcm-panel input,#fcm-panel textarea{user-select:text!important;}
-#fcm-panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(1040px,96vw);height:min(640px,92vh);
+#fcm-panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(1050px,96vw);height:min(650px,92vh);
   background:#1e1635;border:2px solid #5a48a8;border-radius:14px;box-shadow:0 12px 60px rgba(0,0,0,.75);z-index:99990;display:flex;flex-direction:column;overflow:hidden;}
 #fcm-panel.hidden{display:none!important;}
 #fcm-mini{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);width:220px;height:40px;background:#1e1635;border:2px solid #5a48a8;border-radius:20px;display:none;align-items:center;justify-content:center;gap:10px;cursor:pointer;z-index:99990;color:#c4a0e0;font-size:12px;transition:all .15s;}
@@ -114,6 +114,9 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-tbl td{padding:6px 10px;border-bottom:1px solid #2a2048;vertical-align:middle;white-space:nowrap;}
 .fcm-row:hover td{background:#2e2258;}
 .fcm-td-mgmt.no-perm{opacity:0.4;pointer-events:none;}
+.fcm-avwrap{display:flex;align-items:center;gap:5px;}
+.fcm-fav{cursor:pointer;font-size:15px;line-height:1;color:#5a4878;flex-shrink:0;transition:color .15s;}
+.fcm-fav.on{color:#f0c040;} .fcm-fav:hover{color:#ffd860;}
 .fcm-av{width:36px;height:36px;border-radius:8px;background:#201838;border:1px solid #4a3890;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:11px;color:#a080c8;flex-shrink:0;font-weight:700;}
 .fcm-av img{width:36px;height:36px;object-fit:cover;display:block;border-radius:7px;}
 .fcm-name{color:#f0e4ff;font-size:12px;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;}

@@ -21,6 +21,7 @@
         "search": { "DE": "Name oder ID suchen..." },
         "roomSearch": { "DE": "Suchen / ID eingeben..." },
         "sortBy": { "DE": "Sortieren" },
+        "sortFav": { "DE": "Favoriten" },
         "sortRel": { "DE": "Beziehung" },
         "sortId": { "DE": "ID" },
         "sortName": { "DE": "Name" },

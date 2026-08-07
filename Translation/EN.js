@@ -21,6 +21,7 @@
         "search": { "EN": "Search name or ID..." },
         "roomSearch": { "EN": "Search / Enter ID to add..." },
         "sortBy": { "EN": "Sort" },
+        "sortFav": { "EN": "Favorite" },
         "sortRel": { "EN": "Relation" },
         "sortId": { "EN": "ID" },
         "sortName": { "EN": "Name" },

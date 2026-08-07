@@ -21,6 +21,7 @@
         "search": { "CN": "搜索名称或ID..." },
         "roomSearch": { "CN": "搜索 / 输入ID添加..." },
         "sortBy": { "CN": "排序" },
+        "sortFav": { "CN": "最爱" },
         "sortRel": { "CN": "关系" },
         "sortId": { "CN": "ID" },
         "sortName": { "CN": "名称" },

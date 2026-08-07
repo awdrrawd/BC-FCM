@@ -51,6 +51,7 @@ const MOD_VER = (typeof __FCM_VERSION__ !== 'undefined' && __FCM_VERSION__) || '
     const THEME_DEFAULTS = { panelColor: '#1e1635', fontColor: '#f0e4ff', accentColor: '#a078e8' };
     let cfg = {
         avatars: false, lang: 'auto', saveMode: 'off',
+        favorites: [],                // 最愛的成員編號（個人關係頁星號）
         whisperIndicator: false, whisperColor: '#b070e8',
         ghostHide: false,
         whisperAvatar: false,

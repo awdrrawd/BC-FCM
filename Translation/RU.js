@@ -21,6 +21,7 @@
         "search": { "RU": "Поиск по имени или ID..." },
         "roomSearch": { "RU": "Поиск / ввести ID..." },
         "sortBy": { "RU": "Сортировка" },
+        "sortFav": { "RU": "Избранное" },
         "sortRel": { "RU": "Связь" },
         "sortId": { "RU": "ID" },
         "sortName": { "RU": "Имя" },

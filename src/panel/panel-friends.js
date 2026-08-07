@@ -1,18 +1,18 @@
 import { cfg } from '../core/config.js';
 import { T } from '../i18n/i18n.js';
 import { PDB, Snapshot } from '../data/profile-db.js';
-import { onlineFriends, showNickname, setShowNickname, getDisplayName, matchesSearch, buildFriendList, getAllRels, REL_ORDER, getZone, getRoomInfo, amAdmin, inRoomFn } from '../data/data.js';
+import { onlineFriends, showNickname, setShowNickname, getDisplayName, matchesSearch, buildFriendList, getAllRels, REL_ORDER, getZone, getRoomInfo, amAdmin, inRoomFn, isFav } from '../data/data.js';
 import { showRoomJoinConfirm, roomInfoFromResult, makeIdCell } from '../chat/actions.js';
-import { makeAvEl, makeRelEl, mkBtn, makeSearchWrap, makeSortSel, makeCountBar, buildMgmtBtns, buildPersonOps, _autoQueueVisible, refreshSnapshotsForList } from './panel-widgets.js';
+import { makeAvEl, makeFavStar, makeRelEl, mkBtn, makeSearchWrap, makeSortSel, makeCountBar, buildMgmtBtns, buildPersonOps, _autoQueueVisible, refreshSnapshotsForList } from './panel-widgets.js';
 import { queryRoomInfo, getCachedRoomInfo, fetchRoomFull } from './panel-rooms-data.js';
-import { renderCurrent, getRenderToken } from './panel.js';
+import { renderCurrent, refreshPanel, getRenderToken } from './panel.js';
 // ════════════════════════════════════════
 //  FCM module: panel-friends.js  (split from panel.js)
 //  好友（個人關係）頁。searchQ / sortMode / filters 為本頁狀態；
 //  closePanel 透過 resetFriendsSearch 清空搜尋字串。
 // ════════════════════════════════════════
 
-let searchQ = '', sortMode = 'rel';
+let searchQ = '', sortMode = 'fav';
 const filters = { online: true, offline: false, owner: false, lover: false, sub: false, friend: false, whitelist: false, blacklist: false };
 
 function resetFriendsSearch() { searchQ = ''; }
@@ -59,9 +59,12 @@ async function renderFriends(container, _myToken) {
     nickBtn.title = showNickname ? T('togNickToBCName') : T('togNickToNick');
     nickBtn.addEventListener('click', () => { setShowNickname(!showNickname); renderCurrent(); });
     toolbar.appendChild(nickBtn);
-    const { lbl: sl, sel: sortSel } = makeSortSel(sortMode, [['rel', T('sortRel')], ['id', T('sortId')], ['name', T('sortName')], ['added', T('sortAdded')]], v => { sortMode = v; renderCurrent(); });
+    const { lbl: sl, sel: sortSel } = makeSortSel(sortMode, [['fav', T('sortFav')], ['rel', T('sortRel')], ['id', T('sortId')], ['name', T('sortName')], ['added', T('sortAdded')]], v => { sortMode = v; renderCurrent(); });
     toolbar.appendChild(sl); toolbar.appendChild(sortSel);
-    const rBtn = mkBtn('↻', 'fcm-btn', () => renderCurrent());
+    // 手動刷新：即刻抓最新資料，但有 5 秒冷卻（refreshPanel 回 false = 冷卻中，短暫變灰提示）
+    const rBtn = mkBtn('↻', 'fcm-btn', () => {
+        if (!refreshPanel(true)) { rBtn.style.opacity = '0.35'; setTimeout(() => { rBtn.style.opacity = ''; }, 600); }
+    });
     rBtn.title = T('btnRefresh'); rBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
     toolbar.appendChild(rBtn);
     const avBtn = mkBtn('📸', 'fcm-btn', () => { const curMns = friends.map(f => f.mn); refreshSnapshotsForList(curMns); });
@@ -76,10 +79,13 @@ async function renderFriends(container, _myToken) {
                         }
     friends = friends.filter(applyFilters);
     switch (sortMode) {
+        // 關係：關係 > 最愛 > ID
+        case 'rel':   friends.sort((a, b) => { const d = REL_ORDER[a.rel] - REL_ORDER[b.rel]; if (d) return d; const fd = (isFav(b.mn) ? 1 : 0) - (isFav(a.mn) ? 1 : 0); return fd || a.mn - b.mn; }); break;
         case 'id':    friends.sort((a, b) => a.mn - b.mn); break;
         case 'name':  friends.sort((a, b) => a.name.localeCompare(b.name)); break;
         case 'added': friends.sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0)); break;
-        default:      friends.sort((a, b) => { const d = REL_ORDER[a.rel] - REL_ORDER[b.rel]; return d || a.name.localeCompare(b.name); });
+        // 最愛（預設）：最愛 > 關係 > ID（ID 已是明確順位，不再往下排）
+        default:      friends.sort((a, b) => { const fd = (isFav(b.mn) ? 1 : 0) - (isFav(a.mn) ? 1 : 0); if (fd) return fd; const d = REL_ORDER[a.rel] - REL_ORDER[b.rel]; return d || a.mn - b.mn; });
     }
     await PDB.batchGet(friends.map(f => f.mn));
     if (_myToken !== getRenderToken()) return;
@@ -98,7 +104,7 @@ async function renderFriends(container, _myToken) {
     const tbl = document.createElement('table'); tbl.className = 'fcm-tbl';
     const thRow = document.createElement('tr');
     // 個人關係頁無悄悄話，動作僅查看／私訊兩顆，動作欄不設 min-width 交由內容決定。
-    [['', 'width:42px'], [T('colName'), 'width:160px;min-width:160px', 'fcm-th-left'], [T('colId'), ''], [T('colRel'), 'width:70px;min-width:70px'], [T('colZone'), ''], [T('colRoom'), 'min-width:100px'], [T('colOps'), ''], [T('colManage'), 'min-width:130px']].forEach(([text, style, cls]) => {
+    [['', 'width:62px'], [T('colName'), 'width:160px;min-width:160px', 'fcm-th-left'], [T('colId'), ''], [T('colRel'), 'width:70px;min-width:70px'], [T('colZone'), ''], [T('colRoom'), 'min-width:100px'], [T('colOps'), ''], [T('colManage'), 'min-width:130px']].forEach(([text, style, cls]) => {
         const th = document.createElement('th'); th.textContent = text; if (style) th.style.cssText = style; if (cls) th.className = cls; thRow.appendChild(th);
     });
     if (inARoom) { const th = document.createElement('th'); th.textContent = isAdmin ? T('colMgmt') : T('colMgmtNoPerm'); th.className = (isAdmin ? 'fcm-th-mgmt' : 'fcm-th-mgmt-off'); th.style.cssText = 'min-width:140px;max-width:155px;width:150px;'; thRow.appendChild(th); }
@@ -110,7 +116,11 @@ async function renderFriends(container, _myToken) {
         const online = isOnline(f.mn), zone = getZone(f.mn), isInRoom = inRoomFn(f.mn);
         const snapshotUrl = Snapshot._cache[f.mn] || null;
 
-        const avTd = document.createElement('td'); avTd.appendChild(makeAvEl(f.mn, snapshotUrl)); tr.appendChild(avTd);
+        const avTd = document.createElement('td');
+        const avWrap = document.createElement('div'); avWrap.className = 'fcm-avwrap';
+        avWrap.appendChild(makeFavStar(f.mn));
+        avWrap.appendChild(makeAvEl(f.mn, snapshotUrl));
+        avTd.appendChild(avWrap); tr.appendChild(avTd);
         const nameTd = document.createElement('td');
         const nd = document.createElement('div'); nd.className = 'fcm-name'; nd.textContent = f.name; nd.title = f.name;
         const sd = document.createElement('div'); sd.className = 'fcm-sta ' + (online ? 'fcm-online' : 'fcm-offline'); sd.textContent = online ? T('online') : T('offline');

@@ -21,6 +21,7 @@
         "search": { "JA": "名前かIDを検索..." },
         "roomSearch": { "JA": "検索 / IDを入力して追加..." },
         "sortBy": { "JA": "並び替え" },
+        "sortFav": { "JA": "お気に入り" },
         "sortRel": { "JA": "関係" },
         "sortId": { "JA": "ID" },
         "sortName": { "JA": "名前" },

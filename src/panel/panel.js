@@ -4,6 +4,7 @@ import { _removeWhisperAvatar } from '../chat/chat-fx.js';
 import { renderHelp } from './panel-help.js';
 import { renderPeople, resetPeopleSearch, setPeopleQuery } from './panel-people.js';
 import { renderSettings } from './panel-settings.js';
+import { markFriendQuery } from '../data/data.js';
 import { renderFriends, resetFriendsSearch } from './panel-friends.js';
 import { renderRoom, resetRoomAdminSearch } from './panel-room.js';
 import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
@@ -19,6 +20,8 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
     function getRenderToken() { return _renderToken; }
     let panelEl = null, miniEl = null, panelOpen = false, panelMini = false;
     let uiTab = 'friends';
+    // ── 刷新控制：只在 開啟／切頁／每30秒／手動 時刷新；手動有 5 秒冷卻 ──
+    let _lastRefresh = 0, _friendPoll = null;
 
 
     // ═══════════════════════════════════════════════════════════
@@ -40,7 +43,8 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
                 uiTab = key;
                 if (key !== 'people') resetPeopleSearch();
                 tabBar.querySelectorAll('.fcm-tab').forEach(x => x.classList.toggle('active', x.dataset.tab === key));
-                renderCurrent();
+                // 切到「個人關係／房間」時抓一次最新線上狀態；其餘分頁只重繪。
+                if (key === 'friends' || key === 'room') refreshPanel(false); else renderCurrent();
             }); tabBar.appendChild(t);
         });
         const content = document.createElement('div'); content.id = 'fcm-content';
@@ -99,6 +103,24 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
         }).catch(e => console.warn('🐈‍⬛ [FCM] render:', e));
     }
 
+    // 主動刷新：請求最新線上好友資料並重繪。manual=true 時套用 5 秒冷卻（防手動連點狂發請求）。
+    //  結果回來的重繪由 hooks.js 依 consumeFriendQuery() 觸發；此處先以現有資料立即重繪一次。
+    function refreshPanel(manual) {
+        const now = Date.now();
+        if (manual && now - _lastRefresh < 5000) return false;   // 冷卻中
+        _lastRefresh = now;
+        try { if (typeof ServerSend === 'function') { ServerSend('AccountQuery', { Query: 'OnlineFriends' }); markFriendQuery(); } } catch {}
+        renderCurrent();
+        return true;
+    }
+    function _startFriendPoll() {
+        if (_friendPoll) return;
+        _friendPoll = setInterval(() => {
+            if (panelOpen && !panelMini && (uiTab === 'friends' || uiTab === 'room')) refreshPanel(false);
+        }, 30000);
+    }
+    function _stopFriendPoll() { if (_friendPoll) { clearInterval(_friendPoll); _friendPoll = null; } }
+
 
     // ═══════════════════════════════════════════════════════════
     //  PANEL STATE
@@ -108,8 +130,8 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
         panelEl.classList.remove('hidden');
         if (miniEl) miniEl.classList.remove('visible');
         panelOpen = true; panelMini = false;
-        ServerSend('AccountQuery', { Query: 'OnlineFriends' });
-        renderCurrent();
+        _startFriendPoll();
+        refreshPanel(false);
     }
 
     // 切換語言後由設定頁（panel-settings.js）呼叫：整個面板重建再以設定頁開啟。
@@ -120,12 +142,13 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
         buildPanel(); uiTab = 'settings'; openPanel();
     }
 
-    function minimizePanel() { if (!panelEl) return; panelEl.classList.add('hidden'); if (miniEl) miniEl.classList.add('visible'); panelMini = true; _removeWhisperAvatar(); }
-    function restorePanel() { if (!panelEl) buildPanel(); panelEl.classList.remove('hidden'); if (miniEl) miniEl.classList.remove('visible'); panelMini = false; renderCurrent(); }
+    function minimizePanel() { if (!panelEl) return; panelEl.classList.add('hidden'); if (miniEl) miniEl.classList.add('visible'); panelMini = true; _stopFriendPoll(); _removeWhisperAvatar(); }
+    function restorePanel() { if (!panelEl) buildPanel(); panelEl.classList.remove('hidden'); if (miniEl) miniEl.classList.remove('visible'); panelMini = false; _startFriendPoll(); refreshPanel(false); }
     function closePanel() {
         if (panelEl) panelEl.classList.add('hidden');
         if (miniEl) miniEl.classList.remove('visible');
         panelOpen = false; panelMini = false;
+        _stopFriendPoll();
         // 關閉時一併清空所有搜尋欄位狀態
         resetPeopleSearch();
         resetFriendsSearch(); resetRoomAdminSearch(); resetRoomSearchQuery();
@@ -155,4 +178,4 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
         openPanel();
     }
 
-export { renderCurrent, buildPanel, openPanel, closePanel, minimizePanel, restorePanel, togglePanel, registerCommand, openPeopleSearch, getRenderToken, reopenForLang, panelOpen, panelMini, uiTab };
+export { renderCurrent, refreshPanel, buildPanel, openPanel, closePanel, minimizePanel, restorePanel, togglePanel, registerCommand, openPeopleSearch, getRenderToken, reopenForLang, panelOpen, panelMini, uiTab };

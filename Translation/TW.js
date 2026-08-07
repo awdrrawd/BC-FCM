@@ -21,6 +21,7 @@
         "search": { "TW": "搜尋名稱或ID..." },
         "roomSearch": { "TW": "搜尋 / 輸入ID添加..." },
         "sortBy": { "TW": "排序" },
+        "sortFav": { "TW": "最愛" },
         "sortRel": { "TW": "關係" },
         "sortId": { "TW": "ID" },
         "sortName": { "TW": "名稱" },

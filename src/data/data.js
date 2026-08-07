@@ -1,5 +1,6 @@
 import { T } from '../i18n/i18n.js';
 import { _pc } from './profile-db.js';
+import { cfg, saveCfg } from '../core/config.js';
 // ════════════════════════════════════════
 //  FCM module: data.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -222,7 +223,24 @@ import { _pc } from './profile-db.js';
         } catch {}
         return null;
     }
+    // ── 最愛（個人關係頁星號）：存於 cfg.favorites，隨 cfg 一併持久化 ──
+    function isFav(mn) { return (cfg.favorites || []).includes(parseInt(mn)); }
+    function toggleFav(mn) {
+        mn = parseInt(mn);
+        const list = cfg.favorites || (cfg.favorites = []);
+        const i = list.indexOf(mn);
+        if (i >= 0) list.splice(i, 1); else list.push(mn);
+        saveCfg();
+        return i < 0;   // true = 現在是最愛
+    }
     function setOnlineFriends(v) { onlineFriends = v; }
     function setShowNickname(v) { showNickname = v; }
 
-export { onlineFriends, setOnlineFriends, showNickname, setShowNickname, parseAFC, getSubSet, getRel, getAllRels, REL_ORDER, getDisplayName, matchesSearch, buildFriendList, getZone, getRoomInfo, getRoomName, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep, _getWhisperTargetMN };
+    // ── 好友資料刷新閘門 ──────────────────────────────────────────
+    //  BC 會自行背景輪詢 OnlineFriends；我們只想在「FCM 主動請求」的結果回來時重繪，
+    //  故 send 時 mark、hook 收到結果時 consume：背景輪詢的結果只更新資料、不觸發重繪。
+    let _friendQueryPending = false;
+    function markFriendQuery() { _friendQueryPending = true; }
+    function consumeFriendQuery() { const v = _friendQueryPending; _friendQueryPending = false; return v; }
+
+export { onlineFriends, setOnlineFriends, showNickname, setShowNickname, parseAFC, getSubSet, getRel, getAllRels, REL_ORDER, getDisplayName, matchesSearch, buildFriendList, getZone, getRoomInfo, getRoomName, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep, _getWhisperTargetMN, isFav, toggleFav, markFriendQuery, consumeFriendQuery };

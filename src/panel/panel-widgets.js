@@ -1,7 +1,7 @@
 import { cfg } from '../core/config.js';
-import { T } from '../i18n/i18n.js';
+import { T, isZh } from '../i18n/i18n.js';
 import { PDB, _pc, Snapshot, _avQueue, _avBusy, _processAvQueue, loadAvatarFromBundle, _captureSnapshotDelayed } from '../data/profile-db.js';
-import { getDisplayName, REL_ORDER, getRel, isFriendOf, canBeep, inRoomFn } from '../data/data.js';
+import { getDisplayName, REL_ORDER, getRel, isFriendOf, canBeep, inRoomFn, isFav, toggleFav } from '../data/data.js';
 import { roomOp, doView, doBeep, doWhisper, doToggleList, doRemoveFriend, showConfirm, showAddFriendConfirm } from '../chat/actions.js';
 // ════════════════════════════════════════
 //  FCM module: panel-widgets.js  (split from panel.js)
@@ -52,6 +52,17 @@ function makeAvEl(mn, snapshotUrl) {
     }
     el.textContent = getDisplayName(mn).trim().slice(0, 2).toUpperCase() || '?';
     return el;
+}
+
+// ── 最愛星號：點擊切換 cfg.favorites；onToggle 供呼叫端重排（可略） ──
+function makeFavStar(mn, onToggle) {
+    mn = parseInt(mn);
+    const s = document.createElement('span');
+    const paint = () => { const on = isFav(mn); s.className = 'fcm-fav' + (on ? ' on' : ''); s.textContent = on ? '★' : '☆'; };
+    paint();
+    s.title = isZh() ? '設為最愛（點擊切換）' : 'Favorite (click to toggle)';
+    s.addEventListener('click', e => { e.stopPropagation(); const now = toggleFav(mn); paint(); if (onToggle) onToggle(now); });
+    return s;
 }
 
 async function _forceLoadAvatar(mn, el) {
@@ -245,5 +256,5 @@ async function refreshSnapshotsForList(mns) {
     if (!_avBusy && _avQueue.length > 0) _processAvQueue();
 }
 
-export { makeAvEl, _forceLoadAvatar, makeRelEl, makePermEl, mkBtn, mkToggle, makeSearchWrap,
+export { makeAvEl, makeFavStar, _forceLoadAvatar, makeRelEl, makePermEl, mkBtn, mkToggle, makeSearchWrap,
          buildMgmtBtns, buildPersonOps, makeSortSel, makeCountBar, _autoQueueVisible, refreshSnapshotsForList };

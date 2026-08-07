@@ -21,6 +21,7 @@
         "search": { "KO": "이름 또는 ID 검색..." },
         "roomSearch": { "KO": "검색 / ID 입력하여 추가..." },
         "sortBy": { "KO": "정렬" },
+        "sortFav": { "KO": "즐겨찾기" },
         "sortRel": { "KO": "관계" },
         "sortId": { "KO": "ID" },
         "sortName": { "KO": "이름" },
