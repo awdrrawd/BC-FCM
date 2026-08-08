@@ -21,7 +21,7 @@
         "search": { "UA": "Пошук за іменем або ID..." },
         "roomSearch": { "UA": "Пошук / введіть ID..." },
         "sortBy": { "UA": "Сортування" },
-        "sortFav": { "UA": "Обране" },
+        "sortFav": { "UA": "Підписка" },
         "sortRel": { "UA": "Зв'язок" },
         "sortId": { "UA": "ID" },
         "sortName": { "UA": "Ім'я" },

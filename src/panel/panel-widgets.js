@@ -54,13 +54,13 @@ function makeAvEl(mn, snapshotUrl) {
     return el;
 }
 
-// ── 最愛星號：點擊切換 cfg.favorites；onToggle 供呼叫端重排（可略） ──
+// ── 關注星號：點擊切換 cfg.favorites；onToggle 供呼叫端重排（可略） ──
 function makeFavStar(mn, onToggle) {
     mn = parseInt(mn);
     const s = document.createElement('span');
     const paint = () => { const on = isFav(mn); s.className = 'fcm-fav' + (on ? ' on' : ''); s.textContent = on ? '★' : '☆'; };
     paint();
-    s.title = isZh() ? '設為最愛（點擊切換）' : 'Favorite (click to toggle)';
+    s.title = isZh() ? '設為關注（點擊切換）' : 'Follow (click to toggle)';
     s.addEventListener('click', e => { e.stopPropagation(); const now = toggleFav(mn); paint(); if (onToggle) onToggle(now); });
     return s;
 }

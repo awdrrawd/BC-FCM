@@ -107,7 +107,7 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-scroll::-webkit-scrollbar-track{background:#1a1030;}
 .fcm-scroll::-webkit-scrollbar-thumb{background:#4838a0;border-radius:3px;}
 .fcm-count{font-size:11px;color:#9080b8;padding:6px 14px;background:#1a1230;border-top:1px solid #2a2048;letter-spacing:1px;flex-shrink:0;text-align:center;}
-.fcm-tbl{width:100%;border-collapse:collapse;font-size:12px;}
+.fcm-tbl{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;}
 .fcm-tbl th{background:#261a4a;color:#c4a0e0;font-size:10px;letter-spacing:1.2px;padding:9px 10px;text-align:center;border-bottom:2px solid #4a3890;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;}
 .fcm-tbl th.fcm-th-left{text-align:left;}
 .fcm-tbl th.fcm-th-mgmt{color:#f0a060;} .fcm-tbl th.fcm-th-mgmt-off{color:#6050a0;}
@@ -119,14 +119,14 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-fav.on{color:#f0c040;} .fcm-fav:hover{color:#ffd860;}
 .fcm-av{width:36px;height:36px;border-radius:8px;background:#201838;border:1px solid #4a3890;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:11px;color:#a080c8;flex-shrink:0;font-weight:700;}
 .fcm-av img{width:36px;height:36px;object-fit:cover;display:block;border-radius:7px;}
-.fcm-name{color:#f0e4ff;font-size:12px;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis;}
+.fcm-name{color:#f0e4ff;font-size:12px;font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;}
 .fcm-id{color:#7060a0;font-size:11px;}
 .fcm-id-copy{cursor:pointer;transition:color .15s;} .fcm-id-copy:hover{color:#c090ff;}
 .fcm-sta{font-size:10px;margin-top:2px;}
 .fcm-online{color:#50c870;} .fcm-offline{color:#7060a0;} .fcm-you{font-size:10px;color:#a080e8;margin-top:2px;}
 .fcm-zone{font-size:16px;color:#d0a8f0;text-align:center;}
 .fcm-room{font-size:12px;color:#9878b8;}
-.fcm-room-link{font-size:13px;color:#7090f8;cursor:pointer;font-weight:600;display:inline-block;max-width:140px;overflow:hidden;text-overflow:ellipsis;border-bottom:1px dotted #7090f8;transition:color .15s;}
+.fcm-room-link{font-size:13px;color:#7090f8;cursor:pointer;font-weight:600;display:inline-block;max-width:118px;overflow:hidden;text-overflow:ellipsis;border-bottom:1px dotted #7090f8;transition:color .15s;vertical-align:middle;}
 .fcm-room-link:hover{color:#b0c8ff;border-bottom-color:#b0c8ff;}
 .fcm-rel{font-size:10px;font-weight:800;padding:2px 10px;border-radius:10px;display:inline-block;white-space:nowrap;}
 .fcm-rel-owner  {background:#2a0808;color:#ff8888;border:1px solid #801818;}
@@ -144,7 +144,7 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-perm-ban  {background:#1c1c1c;color:#888888;border:1px solid #444444;}
 .fcm-perm-visit{background:#1c1830;color:#9878b8;border:1px solid #483868;}
 .fcm-btns{display:flex;gap:3px;flex-wrap:nowrap;align-items:center;}
-.fcm-btn{padding:3px 7px;border-radius:6px;border:1px solid #4838a0;background:#1e1635;color:#b098d0;font-size:10px;cursor:pointer;transition:all .15s;white-space:nowrap;font-weight:600;}
+.fcm-btn{padding:3px 6px;border-radius:6px;border:1px solid #4838a0;background:#1e1635;color:#b098d0;font-size:10px;cursor:pointer;transition:all .15s;white-space:nowrap;font-weight:600;}
 .fcm-btn:hover{background:#2a1e50;border-color:#9070c8;color:#e8d0ff;}
 .fcm-btn:disabled{opacity:.35;cursor:not-allowed;pointer-events:none;}
 .fcm-btn-red   {border-color:#801010;color:#f08080;}.fcm-btn-red:hover{background:#2a0808;border-color:#d04040;color:#ffb0b0;}

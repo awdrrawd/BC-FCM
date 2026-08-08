@@ -112,12 +112,13 @@ async function renderRoom(container) {
     // 名稱欄固定寬度：.fcm-name 內容上限 140px + td 左右各 10px padding = 160px，
     //  四個子頁（房內人員／管理員／白名單／黑名單）名稱欄寬度一致，避免切換子頁時整表位移。
     // 動作欄不設 min-width：改由內容（查看／私訊，房內人員多一顆悄悄話）決定，避免預留過大空白。
-    [['', 'width:42px'], [T('colName'), 'width:160px;min-width:160px', 'fcm-th-left'], [T('colId'), ''], [T('colRel'), ''], [T('colPerm'), 'min-width:75px'], [T('colOps'), ''], [T('colManage'), 'min-width:130px']].forEach(([text, style, cls]) => {
+    // table-layout:fixed → 每欄鎖死寬度（不隨子頁/內容變動、總和 ≤ 面板寬）。動作欄放最寬（房內人員多一顆悄悄話）。
+    [['', 'width:46px'], [T('colName'), 'width:150px', 'fcm-th-left'], [T('colId'), 'width:64px'], [T('colRel'), 'width:68px'], [T('colPerm'), 'width:74px'], [T('colOps'), 'width:138px'], [T('colManage'), 'width:205px']].forEach(([text, style, cls]) => {
         const th = document.createElement('th'); th.textContent = text; if (style) th.style.cssText = style; if (cls) th.className = cls; thRow.appendChild(th);
     });
-    const thMgmt = document.createElement('th'); thMgmt.textContent = isAdmin ? T('colMgmt') : T('colMgmtNoPerm'); thMgmt.className = isAdmin ? 'fcm-th-mgmt' : 'fcm-th-mgmt-off'; thMgmt.style.cssText = 'min-width:140px;max-width:155px;width:150px;'; thRow.appendChild(thMgmt);
+    const thMgmt = document.createElement('th'); thMgmt.textContent = isAdmin ? T('colMgmt') : T('colMgmtNoPerm'); thMgmt.className = isAdmin ? 'fcm-th-mgmt' : 'fcm-th-mgmt-off'; thMgmt.style.cssText = 'width:206px;'; thRow.appendChild(thMgmt);
     // 分享欄（房管之後，最後一欄）；house 一定在房間內，故恆可分享
-    const thShare = document.createElement('th'); thShare.textContent = T('colShare'); thShare.style.cssText = 'min-width:56px;width:56px;'; thRow.appendChild(thShare);
+    const thShare = document.createElement('th'); thShare.textContent = T('colShare'); thShare.style.cssText = 'width:58px;'; thRow.appendChild(thShare);
     const thead = document.createElement('thead'); thead.appendChild(thRow); tbl.appendChild(thead);
     const tbody = document.createElement('tbody');
 

@@ -19,7 +19,7 @@ const FCM_FALLBACK = {
     "search": { TW: "搜尋名稱或ID...", EN: "Search name or ID..." },
     "roomSearch": { TW: "搜尋 / 輸入ID添加...", EN: "Search / Enter ID to add..." },
     "sortBy": { TW: "排序", EN: "Sort" },
-    "sortFav": { TW: "最愛", EN: "Favorite" },
+    "sortFav": { TW: "關注", EN: "Follow" },
     "sortRel": { TW: "關係", EN: "Relation" },
     "sortId": { TW: "ID", EN: "ID" },
     "sortName": { TW: "名稱", EN: "Name" },

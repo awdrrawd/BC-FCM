@@ -21,7 +21,7 @@
         "search": { "FR": "Chercher nom ou ID..." },
         "roomSearch": { "FR": "Chercher / saisir ID..." },
         "sortBy": { "FR": "Trier" },
-        "sortFav": { "FR": "Favoris" },
+        "sortFav": { "FR": "Suivi" },
         "sortRel": { "FR": "Relation" },
         "sortId": { "FR": "ID" },
         "sortName": { "FR": "Nom" },

@@ -104,10 +104,11 @@ async function renderFriends(container, _myToken) {
     const tbl = document.createElement('table'); tbl.className = 'fcm-tbl';
     const thRow = document.createElement('tr');
     // 個人關係頁無悄悄話，動作僅查看／私訊兩顆，動作欄不設 min-width 交由內容決定。
-    [['', 'width:62px'], [T('colName'), 'width:160px;min-width:160px', 'fcm-th-left'], [T('colId'), ''], [T('colRel'), 'width:70px;min-width:70px'], [T('colZone'), ''], [T('colRoom'), 'min-width:100px'], [T('colOps'), ''], [T('colManage'), 'min-width:130px']].forEach(([text, style, cls]) => {
+    // table-layout:fixed → 每欄鎖死寬度（不隨內容/篩選變動、總和 ≤ 面板寬）。長文字欄以 ellipsis 截斷。
+    [['', 'width:70px'], [T('colName'), 'width:150px', 'fcm-th-left'], [T('colId'), 'width:66px'], [T('colRel'), 'width:68px'], [T('colZone'), 'width:44px'], [T('colRoom'), 'width:150px'], [T('colOps'), 'width:92px'], [T('colManage'), 'width:205px']].forEach(([text, style, cls]) => {
         const th = document.createElement('th'); th.textContent = text; if (style) th.style.cssText = style; if (cls) th.className = cls; thRow.appendChild(th);
     });
-    if (inARoom) { const th = document.createElement('th'); th.textContent = isAdmin ? T('colMgmt') : T('colMgmtNoPerm'); th.className = (isAdmin ? 'fcm-th-mgmt' : 'fcm-th-mgmt-off'); th.style.cssText = 'min-width:140px;max-width:155px;width:150px;'; thRow.appendChild(th); }
+    if (inARoom) { const th = document.createElement('th'); th.textContent = isAdmin ? T('colMgmt') : T('colMgmtNoPerm'); th.className = (isAdmin ? 'fcm-th-mgmt' : 'fcm-th-mgmt-off'); th.style.cssText = 'width:158px;'; thRow.appendChild(th); }
     const thead = document.createElement('thead'); thead.appendChild(thRow); tbl.appendChild(thead);
     const tbody = document.createElement('tbody');
 
