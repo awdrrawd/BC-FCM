@@ -19,8 +19,8 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
     function getRenderToken() { return _renderToken; }
     let panelEl = null, miniEl = null, panelOpen = false, panelMini = false;
     let uiTab = 'friends';
-    // 手動刷新的 5 秒冷卻計時（BC 自身輪詢很頻繁，平時的即時更新交給 hooks.js 的輪詢重繪）
-    let _lastRefresh = 0;
+    // 手動刷新的 5 秒冷卻計時；_friendPoll：面板開著時的定期抓取（BC 在聊天室內不會自動輪詢 OnlineFriends）
+    let _lastRefresh = 0, _friendPoll = null;
 
 
     // ═══════════════════════════════════════════════════════════
@@ -111,6 +111,17 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
         renderCurrent();
         return true;
     }
+    // 面板開著且在 friends/room 分頁時定期重查線上好友；結果回來由 hooks.js 的 result hook 重繪。
+    function _startFriendPoll() {
+        if (_friendPoll) return;
+        _friendPoll = setInterval(() => {
+            if (panelOpen && !panelMini && (uiTab === 'friends' || uiTab === 'room')
+                && typeof ServerSend === 'function') {
+                ServerSend('AccountQuery', { Query: 'OnlineFriends' });
+            }
+        }, 15000);  // ponytail: 固定 15s；要更即時就調短
+    }
+    function _stopFriendPoll() { if (_friendPoll) { clearInterval(_friendPoll); _friendPoll = null; } }
 
 
     // ═══════════════════════════════════════════════════════════
@@ -121,8 +132,9 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
         panelEl.classList.remove('hidden');
         if (miniEl) miniEl.classList.remove('visible');
         panelOpen = true; panelMini = false;
-        _lastRefresh = Date.now();   // 開啟即查一次，順手起算冷卻，避免開啟後立刻手動再查
+        // 開啟即查一次；不動 _lastRefresh，手動 ↻ 的冷卻與「開啟」脫鉤（開啟後仍可立即手動再查一次）
         try { if (typeof ServerSend === 'function') ServerSend('AccountQuery', { Query: 'OnlineFriends' }); } catch {}
+        _startFriendPoll();
         renderCurrent();
     }
 
@@ -134,12 +146,13 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
         buildPanel(); uiTab = 'settings'; openPanel();
     }
 
-    function minimizePanel() { if (!panelEl) return; panelEl.classList.add('hidden'); if (miniEl) miniEl.classList.add('visible'); panelMini = true; _removeWhisperAvatar(); }
-    function restorePanel() { if (!panelEl) buildPanel(); panelEl.classList.remove('hidden'); if (miniEl) miniEl.classList.remove('visible'); panelMini = false; renderCurrent(); }
+    function minimizePanel() { if (!panelEl) return; panelEl.classList.add('hidden'); if (miniEl) miniEl.classList.add('visible'); panelMini = true; _stopFriendPoll(); _removeWhisperAvatar(); }
+    function restorePanel() { if (!panelEl) buildPanel(); panelEl.classList.remove('hidden'); if (miniEl) miniEl.classList.remove('visible'); panelMini = false; _startFriendPoll(); renderCurrent(); }
     function closePanel() {
         if (panelEl) panelEl.classList.add('hidden');
         if (miniEl) miniEl.classList.remove('visible');
         panelOpen = false; panelMini = false;
+        _stopFriendPoll();
         // 關閉時一併清空所有搜尋欄位狀態
         resetPeopleSearch();
         resetFriendsSearch(); resetRoomAdminSearch(); resetRoomSearchQuery();
