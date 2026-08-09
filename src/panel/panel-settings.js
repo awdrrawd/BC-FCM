@@ -41,6 +41,8 @@ function renderSettings(container) {
     const langLbl = document.createElement('div'); langLbl.className = 'fcm-set-label'; langLbl.textContent = T('langLabel');
     langInfo.appendChild(langLbl);   // 語言不需要說明文字
     const langSel = document.createElement('select'); langSel.className = 'fcm-sel'; langSel.style.flexShrink = '0';
+    // 國旗字體用 inline style（保證生效，不被主題 CSS 層疊蓋掉）：白嫖 BC 的 "Twemoji Country Flags"。
+    langSel.style.fontFamily = '"Twemoji Country Flags",-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif';
     // 舊值相容：把已存的 zh/en 映射回 TW/EN 供下拉選單正確選取
     const _curLang = cfg.lang === 'zh' ? 'TW' : cfg.lang === 'en' ? 'EN' : (cfg.lang || 'auto');
     FCM_LANGS.forEach(v => {

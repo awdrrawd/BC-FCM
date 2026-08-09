@@ -90,7 +90,7 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-search:focus{border-color:#9078d0;} .fcm-search::placeholder{color:#5a4878;}
 .fcm-clear-btn{position:absolute;right:6px;background:none;border:none;color:#6050a0;cursor:pointer;font-size:15px;padding:0 2px;line-height:1;transition:color .15s;}
 .fcm-clear-btn:hover{color:#f0d8ff;}
-.fcm-sel{background:#1a1030;border:1px solid #5048a0;border-radius:8px;padding:5px 6px;color:#c4a0e0;font-size:11px;outline:none;cursor:pointer;max-width:110px;flex-shrink:0;font-family:"Twemoji Country Flags",-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif;}
+.fcm-sel{background:#1a1030;border:1px solid #5048a0;border-radius:8px;padding:5px 6px;color:#c4a0e0;font-size:11px;outline:none;cursor:pointer;max-width:110px;flex-shrink:0;}
 .fcm-sel option{background:#1a1030;}
 .fcm-lbl-sm{font-size:10px;color:#6050a0;letter-spacing:1px;font-weight:700;white-space:nowrap;flex-shrink:0;}
 .fcm-spacer{flex:1;}
