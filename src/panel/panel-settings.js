@@ -42,11 +42,14 @@ function renderSettings(container) {
     langInfo.appendChild(langLbl);   // 語言不需要說明文字
     const langSel = document.createElement('select'); langSel.className = 'fcm-sel'; langSel.style.flexShrink = '0';
     // 國旗字體用 inline style（保證生效，不被主題 CSS 層疊蓋掉）：白嫖 BC 的 "Twemoji Country Flags"。
-    langSel.style.fontFamily = '"Twemoji Country Flags",-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif';
+    // select 本體 + 每個 option 都要設：因為 .fcm-sel option 有自訂背景色，Chromium 會用 styled
+    // popup 渲染下拉清單，該模式下 option 不繼承 select 的字體，不各自設國旗就會退化成 TW/CN 字母。
+    const FLAG_FONT = '"Twemoji Country Flags",-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif';
+    langSel.style.fontFamily = FLAG_FONT;
     // 舊值相容：把已存的 zh/en 映射回 TW/EN 供下拉選單正確選取
     const _curLang = cfg.lang === 'zh' ? 'TW' : cfg.lang === 'en' ? 'EN' : (cfg.lang || 'auto');
     FCM_LANGS.forEach(v => {
-        const o = document.createElement('option'); o.value = v; o.textContent = (FCM_LANG_FLAGS[v] ? FCM_LANG_FLAGS[v] + ' ' : '') + (FCM_LANG_NAMES[v] || v); if (v === _curLang) o.selected = true; langSel.appendChild(o);
+        const o = document.createElement('option'); o.value = v; o.style.fontFamily = FLAG_FONT; o.textContent = (FCM_LANG_FLAGS[v] ? FCM_LANG_FLAGS[v] + ' ' : '') + (FCM_LANG_NAMES[v] || v); if (v === _curLang) o.selected = true; langSel.appendChild(o);
     });
     langSel.addEventListener('change', async () => {
         cfg.lang = langSel.value; saveCfg();
