@@ -1,5 +1,5 @@
 import { cfg, saveCfg, THEME_DEFAULTS } from '../core/config.js';
-import { T, FCM_LANGS, FCM_LANG_NAMES, ensureI18n } from '../i18n/i18n.js';
+import { T, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, ensureI18n } from '../i18n/i18n.js';
 import { applyTheme } from './styles.js';
 import { PDB, _pc, Snapshot, detectWCESave, setAvStatusEl } from '../data/profile-db.js';
 import { buildFriendList } from '../data/data.js';
@@ -44,7 +44,7 @@ function renderSettings(container) {
     // 舊值相容：把已存的 zh/en 映射回 TW/EN 供下拉選單正確選取
     const _curLang = cfg.lang === 'zh' ? 'TW' : cfg.lang === 'en' ? 'EN' : (cfg.lang || 'auto');
     FCM_LANGS.forEach(v => {
-        const o = document.createElement('option'); o.value = v; o.textContent = FCM_LANG_NAMES[v] || v; if (v === _curLang) o.selected = true; langSel.appendChild(o);
+        const o = document.createElement('option'); o.value = v; o.textContent = (FCM_LANG_FLAGS[v] ? FCM_LANG_FLAGS[v] + ' ' : '') + (FCM_LANG_NAMES[v] || v); if (v === _curLang) o.selected = true; langSel.appendChild(o);
     });
     langSel.addEventListener('change', async () => {
         cfg.lang = langSel.value; saveCfg();
