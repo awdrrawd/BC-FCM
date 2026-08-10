@@ -12,13 +12,13 @@ import './i18n-fallback.js';   // 內建後備字庫（TW+EN）同步註冊，�
 
 const I18N_NS = 'FCM';
 // 手動語言選單（auto + 各語系）；auto 依 BC TranslationLanguage
-const FCM_LANGS = ['auto', 'TW', 'CN', 'EN', 'JA', 'KO', 'DE', 'FR', 'RU', 'UA'];
-const FCM_LANG_NAMES = { auto: 'Auto', TW: '繁體中文', CN: '简体中文', EN: 'English', JA: '日本語', KO: '한국어', DE: 'Deutsch', FR: 'Français', RU: 'Русский', UA: 'Українська' };
+const FCM_LANGS = ['auto', 'TW', 'CN', 'EN', 'JA', 'KO', 'DE', 'FR', 'ES', 'VI', 'RU', 'UA'];
+const FCM_LANG_NAMES = { auto: 'Auto', TW: '繁體中文', CN: '简体中文', EN: 'English', JA: '日本語', KO: '한국어', DE: 'Deutsch', FR: 'Français', ES: 'Español', VI: 'Tiếng Việt', RU: 'Русский', UA: 'Українська' };
 // 國旗 emoji（國家碼 regional indicator）；顯示需白嫖 BC country-flag polyfill 的
 // "Twemoji Country Flags" 字體（見 styles.js .fcm-sel）。auto 用地球代表「跟隨 BC 語系」。
-const FCM_LANG_FLAGS = { auto: '🌐', TW: '🇹🇼', CN: '🇨🇳', EN: '🇬🇧', JA: '🇯🇵', KO: '🇰🇷', DE: '🇩🇪', FR: '🇫🇷', RU: '🇷🇺', UA: '🇺🇦' };
+const FCM_LANG_FLAGS = { auto: '🌐', TW: '🇹🇼', CN: '🇨🇳', EN: '🇬🇧', JA: '🇯🇵', KO: '🇰🇷', DE: '🇩🇪', FR: '🇫🇷', ES: '🇪🇸', VI: '🇻🇳', RU: '🇷🇺', UA: '🇺🇦' };
 // 執行期 fetch 的語言檔（一國一檔）；引擎只會抓「目前語言 + EN 後備」（CN 再加 TW）
-const T_LANGS = ['TW', 'CN', 'EN', 'JA', 'KO', 'DE', 'FR', 'RU', 'UA'];
+const T_LANGS = ['TW', 'CN', 'EN', 'JA', 'KO', 'DE', 'FR', 'ES', 'VI', 'RU', 'UA'];
 
 // 依 bundle（assets/main.js）位置解析同層根目錄的素材網址；本地 vite preview 與 Pages 皆適用。
 function assetUrl(path) {
