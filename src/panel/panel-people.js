@@ -149,10 +149,12 @@ async function renderPeople(container, _myToken) {
         const thead = document.createElement('thead');
         const thRow = document.createElement('tr');
         [
-            ['', 'width:42px'], [T('colName'), 'width:160px;min-width:160px', 'fcm-th-left'], [T('colId'), ''],
-            [T('colRel'), ''], [T('colOps'), ''], [T('colManage'), 'min-width:130px'],
-            ...((!!(typeof ChatRoomData !== 'undefined' && ChatRoomData)) ? [[T('colMgmt'), 'min-width:130px']] : []),
-            [T('colSeen'), 'min-width:80px'], [T('colShare'), 'min-width:60px'],
+            // table-layout:fixed 只認 width（不認 min-width）；每欄給明確寬度，比照好友／房間頁，
+            //  否則沒指定寬度的欄位會平分剩餘空間、把管理/房管擠到按鈕溢出相撞。
+            ['', 'width:42px'], [T('colName'), 'width:150px', 'fcm-th-left'], [T('colId'), 'width:64px'],
+            [T('colRel'), 'width:76px'], [T('colOps'), 'width:92px'], [T('colManage'), 'width:205px'],
+            ...((!!(typeof ChatRoomData !== 'undefined' && ChatRoomData)) ? [[T('colMgmt'), 'width:158px']] : []),
+            [T('colSeen'), 'width:80px'], [T('colShare'), 'width:62px'],
         ].forEach(([text, style, cls]) => {
             const th = document.createElement('th'); th.textContent = text;
             if (style) th.style.cssText = style; if (cls) th.className = cls; thRow.appendChild(th);
@@ -191,7 +193,6 @@ async function renderPeople(container, _myToken) {
                 const _isAdmin_p = amAdmin();
                 const mgmtTd_p = document.createElement('td');
                 mgmtTd_p.className = 'fcm-td-mgmt' + (_isAdmin_p ? '' : ' no-perm');
-                mgmtTd_p.style.maxWidth = '145px';
                 const mb_p = buildMgmtBtns(mn, 'people');
                 if (mb_p) mgmtTd_p.appendChild(mb_p);
                 tr.appendChild(mgmtTd_p);
