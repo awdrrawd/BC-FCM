@@ -124,13 +124,21 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
         // leaking Enter/Shift+Enter events into the new room context (Nami bug fix)
         document.querySelectorAll('.fcm-search, .fcm-room-search').forEach(el => el.blur());
         closePanel();
+        // 先離開並切到 ChatSearch（同步）：把畫面弄離 ChatRoom，避免 join 回來時 ChatRoomRun 讀到 null 而崩潰。
         try {
             if (typeof ChatRoomLeave === 'function') ChatRoomLeave();
             if (typeof CommonSetScreen === 'function') CommonSetScreen('Online', 'ChatSearch');
-            try { ChatSearchLastQueryJoinTime = typeof CommonTime === 'function' ? CommonTime() : Date.now(); } catch {}
-            try { ChatSearchLastQueryJoin = roomName; } catch {}
-            ServerSend('ChatRoomJoin', { Name: roomName });
-        } catch (e) { console.warn('🐈‍⬛ [FCM] joinRoom:', e); }
+        } catch (e) { console.warn('🐈‍⬛ [FCM] leaveRoom:', e); }
+        // 隔一小段再送 join：模擬 BC 手動換房的人為延遲，讓伺服器先處理完「離開」，
+        //  否則 leave 與 join 擠在同一 tick 會被伺服器判定為重複加入。
+        // ponytail: 固定 150ms 緩衝；連線很慢時可調長，這是需要依實際延遲微調的旋鈕。
+        setTimeout(() => {
+            try {
+                ChatSearchLastQueryJoinTime = typeof CommonTime === 'function' ? CommonTime() : Date.now();
+                ChatSearchLastQueryJoin = roomName;
+                if (typeof ServerSend === 'function') ServerSend('ChatRoomJoin', { Name: roomName });
+            } catch (e) { console.warn('🐈‍⬛ [FCM] joinRoom:', e); }
+        }, 150);
     }
 
     // 只知道房名時的簡易文字確認（例如好友列表的房間連結）。
