@@ -1,4 +1,5 @@
-import { modApi, cfg, BTN_X, BTN_Y, BTN_W, BTN_H, _fcmIconImg } from './config.js';
+import { modApi, cfg, MOD_VER, BTN_X, BTN_Y, BTN_W, BTN_H, _fcmIconImg } from './config.js';
+import { T } from '../i18n/i18n.js';
 import { setOnlineFriends } from '../data/data.js';
 import { PDB, _captureSnapshotDelayed } from '../data/profile-db.js';
 import { renderCurrent, panelOpen, panelMini, uiTab, buildPanel, togglePanel, closePanel, openPanel, openPeopleSearch } from '../panel/panel.js';
@@ -15,6 +16,7 @@ import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSH
     //  按鈕框剛好貼合文字寬度（不受欄位固定寬影響）。
     //  _relCollect：InformationSheetRun 繪製期間暫存本幀擷取結果；_relRegions：供點擊命中測試。
     let _relCollect = null;
+    let _introShown = false;   // 初始化提示只顯示一次
     let _relRegions = [];
     let _afcRegions = [];   // AFC 拓展戀人面板的可點區塊（透過 window.Liko.AFC 公開 API）
 
@@ -90,6 +92,11 @@ import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSH
     });
     modApi.hookFunction('ChatRoomSync', 0, (args, next) => {
         const r = next(args);
+        // 初始化提示：ChatRoomSendLocal 只在房內生效，故延到首次進房時顯示一次
+        if (!_introShown) {
+            _introShown = true;
+            if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('initHint', MOD_VER), 0);
+        }
         const raws = (args[0] && args[0].Character) || [];
         setTimeout(() => raws.forEach(raw => {
             const C = ChatRoomCharacter && ChatRoomCharacter.find(c => c.MemberNumber === raw.MemberNumber);

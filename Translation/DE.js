@@ -9,6 +9,7 @@
     var I = Liko && Liko.__Sys_i18n__;
     if (!I || !I.register) { console.error('[Liko FCM DE] i18n 引擎尚未載入'); return; }
     I.register('FCM', {
+        "initHint": { "DE": "🐈‍⬛ FCM v{0} initialisiert. Klicke auf das „SVG“-Symbol, um Freunde und Räume zu verwalten; beim ersten Mal empfiehlt sich eine kurze Einrichtung auf der Einstellungsseite.\n⚠ Hinweis: Neu hinzugefügte Freunde können als „einseitig“ erscheinen – entferne sie und füge sie erneut hinzu. Dieses Problem wurde der Community gemeldet." },
         "panelTitle": { "DE": "🎛 FCM ─ Freunde- und Raum-Manager" },
         "tabFriends": { "DE": "Beziehungen" },
         "tabRoom": { "DE": "Raum-Verw." },

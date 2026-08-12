@@ -9,6 +9,7 @@
     var I = Liko && Liko.__Sys_i18n__;
     if (!I || !I.register) { console.error('[Liko FCM FR] i18n 引擎尚未載入'); return; }
     I.register('FCM', {
+        "initHint": { "FR": "🐈‍⬛ FCM v{0} initialisé. Cliquez sur l'icône « SVG » pour gérer amis et salons ; à la première utilisation, une configuration rapide sur la page Paramètres est conseillée.\n⚠ Remarque : les amis récemment ajoutés peuvent apparaître comme « unilatéraux » — essayez de les supprimer puis de les rajouter. Ce problème a été signalé à la communauté." },
         "panelTitle": { "FR": "🎛 FCM ─ Gestionnaire d'amis et de salons" },
         "tabFriends": { "FR": "Relations" },
         "tabRoom": { "FR": "Gest. salon" },

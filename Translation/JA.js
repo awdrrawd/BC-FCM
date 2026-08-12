@@ -9,6 +9,7 @@
     var I = Liko && Liko.__Sys_i18n__;
     if (!I || !I.register) { console.error('[Liko FCM JA] i18n 引擎尚未載入'); return; }
     I.register('FCM', {
+        "initHint": { "JA": "🐈‍⬛ FCM v{0} を初期化しました。「SVG」アイコンをクリックするとフレンド・ルーム管理ができます。初回はまず設定ページで簡単な設定をおすすめします。\n⚠ 注意：フレンド追加時に「一方向フレンド」となる場合があります。削除して再追加をお試しください。本件はコミュニティへ報告済みです。" },
         "panelTitle": { "JA": "🎛 FCM ─ フレンド＆ルーム管理" },
         "tabFriends": { "JA": "関係" },
         "tabRoom": { "JA": "ルーム管理" },

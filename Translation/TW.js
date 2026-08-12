@@ -9,6 +9,7 @@
     var I = Liko && Liko.__Sys_i18n__;
     if (!I || !I.register) { console.error('[Liko FCM TW] i18n 引擎尚未載入'); return; }
     I.register('FCM', {
+        "initHint": { "TW": "🐈‍⬛ FCM v{0} 已初始化，點「SVG」圖示可進行好友與房間管理；初次使用可先到設定頁做簡單設定。\n⚠ 注意：新增好友時可能出現「單向好友」，可嘗試刪除後重新添加；此問題已回報社群。" },
         "panelTitle": { "TW": "🎛 FCM ─ 好友與房間管理" },
         "tabFriends": { "TW": "個人關係" },
         "tabRoom": { "TW": "房間管理" },

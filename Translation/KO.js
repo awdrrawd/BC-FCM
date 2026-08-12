@@ -9,6 +9,7 @@
     var I = Liko && Liko.__Sys_i18n__;
     if (!I || !I.register) { console.error('[Liko FCM KO] i18n 引擎尚未載入'); return; }
     I.register('FCM', {
+        "initHint": { "KO": "🐈‍⬛ FCM v{0} 초기화 완료. 「SVG」 아이콘을 클릭하면 친구·방 관리를 할 수 있습니다. 처음 사용하신다면 설정 페이지에서 간단히 설정해 주세요.\n⚠ 주의: 친구 추가 시 '단방향 친구'로 표시될 수 있습니다. 삭제 후 다시 추가해 보세요. 이 문제는 커뮤니티에 보고되었습니다." },
         "panelTitle": { "KO": "🎛 FCM ─ 친구 및 방 관리" },
         "tabFriends": { "KO": "관계" },
         "tabRoom": { "KO": "방 관리" },

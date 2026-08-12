@@ -3,6 +3,7 @@
     var I = window.Liko && window.Liko.__Sys_i18n__;
     if (!I || !I.register) { console.error('[Liko FCM ES] i18n no está disponible'); return; }
     var V = {
+        initHint: '🐈‍⬛ FCM v{0} inicializado. Haz clic en el icono «SVG» para gestionar amistades y salas; en el primer uso conviene una configuración sencilla en la página de Ajustes.\n⚠ Nota: las amistades recién añadidas pueden aparecer como «unilaterales» — prueba a eliminarlas y añadirlas de nuevo. Este problema ya se ha reportado a la comunidad.',
         panelTitle: '🎛 FCM ─ Gestor de amistades y salas', tabFriends: 'Relaciones', tabRoom: 'Gestión de sala', tabSettings: 'Ajustes', tabPeople: 'Personas', tabHelp: '🔖 Ayuda', minimize: '—', close: '×', miniLabel: 'Gestor de amistades y salas',
         search: 'Buscar nombre o ID...', roomSearch: 'Buscar / Introducir ID para añadir...', sortBy: 'Ordenar', sortFav: 'Seguidos', sortRel: 'Relación', sortId: 'ID', sortName: 'Nombre', sortAdded: 'Añadido', sortSeen: 'Visto por última vez', showOnly: 'Mostrar', togNick: 'Apodo', togName: 'Nombre',
         fOnline: 'En línea', fOffline: 'Sin conexión', fOwner: 'Dueña', fLover: 'Amante', fSub: 'Sumisa', fFriend: 'Amiga', colName: 'Nombre', colId: 'ID', colRel: 'Rel.', colZone: 'Zona', colRoom: 'Sala', colPerm: 'Perm.', colOps: 'Acciones', colManage: 'Gestionar', colMgmt: 'Administración', colMgmtNoPerm: 'Administración (sin permiso)', colSeen: 'Última vez',

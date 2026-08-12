@@ -9,6 +9,7 @@
     var I = Liko && Liko.__Sys_i18n__;
     if (!I || !I.register) { console.error('[Liko FCM EN] i18n 引擎尚未載入'); return; }
     I.register('FCM', {
+        "initHint": { "EN": "🐈‍⬛ FCM v{0} initialized. Click the \"SVG\" icon to manage friends and rooms; first-time users may want a quick setup on the Settings page.\n⚠ Note: newly added friends may show as \"one-way\" — try removing and re-adding them. This issue has been reported to the community." },
         "panelTitle": { "EN": "🎛 FCM ─ Friends and ChatRoom Manager" },
         "tabFriends": { "EN": "Relations" },
         "tabRoom": { "EN": "Room Mgmt" },

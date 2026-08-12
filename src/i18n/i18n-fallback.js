@@ -7,6 +7,7 @@
 import './i18n-engine.js';   // 確保 window.Liko.__Sys_i18n__ 存在（引擎自帶防重載）
 
 const FCM_FALLBACK = {
+    "initHint": { TW: "🐈‍⬛ FCM v{0} 已初始化，點「SVG」圖示可進行好友與房間管理；初次使用可先到設定頁做簡單設定。\n⚠ 注意：新增好友時可能出現「單向好友」，可嘗試刪除後重新添加；此問題已回報社群。", EN: "🐈‍⬛ FCM v{0} initialized. Click the \"SVG\" icon to manage friends and rooms; first-time users may want a quick setup on the Settings page.\n⚠ Note: newly added friends may show as \"one-way\" — try removing and re-adding them. This issue has been reported to the community." },
     "panelTitle": { TW: "🎛 FCM ─ 好友與房間管理", EN: "🎛 FCM ─ Friends and ChatRoom Manager" },
     "tabFriends": { TW: "個人關係", EN: "Relations" },
     "tabRoom": { TW: "房間管理", EN: "Room Mgmt" },

@@ -3,6 +3,7 @@
     var I = window.Liko && window.Liko.__Sys_i18n__;
     if (!I || !I.register) { console.error('[Liko FCM VI] chưa tải i18n'); return; }
     var V = {
+        initHint: '🐈‍⬛ FCM v{0} đã khởi tạo. Nhấp vào biểu tượng «SVG» để quản lý bạn bè và phòng; lần đầu sử dụng nên thiết lập đơn giản ở trang Cài đặt.\n⚠ Lưu ý: bạn mới thêm có thể hiển thị là «một chiều» — hãy thử xóa rồi thêm lại. Vấn đề này đã được báo cáo cho cộng đồng.',
         panelTitle: '🎛 FCM ─ Quản lý bạn bè và phòng chat', tabFriends: 'Quan hệ', tabRoom: 'Quản lý phòng', tabSettings: 'Cài đặt', tabPeople: 'Mọi người', tabHelp: '🔖 Trợ giúp', minimize: '—', close: '×', miniLabel: 'Quản lý bạn bè và phòng chat',
         search: 'Tìm tên hoặc ID...', roomSearch: 'Tìm kiếm / Nhập ID để thêm...', sortBy: 'Sắp xếp', sortFav: 'Theo dõi', sortRel: 'Quan hệ', sortId: 'ID', sortName: 'Tên', sortAdded: 'Ngày thêm', sortSeen: 'Lần cuối gặp', showOnly: 'Hiển thị', togNick: 'Biệt danh', togName: 'Tên',
         fOnline: 'Trực tuyến', fOffline: 'Ngoại tuyến', fOwner: 'Chủ nhân', fLover: 'Người yêu', fSub: 'Nô lệ', fFriend: 'Bạn bè', colName: 'Tên', colId: 'ID', colRel: 'Quan hệ', colZone: 'Khu', colRoom: 'Phòng', colPerm: 'Quyền', colOps: 'Thao tác', colManage: 'Quản lý', colMgmt: 'Quản trị phòng', colMgmtNoPerm: 'Quản trị phòng (không có quyền)', colSeen: 'Lần cuối gặp',
