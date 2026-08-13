@@ -1,25 +1,18 @@
-// ════════════════════════════════════════
-//  FCM entry (bundled by vite → assets/main.js)
-//  Loader (loader.user.js / loader.local.user.js) dynamically imports this file.
-//  Splits the former single-file userscript (Plugins/liko-FCM.user.js) into ./{core,panel,chat,data,i18n}/*.js.
-// ════════════════════════════════════════
-
-import { MOD_VER, FCM_ALREADY_LOADED } from './core/config.js';
-import { openPanel, closePanel, togglePanel } from './panel/panel.js';
-import { init } from './core/core-init.js';
-
+// Keep this bootstrap free of static imports so the duplicate guard runs
+// before ModSDK registration or any other FCM module side effect.
 window.Liko = window.Liko ?? {};
 
-if (FCM_ALREADY_LOADED) {
-    console.warn('🐈‍⬛ [FCM] ⚠️ Already loaded, skipping duplicate import.');
+if (window.Liko.FCM) {
+    console.warn('[FCM] Already loaded, skipping duplicate import.');
 } else {
-    // 對外唯一入口：window.Liko.FCM（版本 + API；loader 先設 'loading' 佔位）
-    window.Liko.FCM = {
-        version: MOD_VER,
-        open: () => openPanel(),
-        close: () => closePanel(),
-        toggle: () => togglePanel(),
-    };
+    const fcmNamespace = window.Liko.FCM = {};
 
-    init();
+    import('./app.js').catch((error) => {
+        // A successful ModSDK registration writes the version in config.js.
+        // Only release the namespace if loading failed before that point.
+        if (window.Liko.FCM === fcmNamespace && !fcmNamespace.version) {
+            delete window.Liko.FCM;
+        }
+        console.error('[FCM] Failed to load:', error);
+    });
 }
