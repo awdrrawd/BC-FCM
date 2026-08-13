@@ -49,6 +49,11 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
 
     function doBeep(mn) {
         mn = parseInt(mn); const name = getDisplayName(mn);
+        // Let the overlay disappear on screen before ServerSend enters other
+        // mods' synchronous hooks (notably WCE's first-time IM history load).
+        // This does not bypass ModSDK; it only moves the normal send to the
+        // next painted frame so the click itself remains responsive.
+        const sendAfterPaint = callback => requestAnimationFrame(() => setTimeout(callback, 0));
         const ex = document.getElementById('fcm-beep-overlay'); if (ex) { ex.remove(); return; }
         const overlay = document.createElement('div'); overlay.id = 'fcm-beep-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:center;justify-content:center;';
@@ -63,7 +68,14 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
         const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex;gap:12px;';
         const cancelBtn = document.createElement('button'); cancelBtn.textContent = T('beepCancel'); cancelBtn.style.cssText = 'flex:1;padding:14px;background:#1e1635;border:1.5px solid #5a48a8;border-radius:10px;color:#c4a0e0;font-size:14px;cursor:pointer;font-weight:600;'; cancelBtn.addEventListener('click', () => overlay.remove());
         const sendBtn = document.createElement('button'); sendBtn.textContent = T('beepSend'); sendBtn.style.cssText = 'flex:2;padding:14px;background:#1a3860;border:1.5px solid #4090d8;border-radius:10px;color:#90d0ff;font-size:15px;cursor:pointer;font-weight:700;';
-        sendBtn.addEventListener('click', () => { const msg = ta.value.trim(); ServerSend('AccountBeep', { MemberNumber: mn, BeepType: '', Message: msg || undefined }); if (typeof FriendListBeepLog !== 'undefined') FriendListBeepLog.push({ MemberNumber: mn, MemberName: name, Sent: true, Time: new Date(), Message: msg }); overlay.remove(); });
+        sendBtn.addEventListener('click', () => {
+            const msg = ta.value.trim();
+            overlay.remove();
+            sendAfterPaint(() => {
+                ServerSend('AccountBeep', { MemberNumber: mn, BeepType: '', Message: msg || undefined });
+                if (typeof FriendListBeepLog !== 'undefined') FriendListBeepLog.push({ MemberNumber: mn, MemberName: name, Sent: true, Time: new Date(), Message: msg });
+            });
+        });
         ta.addEventListener('keydown', e => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); sendBtn.click(); } if (e.key === 'Escape') overlay.remove(); e.stopPropagation(); });
         const summonBtn = document.createElement('button');
         summonBtn.textContent = T('beepSummon');
@@ -71,16 +83,18 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
         summonBtn.addEventListener('click', () => {
             const msg = T('beepSummonConfirm', name);
             showConfirm(msg, () => {
-                try {
-                    ServerSend('AccountBeep', {
-                        MemberNumber: mn, BeepType: '',
-                        Message: 'summon',
-                        ChatRoomName: (typeof ChatRoomData !== 'undefined' && ChatRoomData) ? ChatRoomData.Name : undefined,
-                        ChatRoomSpace: (typeof ChatRoomData !== 'undefined' && ChatRoomData) ? ChatRoomData.Space : undefined,
-                    });
-                } catch(e) { console.warn('🐈‍⬛ [FCM] summon error:', e); }
-                if (typeof FriendListBeepLog !== 'undefined') FriendListBeepLog.push({ MemberNumber: mn, MemberName: name, Sent: true, Time: new Date(), Message: '[summon]' });
                 overlay.remove();
+                sendAfterPaint(() => {
+                    try {
+                        ServerSend('AccountBeep', {
+                            MemberNumber: mn, BeepType: '',
+                            Message: 'summon',
+                            ChatRoomName: (typeof ChatRoomData !== 'undefined' && ChatRoomData) ? ChatRoomData.Name : undefined,
+                            ChatRoomSpace: (typeof ChatRoomData !== 'undefined' && ChatRoomData) ? ChatRoomData.Space : undefined,
+                        });
+                    } catch(e) { console.warn('🐈‍⬛ [FCM] summon error:', e); }
+                    if (typeof FriendListBeepLog !== 'undefined') FriendListBeepLog.push({ MemberNumber: mn, MemberName: name, Sent: true, Time: new Date(), Message: '[summon]' });
+                });
             }, T('beepSummon'));
         });
         if (typeof ChatRoomData === 'undefined' || !ChatRoomData) {
