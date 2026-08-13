@@ -1,18 +1,18 @@
-// Keep this bootstrap free of static imports so the duplicate guard runs
-// before ModSDK registration or any other FCM module side effect.
-window.Liko = window.Liko ?? {};
+// FCM entry (bundled by Vite to assets/main.js).
+import { FCM_ALREADY_LOADED, MOD_VER } from './core/version.js';
+import './core/config.js';
+import { openPanel, closePanel, togglePanel } from './panel/panel.js';
+import { init } from './core/core-init.js';
 
-if (window.Liko.FCM) {
-    console.warn('[FCM] Already loaded, skipping duplicate import.');
+if (FCM_ALREADY_LOADED) {
+    console.warn('[FCM] Already loaded, skipping duplicate initialization.');
 } else {
-    const fcmNamespace = window.Liko.FCM = {};
-
-    import('./app.js').catch((error) => {
-        // A successful ModSDK registration writes the version in config.js.
-        // Only release the namespace if loading failed before that point.
-        if (window.Liko.FCM === fcmNamespace && !fcmNamespace.version) {
-            delete window.Liko.FCM;
-        }
-        console.error('[FCM] Failed to load:', error);
+    Object.assign(window.Liko.FCM, {
+        version: MOD_VER,
+        open: () => openPanel(),
+        close: () => closePanel(),
+        toggle: () => togglePanel(),
     });
+
+    init();
 }
