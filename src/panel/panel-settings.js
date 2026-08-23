@@ -1,12 +1,13 @@
 import { cfg, saveCfg, THEME_DEFAULTS } from '../core/config.js';
 import { T, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, ensureI18n } from '../i18n/i18n.js';
 import { applyTheme } from './styles.js';
-import { PDB, _pc, Snapshot, detectWCESave, setAvStatusEl } from '../data/profile-db.js';
+import { PDB, _pc, Snapshot, detectWCESave, setAvStatusEl, ensureOwnAvatarSnapshot, updateOwnAvatarSnapshot, updateOwnAvatarProfile } from '../data/profile-db.js';
 import { buildFriendList } from '../data/data.js';
 import { mkBtn, mkToggle, refreshSnapshotsForList } from './panel-widgets.js';
 import { exportProfiles, importProfiles } from './panel-people.js';
 import { _applyWhisperStyle, _removeWhisperAvatar, _installOocProtect, _uninstallOocProtect } from '../chat/chat-fx.js';
 import { renderCurrent, reopenForLang } from './panel.js';
+import { refreshChatSettings } from '../communication/chat.js';
 // ════════════════════════════════════════
 //  FCM module: panel-settings.js  (split from panel.js)
 //  設定頁。與 index 唯一的耦合是「切換語言後重建面板」，已抽成 reopenForLang()。
@@ -20,11 +21,24 @@ function renderSettings(container) {
         const tog = mkToggle(on, onChange), info = document.createElement('div');
         const lbl = document.createElement('div'); lbl.className = 'fcm-set-label'; lbl.textContent = label;
         const nt = document.createElement('div'); nt.className = 'fcm-set-note'; nt.textContent = note;
-        info.appendChild(lbl); info.appendChild(nt); row.appendChild(tog); row.appendChild(info);
+        info.style.flex = '1';
+        info.appendChild(lbl); info.appendChild(nt); row.appendChild(info); row.appendChild(tog);
         return row;
     }
-    function sectionHeader(title) {
+    const nav = document.createElement('div'); nav.className = 'fcm-settings-nav';
+    const navItems = [['main', T('settingsTabMain')], ['communication', T('settingsTabCommunication')], ['chat', T('settingsTabChat')]];
+    navItems.forEach(([id, label], index) => {
+        const b = document.createElement('button'); b.textContent = label; b.classList.toggle('active', index === 0);
+        b.addEventListener('click', () => {
+            nav.querySelectorAll('button').forEach(x => x.classList.remove('active')); b.classList.add('active');
+            wrap.querySelector(`#fcm-settings-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        });
+        nav.appendChild(b);
+    });
+    wrap.appendChild(nav);
+    function sectionHeader(title, id) {
         const h = document.createElement('div');
+        if (id) { h.id = `fcm-settings-${id}`; h.className = `fcm-settings-section fcm-settings-${id}`; }
         h.style.cssText = 'font-size:15px;font-weight:800;letter-spacing:1px;color:#c4a0e0;padding:14px 0 4px 0;border-bottom:2px solid #3a2870;margin-bottom:2px;';
         h.textContent = title; wrap.appendChild(h);
     }
@@ -33,7 +47,7 @@ function renderSettings(container) {
     // ══════════════════════════════════════════
     //  GROUP A: UI 管理
     // ══════════════════════════════════════════
-    sectionHeader(T('setSecUI'));
+    sectionHeader(T('setSecUI'), 'main');
 
     // ── Language ──────────────────────────────
     const langRow = document.createElement('div'); langRow.className = 'fcm-set-row'; langRow.style.alignItems = 'center';
@@ -71,7 +85,7 @@ function renderSettings(container) {
         const box = document.createElement('label'); box.style.cssText = 'display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#a090c8;cursor:pointer;';
         const inp = document.createElement('input'); inp.type = 'color'; inp.value = cfg[cfgKey] || THEME_DEFAULTS[cfgKey];
         inp.style.cssText = 'width:32px;height:24px;border-radius:6px;border:1px solid #5048a0;background:#1a1030;cursor:pointer;padding:1px;';
-        inp.addEventListener('input', () => { cfg[cfgKey] = inp.value; saveCfg(); applyTheme(); });
+        inp.addEventListener('input', () => { cfg[cfgKey] = inp.value; cfg.themePreset = 'custom'; saveCfg(); applyTheme(); });
         const span = document.createElement('span'); span.textContent = T(labelKey);
         box.appendChild(inp); box.appendChild(span); box._inp = inp;
         return box;
@@ -81,25 +95,91 @@ function renderSettings(container) {
     const fAccent = colorField('themeAccentColor', 'accentColor');
     const themeReset = mkBtn(T('themeReset'), 'fcm-btn', () => {
         cfg.panelColor = THEME_DEFAULTS.panelColor; cfg.fontColor = THEME_DEFAULTS.fontColor; cfg.accentColor = THEME_DEFAULTS.accentColor;
+        cfg.themePreset = 'violet';
         saveCfg(); applyTheme();
         fPanel._inp.value = THEME_DEFAULTS.panelColor; fFont._inp.value = THEME_DEFAULTS.fontColor; fAccent._inp.value = THEME_DEFAULTS.accentColor;
+        presetRow.querySelectorAll('button').forEach(x => x.classList.toggle('active', x.textContent === T('themePreset_violet')));
     });
     themeReset.style.cssText = 'font-size:11px;padding:5px 10px;';
     pickers.appendChild(fPanel); pickers.appendChild(fFont); pickers.appendChild(fAccent); pickers.appendChild(themeReset);
-    themeInfo.appendChild(themeLbl); themeInfo.appendChild(themeNote); themeInfo.appendChild(pickers);
+    const presetRow = document.createElement('div'); presetRow.className = 'fcm-theme-presets';
+    const themePresets = {
+        violet: ['#1a1821', '#f1ecff', '#7648fe'], eu: ['#171d29', '#f2efe6', '#cda85a'],
+        electronic: ['#0b0f14', '#d9f8ff', '#35e0c9'], jp: ['#f7f3ea', '#2b2a28', '#b23b32'],
+        cn: ['#1a1210', '#f2e6d8', '#c23616'], silentblack: ['#0a0a0a', '#ededed', '#d8d8d8'],
+        minimalwhite: ['#fafafa', '#171717', '#171717'],
+    };
+    Object.entries(themePresets).forEach(([key, colors]) => {
+        const b = document.createElement('button'); b.className = 'fcm-btn'; b.textContent = T(`themePreset_${key}`);
+        b.classList.toggle('active', cfg.themePreset === key);
+        b.addEventListener('click', () => {
+            [cfg.panelColor, cfg.fontColor, cfg.accentColor] = colors; cfg.themePreset = key;
+            fPanel._inp.value = colors[0]; fFont._inp.value = colors[1]; fAccent._inp.value = colors[2];
+            presetRow.querySelectorAll('button').forEach(x => x.classList.remove('active')); b.classList.add('active');
+            saveCfg(); applyTheme();
+        });
+        presetRow.appendChild(b);
+    });
+    themeInfo.appendChild(themeLbl); themeInfo.appendChild(themeNote); themeInfo.appendChild(presetRow); themeInfo.appendChild(pickers);
     themeRow.appendChild(themeInfo);
     wrap.appendChild(themeRow);
     divider();
 
     // ── Avatars ───────────────────────────────
-    const avRow = settingRow(T('setAvatars'), T('setAvatarsNote'), cfg.avatars, v => { cfg.avatars = v; saveCfg(); });
+    const avRow = document.createElement('div'); avRow.className = 'fcm-set-row'; avRow.style.alignItems = 'center';
+    const avDisplayInfo = document.createElement('div'); avDisplayInfo.style.flex = '1';
+    const avDisplayLabel = document.createElement('div'); avDisplayLabel.className = 'fcm-set-label'; avDisplayLabel.textContent = T('setAvatars');
+    const avDisplayNote = document.createElement('div'); avDisplayNote.className = 'fcm-set-note'; avDisplayNote.textContent = T('setAvatarsNote');
+    avDisplayInfo.appendChild(avDisplayLabel); avDisplayInfo.appendChild(avDisplayNote); avRow.appendChild(avDisplayInfo);
+    const avDisplaySelect = document.createElement('select'); avDisplaySelect.className = 'fcm-sel';
+    [['none', '不顯示'], ['round', '圓形'], ['square', '方形']].forEach(([value, label]) => {
+        const option = document.createElement('option'); option.value = value; option.textContent = label;
+        option.selected = value === (cfg.avatars ? (cfg.avatarShape || 'square') : 'none'); avDisplaySelect.appendChild(option);
+    });
+    avDisplaySelect.addEventListener('change', async () => {
+        cfg.avatars = avDisplaySelect.value !== 'none';
+        if (cfg.avatars) { cfg.avatarShape = avDisplaySelect.value; cfg.chatAvatarShape = avDisplaySelect.value; }
+        saveCfg(); if (cfg.avatars) await ensureOwnAvatarSnapshot(); renderCurrent();
+    });
+    avRow.appendChild(avDisplaySelect);
+    const ownSnapshotBtn = document.createElement('button'); ownSnapshotBtn.className = 'fcm-btn';
+    ownSnapshotBtn.textContent = T('btnUpdateOwnAvatar'); ownSnapshotBtn.style.cssText = 'font-size:11px;padding:6px 12px;flex-shrink:0;';
+    ownSnapshotBtn.addEventListener('click', async () => {
+        ownSnapshotBtn.disabled = true;
+        const ok = await updateOwnAvatarSnapshot();
+        ownSnapshotBtn.textContent = ok ? T('ownAvatarUpdated') : T('ownAvatarUpdateFailed');
+        setTimeout(() => { ownSnapshotBtn.textContent = T('btnUpdateOwnAvatar'); ownSnapshotBtn.disabled = false; }, 2500);
+    });
     const cacheBtn = document.createElement('button'); cacheBtn.className = 'fcm-btn fcm-btn-blue';
     cacheBtn.textContent = T('btnReloadAvatars'); cacheBtn.style.cssText = 'font-size:11px;padding:6px 12px;flex-shrink:0;margin-left:auto;';
     cacheBtn.title = T('reloadAvatarsNote');
-    avRow.appendChild(cacheBtn);
+    avRow.appendChild(ownSnapshotBtn); avRow.appendChild(cacheBtn);
     wrap.appendChild(avRow);
+    const avatarModeRow = document.createElement('div'); avatarModeRow.className = 'fcm-set-row'; avatarModeRow.style.alignItems = 'center';
+    const avatarModeInfo = document.createElement('div'); avatarModeInfo.style.flex = '1';
+    const avatarModeLabel = document.createElement('div'); avatarModeLabel.className = 'fcm-set-label'; avatarModeLabel.textContent = T('avatarModeLabel');
+    const avatarModeNote = document.createElement('div'); avatarModeNote.className = 'fcm-set-note'; avatarModeNote.textContent = T('avatarModeNote');
+    avatarModeInfo.appendChild(avatarModeLabel); avatarModeInfo.appendChild(avatarModeNote);
+    const avatarModeSelect = document.createElement('select'); avatarModeSelect.className = 'fcm-sel';
+    [['url', T('avatarModeUrl')], ['game', T('avatarModeGame')], ['none', T('avatarModeNone')]].forEach(([value, label]) => {
+        const o = document.createElement('option'); o.value = value; o.textContent = label; o.selected = cfg.avatarMode === value; avatarModeSelect.appendChild(o);
+    });
+    avatarModeRow.appendChild(avatarModeInfo); avatarModeRow.appendChild(avatarModeSelect); wrap.appendChild(avatarModeRow);
+    const avatarUrlRow = document.createElement('div'); avatarUrlRow.className = 'fcm-set-row'; avatarUrlRow.style.paddingLeft = '56px';
+    const avatarUrlInput = document.createElement('input'); avatarUrlInput.className = 'fcm-search'; avatarUrlInput.placeholder = 'https://…'; avatarUrlInput.value = cfg.avatarUrl || '';
+    avatarUrlInput.style.width = '100%'; avatarUrlRow.appendChild(avatarUrlInput); wrap.appendChild(avatarUrlRow);
+    const paintAvatarMode = () => { avatarUrlRow.style.display = avatarModeSelect.value === 'url' ? 'flex' : 'none'; };
+    avatarModeSelect.addEventListener('change', async () => {
+        cfg.avatarMode = avatarModeSelect.value; saveCfg(); paintAvatarMode();
+        await updateOwnAvatarProfile(cfg.avatarMode, cfg.avatarUrl);
+    });
+    avatarUrlInput.addEventListener('change', async () => {
+        cfg.avatarUrl = avatarUrlInput.value.trim(); saveCfg();
+        if (cfg.avatarMode === 'url') await updateOwnAvatarProfile('url', cfg.avatarUrl);
+    });
+    paintAvatarMode();
 
-    const avPanel = document.createElement('div');
+    const avPanel = document.createElement('div'); avPanel.className = 'fcm-avatar-options';
     avPanel.style.cssText = 'display:none;margin:0 0 4px 0;padding:10px 14px;background:#1a1030;border-radius:8px;border:1px solid #3a2870;flex-direction:column;gap:8px;';
     const avStatus = document.createElement('div'); avStatus.className = 'fcm-reload-status'; avStatus.style.textAlign = 'center';
     setAvStatusEl(avStatus);
@@ -130,7 +210,8 @@ function renderSettings(container) {
     loadExecBtn.addEventListener('click', async () => {
         if (loadExecBtn.disabled) return;
         loadExecBtn.disabled = true;
-        const friendMns = buildFriendList().map(f => f.mn).filter(mn => { const snap = Snapshot._cache[mn]; return !snap || snap.length <= 800; });
+        const friendMns = [];
+        for (const f of buildFriendList()) if (!await Snapshot.get(f.mn)) friendMns.push(f.mn);
         const total = friendMns.length;
         if (total === 0) { avStatus.textContent = T('noFriendsToLoad'); loadExecBtn.disabled = false; setTimeout(() => { avStatus.textContent = ''; }, 3000); return; }
         const waitMs = Math.min(30000, Math.max(5000, total * 150));
@@ -227,9 +308,35 @@ function renderSettings(container) {
     wrap.appendChild(exportRow);
 
     // ══════════════════════════════════════════
+    //  GROUP B: communication foundation
+    // ══════════════════════════════════════════
+    sectionHeader(T('setSecCommunication'), 'communication');
+    wrap.appendChild(settingRow(T('communicationEnabled'), T('communicationEnabledNote'), cfg.communicationEnabled, v => { cfg.communicationEnabled = v; saveCfg(); refreshChatSettings(); }));
+    divider();
+    wrap.appendChild(settingRow(T('persistentBalloon'), T('persistentBalloonNote'), cfg.persistentBalloon, v => { cfg.persistentBalloon = v; saveCfg(); refreshChatSettings(); }));
+    divider();
+    wrap.appendChild(settingRow(T('takeoverChatButtons'), T('takeoverChatButtonsNote'), cfg.takeoverFcmChatButtons, v => { cfg.takeoverFcmChatButtons = v; saveCfg(); }));
+    divider();
+    wrap.appendChild(settingRow(T('individualBalloons'), T('individualBalloonsNote'), cfg.individualBalloons, v => { cfg.individualBalloons = v; saveCfg(); refreshChatSettings(); }));
+    divider();
+    wrap.appendChild(settingRow(T('notificationAnimation'), T('notificationAnimationNote'), cfg.notificationAnimation, v => { cfg.notificationAnimation = v; saveCfg(); }));
+    divider();
+    wrap.appendChild(settingRow(T('notificationAudio'), T('notificationAudioNote'), cfg.notificationAudio, v => { cfg.notificationAudio = v; saveCfg(); }));
+    const soundRow = document.createElement('div'); soundRow.className = 'fcm-set-row'; soundRow.style.alignItems = 'center';
+    const soundInfo = document.createElement('div'); soundInfo.style.flex = '1';
+    const soundLabel = document.createElement('div'); soundLabel.className = 'fcm-set-label'; soundLabel.textContent = T('notificationSound');
+    soundInfo.appendChild(soundLabel);
+    const soundSelect = document.createElement('select'); soundSelect.className = 'fcm-sel';
+    [['Audio/BeepAlarm.mp3', 'BeepAlarm'], ['Audio/BellMedium.mp3', 'BellMedium'], ['Audio/Belt1.mp3', 'Belt1'], ['Audio/BrushHair4.mp3', 'BrushHair4'], ['Audio/VibrationTone4ShortLoop.mp3', 'VibrationTone4ShortLoop']].forEach(([value, label]) => {
+        const o = document.createElement('option'); o.value = value; o.textContent = label; o.selected = cfg.notificationSound === value; soundSelect.appendChild(o);
+    });
+    soundSelect.addEventListener('change', () => { cfg.notificationSound = soundSelect.value; saveCfg(); try { new Audio(cfg.notificationSound).play().catch(() => {}); } catch {} });
+    soundRow.appendChild(soundInfo); soundRow.appendChild(soundSelect); wrap.appendChild(soundRow);
+
+    // ══════════════════════════════════════════
     //  GROUP B: 聊天室管理
     // ══════════════════════════════════════════
-    sectionHeader(T('setSecChat'));
+    sectionHeader(T('setSecChat'), 'chat');
 
     // ── Profile 關係人快速搜尋（置於聊天室管理最上方）──
     buildProfileRelSetting();
@@ -245,9 +352,11 @@ function renderSettings(container) {
     const wiNote = document.createElement('div'); wiNote.className = 'fcm-set-note'; wiNote.textContent = T('whisperIndicatorNote');
     wiInfo.appendChild(wiLbl); wiInfo.appendChild(wiNote);
     const wiColorLabelBtn = document.createElement('span');
+    wiColorLabelBtn.className = 'fcm-color-edit-label';
     wiColorLabelBtn.style.cssText = 'font-size:11px;color:#a080c8;white-space:nowrap;flex-shrink:0;cursor:pointer;';
     wiColorLabelBtn.textContent = T('colorEditLabel');
     const wiColorBtn = document.createElement('button');
+    wiColorBtn.className = 'fcm-color-button';
     wiColorBtn.style.cssText = `width:28px;height:28px;border-radius:50%;background:${cfg.whisperColor||'#b070e8'};border:2px solid #6040a0;cursor:pointer;flex-shrink:0;transition:border-color .15s;`;
     let wiColorOpen = false;
     const wiColorPanel = document.createElement('div'); wiColorPanel.style.cssText = 'display:none;padding:10px 0 4px 56px;';
@@ -267,7 +376,7 @@ function renderSettings(container) {
     swatchRow.appendChild(customInp); wiColorPanel.appendChild(swatchRow);
     wiColorLabelBtn.addEventListener('click', () => wiColorBtn.click());
     wiColorBtn.addEventListener('click', () => { wiColorOpen = !wiColorOpen; wiColorPanel.style.display = wiColorOpen ? 'block' : 'none'; wiColorBtn.style.borderColor = wiColorOpen ? '#d0a0ff' : '#6040a0'; });
-    wiToggleRow.appendChild(wiTog); wiToggleRow.appendChild(wiInfo); wiToggleRow.appendChild(wiColorLabelBtn); wiToggleRow.appendChild(wiColorBtn);
+    wiToggleRow.appendChild(wiInfo); wiToggleRow.appendChild(wiColorLabelBtn); wiToggleRow.appendChild(wiColorBtn); wiToggleRow.appendChild(wiTog);
     wiWrap.appendChild(wiToggleRow); wiWrap.appendChild(wiColorPanel);
     wrap.appendChild(wiWrap);
     updateColorBtn(cfg.whisperColor || '#b070e8');
@@ -298,12 +407,14 @@ function renderSettings(container) {
         cfg.profileRelations = v; saveCfg();
     });
     const prcColorLabelBtn = document.createElement('span');
+    prcColorLabelBtn.className = 'fcm-color-edit-label';
     prcColorLabelBtn.style.cssText = 'font-size:11px;color:#a080c8;white-space:nowrap;flex-shrink:0;cursor:pointer;margin-left:auto;';
     prcColorLabelBtn.textContent = T('colorEditLabel');   // 與私聊提示色共用「修改顏色」字串
     const _prcSwatchBg = c => c
         ? c
         : `#2a2048 linear-gradient(45deg, transparent 46%, #ff4040 46%, #ff4040 54%, transparent 54%)`;
     const prcColorBtn = document.createElement('button');
+    prcColorBtn.className = 'fcm-color-button';
     prcColorBtn.style.cssText = `width:28px;height:28px;border-radius:50%;background:${_prcSwatchBg(cfg.profileRelColor)};border:2px solid #6040a0;cursor:pointer;flex-shrink:0;transition:border-color .15s;`;
     let prcColorOpen = false;
     const prcColorPanel = document.createElement('div'); prcColorPanel.style.cssText = 'display:none;padding:10px 0 4px 0;';
@@ -345,7 +456,8 @@ function renderSettings(container) {
     prcSwatchRow.appendChild(prcCustomInp); prcColorPanel.appendChild(prcSwatchRow);
     prcColorLabelBtn.addEventListener('click', () => prcColorBtn.click());
     prcColorBtn.addEventListener('click', () => { prcColorOpen = !prcColorOpen; prcColorPanel.style.display = prcColorOpen ? 'block' : 'none'; prcColorBtn.style.borderColor = prcColorOpen ? '#d0a0ff' : '#6040a0'; });
-    prRow.appendChild(prcColorLabelBtn); prRow.appendChild(prcColorBtn);
+    const prToggle = prRow.querySelector('.fcm-tog');
+    prRow.insertBefore(prcColorLabelBtn, prToggle); prRow.insertBefore(prcColorBtn, prToggle);
     wrap.appendChild(prRow);
     wrap.appendChild(prcColorPanel);
     }   // end buildProfileRelSetting

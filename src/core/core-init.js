@@ -1,9 +1,10 @@
 import { MOD_VER, cfg, loadCfg } from './config.js';
 import { ensureI18n } from '../i18n/i18n.js';
-import { PDB, Snapshot, detectWCESave } from '../data/profile-db.js';
+import { PDB, Snapshot, detectWCESave, ensureOwnAvatarSnapshot } from '../data/profile-db.js';
 import { buildPanel, registerCommand } from '../panel/panel.js';
 import { _installOocProtect } from '../chat/chat-fx.js';
 import { registerHooks } from './hooks.js';
+import { initChat } from '../communication/chat.js';
 // ════════════════════════════════════════
 //  FCM module: core-init.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -12,7 +13,9 @@ import { registerHooks } from './hooks.js';
 
     async function init() {
         loadCfg();
-        if (typeof ChatRoomCharacter === 'undefined' || typeof Player === 'undefined') return setTimeout(init, 500);
+        if (typeof ChatRoomCharacter === 'undefined' || typeof Player === 'undefined' || !Player?.MemberNumber) return setTimeout(init, 500);
+        // Player settings become available only after login; merge them over the local fallback.
+        loadCfg();
 
         // 載入多語字庫（與 HSC 共用 Liko-i18n 引擎），完成後再建面板／首次渲染
         await ensureI18n();
@@ -26,8 +29,10 @@ import { registerHooks } from './hooks.js';
             if (stored.saveMode === undefined) {
                 await detectWCESave();
             }
+            if (cfg.avatars) await ensureOwnAvatarSnapshot();
         });
         buildPanel();
+        await initChat();
         registerHooks();
         registerCommand();
         console.log(`🐈‍⬛ [FCM] ✅ v${MOD_VER} loaded`);

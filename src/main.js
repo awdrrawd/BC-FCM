@@ -3,6 +3,7 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './core/version.js';
 import './core/config.js';
 import { openPanel, closePanel, togglePanel } from './panel/panel.js';
 import { init } from './core/core-init.js';
+import { openChat, closeChat } from './communication/chat.js';
 
 if (FCM_ALREADY_LOADED) {
     console.warn('[FCM] Already loaded, skipping duplicate initialization.');
@@ -12,6 +13,8 @@ if (FCM_ALREADY_LOADED) {
         open: () => openPanel(),
         close: () => closePanel(),
         toggle: () => togglePanel(),
+        openChat: memberNumber => openChat(memberNumber),
+        closeChat: () => closeChat(),
     });
 
     init();

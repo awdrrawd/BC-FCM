@@ -59,7 +59,7 @@ async function renderPeople(container, _myToken) {
     const wrapper = document.createElement('div'); wrapper.className = 'fcm-scroll-wrap';
     const scroll = document.createElement('div'); scroll.className = 'fcm-scroll';
     const countBar = document.createElement('div'); countBar.className = 'fcm-count';
-    const pageBar = document.createElement('div');
+    const pageBar = document.createElement('div'); pageBar.className = 'fcm-page-bar';
     pageBar.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 12px;background:#1a1230;border-top:1px solid #2a2048;flex-shrink:0;';
     wrapper.appendChild(scroll); wrapper.appendChild(countBar); wrapper.appendChild(pageBar);
     container.appendChild(wrapper);
@@ -206,7 +206,7 @@ async function renderPeople(container, _myToken) {
                 }
                 shareTd.appendChild(shareBtn);
             } else {
-                shareTd.innerHTML = '<span style="color:#4a3870;font-size:11px;">—</span>';
+                shareTd.innerHTML = '<span class="fcm-empty-value">—</span>';
             }
             const seenTime = p.seen;
             const seenTd = document.createElement('td'); seenTd.className = 'fcm-id'; seenTd.style.textAlign = 'center';

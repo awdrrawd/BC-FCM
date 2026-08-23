@@ -44,7 +44,7 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
     //  SETTINGS
     // ═══════════════════════════════════════════════════════════
     // 主題顏色預設值（＝原本精心調校的深紫配色）；三者皆為預設時不套用覆蓋、保留原生外觀
-    const THEME_DEFAULTS = { panelColor: '#1e1635', fontColor: '#f0e4ff', accentColor: '#a078e8' };
+    const THEME_DEFAULTS = { panelColor: '#1a1821', fontColor: '#f1ecff', accentColor: '#7648fe' };
     let cfg = {
         avatars: false, lang: 'auto', saveMode: 'off',
         favorites: [],                // 關注的成員編號（個人關係頁星號）
@@ -61,8 +61,52 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
         panelColor: THEME_DEFAULTS.panelColor,
         fontColor: THEME_DEFAULTS.fontColor,
         accentColor: THEME_DEFAULTS.accentColor,
+        themePreset: 'violet',
+        avatarMode: 'game',
+        avatarUrl: '',
+        avatarShape: 'square',
+        chatAvatarShape: 'square',
+        chatGroups: {},
+        chatMemberGroups: {},
+        busyMessage: '',
+        afkMessage: '',
+        busyAutoReply: false,
+        afkAutoReply: false,
+        chatAvatarMode: 'follow',
+        chatAvatarUrl: '',
+        chatThemeMode: 'follow',
+        chatThemePreset: 'violet',
+        communicationEnabled: false,
+        persistentBalloon: false,
+        takeoverFcmChatButtons: false,
+        individualBalloons: false,
+        notificationAnimation: true,
+        notificationAudio: true,
+        notificationSound: 'Audio/BeepAlarm.mp3',
+        chatLayout: 'split',
+        chatPanelPosition: null,
+        chatBalloonPosition: null,
+        chatUserBalloonPositions: {},
+        chatStatus: 'online',
     };
-    function loadCfg() { try { const s = localStorage.getItem('LikoFCM'); if (s) Object.assign(cfg, JSON.parse(s)); } catch {} }
-    function saveCfg() { try { localStorage.setItem('LikoFCM', JSON.stringify(cfg)); } catch {} }
+    function loadCfg() {
+        try { const s = localStorage.getItem('LikoFCM'); if (s) Object.assign(cfg, JSON.parse(s)); } catch {}
+        try { const s = Player?.ExtensionSettings?.FCM?.settings; if (s && typeof s === 'object') Object.assign(cfg, s); } catch {}
+        // Migrate the former built-in purple defaults; intentional custom colors are untouched.
+        if (cfg.panelColor === '#1e1635' && cfg.fontColor === '#f0e4ff' && cfg.accentColor === '#a078e8') {
+            Object.assign(cfg, THEME_DEFAULTS, { themePreset: 'violet' });
+        }
+        if (!['round', 'square'].includes(cfg.avatarShape)) cfg.avatarShape = 'square';
+        if (!['round', 'square'].includes(cfg.chatAvatarShape)) cfg.chatAvatarShape = 'square';
+    }
+    function saveCfg() {
+        try { localStorage.setItem('LikoFCM', JSON.stringify(cfg)); } catch {}
+        try {
+            Player.ExtensionSettings ??= {};
+            Player.ExtensionSettings.FCM ??= {};
+            Player.ExtensionSettings.FCM.settings = { ...cfg };
+            if (typeof globalThis.ServerPlayerExtensionSettingsSync === 'function') globalThis.ServerPlayerExtensionSettingsSync('FCM');
+        } catch {}
+    }
 
 export { MOD_VER, modApi, BTN_X, BTN_Y, BTN_W, BTN_H, FCM_ICON_SVG, _fcmIconImg, cfg, loadCfg, saveCfg, THEME_DEFAULTS };

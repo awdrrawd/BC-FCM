@@ -239,7 +239,7 @@
         "sortFavFirst": { "CN": "最爱优先" },
         "sortFriendFirst": { "CN": "好友优先" },
         "sortNameOnly": { "CN": "名称优先" },
-        "setSecUI": { "CN": "⚙ UI 管理" },
+        "setSecUI": { "CN": "⚙ 主设置" },
         "setSecChat": { "CN": "⚙ 聊天室管理" },
         "avCacheCleared": { "CN": "✓ 头像缓存已清除" },
         "noFriendsToLoad": { "CN": "没有需要加载的好友" },

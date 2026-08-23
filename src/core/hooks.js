@@ -1,11 +1,12 @@
 import { modApi, cfg, MOD_VER, BTN_X, BTN_Y, BTN_W, BTN_H, _fcmIconImg } from './config.js';
 import { T } from '../i18n/i18n.js';
 import { setOnlineFriends } from '../data/data.js';
-import { PDB, _captureSnapshotDelayed } from '../data/profile-db.js';
+import { PDB, syncRoomAvatar } from '../data/profile-db.js';
 import { renderCurrent, panelOpen, panelMini, uiTab, buildPanel, togglePanel, closePanel, openPanel, openPeopleSearch } from '../panel/panel.js';
 import { _applyWhisperStyle, _updateWhisperAvatar, _drawWavOnCanvas } from '../chat/chat-fx.js';
 import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from '../chat/wps-share.js';
 import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSHARE_TAG } from '../chat/actions.js';
+import { handleIncomingBeep, handleIncomingWhisper, handleOutgoingServerSend } from '../communication/chat.js';
 // ════════════════════════════════════════
 //  FCM module: hooks.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -78,6 +79,14 @@ import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSH
     }
 
     function registerHooks() {
+    modApi.hookFunction('ServerAccountBeep', 10, (args, next) => {
+        try { handleIncomingBeep(args[0]); } catch {}
+        return next(args);
+    });
+    modApi.hookFunction('ServerSend', 10, (args, next) => {
+        try { handleOutgoingServerSend(args[0], args[1]); } catch {}
+        return next(args);
+    });
     modApi.hookFunction('ServerAccountQueryResult', 0, (args, next) => {
         const data = args[0];
         if (data?.Query === 'OnlineFriends' && Array.isArray(data.Result)) {
@@ -102,7 +111,7 @@ import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSH
             const C = ChatRoomCharacter && ChatRoomCharacter.find(c => c.MemberNumber === raw.MemberNumber);
             if (C) {
                 if (cfg.saveMode !== 'off') PDB.save(C, raw);
-                _captureSnapshotDelayed(C);
+                if (cfg.avatars) syncRoomAvatar(C);
             }
         }), 800);
         return r;
@@ -115,7 +124,7 @@ import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSH
                 const C = ChatRoomCharacter && ChatRoomCharacter.find(c => c.MemberNumber === raw.MemberNumber);
                 if (C) {
                     if (cfg.saveMode !== 'off') PDB.save(C, raw);
-                    _captureSnapshotDelayed(C);
+                    if (cfg.avatars) syncRoomAvatar(C);
                 }
             }, 800);
         }
@@ -184,6 +193,7 @@ import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSH
     // WPS hidden share messages
     modApi.hookFunction('ChatRoomMessage', 0, (args, next) => {
         const data = args[0];
+        try { handleIncomingWhisper(data); } catch {}
         // 好友邀請通知：leash 式 Hidden 訊息（同房投遞）→ 顯示接收卡，抑制 BC 預設處理
         if (data?.Type === 'Hidden' && data?.Content === FRIENDREQ_MSG) {
             try { handleIncomingFriendReq(data.Sender); } catch {}

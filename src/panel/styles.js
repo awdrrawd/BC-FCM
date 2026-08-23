@@ -13,18 +13,29 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
         const t = (cfg && cfg.fontColor)   || THEME_DEFAULTS.fontColor;
         const a = (cfg && cfg.accentColor) || THEME_DEFAULTS.accentColor;
         let el = document.getElementById('fcm-theme');
-        const isDefault = p === THEME_DEFAULTS.panelColor && t === THEME_DEFAULTS.fontColor && a === THEME_DEFAULTS.accentColor;
-        if (isDefault) { if (el) el.remove(); return; }
         if (!el) { el = document.createElement('style'); el.id = 'fcm-theme'; document.head.appendChild(el); }
         const mix = (c1, pct, c2) => `color-mix(in srgb, ${c1} ${pct}%, ${c2})`;
-        const panel2     = mix(p, 88, '#000');          // 稍深：分隔線
-        const panel1     = mix(p, 80, '#000');          // 更深：工具列 / 分頁列 / 計數列底
+        const presetTokens = {
+            violet: ['#13101a','#322744','#2c2140','#2a2338','#9c93b8'],
+            eu: ['#1e2636','#262f44','#303a54','#2f3a52','#aab2c9'],
+            electronic: ['#10161d','#16202b','#17324a','#1c2a33','#6f8a99'],
+            jp: ['#efe8d8','#e6ddc8','#ded1b2','#d8cdb3','#7a7266'],
+            cn: ['#241a17','#2e211d','#3a2620','#4a332b','#b8a58f'],
+            silentblack: ['#121212','#1c1c1c','#262626','#232323','#7a7a7a'],
+            minimalwhite: ['#f2f2f2','#ececec','#e2e2e2','#e0e0e0','#8a8a8a'],
+        };
+        const preset = presetTokens[cfg?.themePreset];
+        const colorScheme = ['jp', 'minimalwhite'].includes(cfg?.themePreset) ? 'light' : 'dark';
+        const panel2     = preset?.[3] || mix(p, 88, '#000');
+        const panel1     = preset?.[0] || mix(p, 80, '#000');
+        const panelRaised = preset?.[1] || mix(p, 82, a);
+        const panelSelected = preset?.[2] || mix(p, 72, a);
         const panelHead  = mix(p, 78, a);               // 帶強調色的表頭
-        const rowHover   = mix(p, 82, a);               // 列 hover
+        const rowHover   = panelRaised;                 // 列 hover
         const inputBg    = mix(p, 70, '#000');          // 輸入框底
-        const border     = mix(a, 55, '#000');          // 邊框（較深強調色）
+        const border     = preset?.[3] || mix(a, 55, '#000');
         const borderSoft = mix(a, 40, p);               // 柔邊框
-        const textDim    = mix(t, 62, p);               // 次要文字
+        const textDim    = preset?.[4] || mix(t, 62, p);
         const accentB    = mix(a, 72, '#fff');          // 亮強調（標題 / 選中分頁）
         const hdrGrad    = mix(p, 84, a);               // 標題列漸層起點
         // 只主題化「純色」按鈕（查看／悄悄話／重新整理…）；語意化的彩色按鈕
@@ -43,7 +54,9 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-tab{color:${textDim}!important;}
 .fcm-tab:hover{color:${accentB}!important;background:${rowHover}!important;}
 .fcm-tab.active{color:${accentB}!important;border-bottom-color:${a}!important;background:${p}!important;}
-.fcm-toolbar{background:${panel1}!important;border-bottom-color:${borderSoft}!important;}
+.fcm-toolbar{background:${panel1}!important;border-bottom-color:${borderSoft}!important;color:${textDim}!important;}
+.fcm-nick-tog,.fcm-ftog{background:transparent!important;border-color:${border}!important;color:${textDim}!important;}
+.fcm-nick-tog:hover,.fcm-ftog:hover,.fcm-ftog.on{background:${panelSelected}!important;border-color:${a}!important;color:${accentB}!important;}
 .fcm-subtabs{background:${panel1}!important;border-bottom-color:${borderSoft}!important;}
 .fcm-stab{color:${textDim}!important;}
 .fcm-stab.active{color:${accentB}!important;border-bottom-color:${a}!important;}
@@ -52,15 +65,68 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-tbl th{background:${panelHead}!important;color:${textDim}!important;border-bottom-color:${border}!important;}
 .fcm-tbl td{border-bottom-color:${panel2}!important;}
 .fcm-row:hover td{background:${rowHover}!important;}
+.fcm-row td{border-bottom-color:${border}!important;}
 .fcm-name{color:${t}!important;}
+.fcm-av{background:${panel1}!important;border-color:${border}!important;color:${a}!important;}
+.fcm-you{color:${a}!important;}.fcm-id,.fcm-id-copy{color:${textDim}!important;}.fcm-id-copy:hover{color:${a}!important;}.fcm-zone{color:${accentB}!important;}
 .fcm-search{background:${inputBg}!important;border-color:${border}!important;color:${t}!important;}
-.fcm-sel{background:${inputBg}!important;border-color:${border}!important;color:${textDim}!important;}
+.fcm-search::placeholder{color:${textDim}!important;}.fcm-clear-btn{color:${textDim}!important;}.fcm-clear-btn:hover{color:${a}!important;}
+.fcm-search:hover{border-color:${a}!important;}.fcm-search:focus{background:${panel1}!important;border-color:${a}!important;color:${t}!important;box-shadow:0 0 0 2px color-mix(in srgb, ${a} 24%, transparent)!important;}
+.fcm-search::selection{background:${a}!important;color:${p}!important;}
+.fcm-sel{background:${inputBg}!important;border-color:${border}!important;color:${t}!important;color-scheme:${colorScheme};}
+.fcm-sel:hover,.fcm-sel:focus{border-color:${a}!important;outline:none!important;box-shadow:0 0 0 2px color-mix(in srgb, ${a} 20%, transparent)!important;}
+.fcm-sel option{background:${panel1}!important;color:${t}!important;}.fcm-sel option:checked{background:${a}!important;color:${p}!important;}.fcm-sel option:disabled{color:${textDim}!important;}
 .fcm-btn${_plainBtn}{background:${p}!important;border-color:${border}!important;color:${textDim}!important;}
 .fcm-btn${_plainBtn}:hover{background:${rowHover}!important;border-color:${a}!important;color:${accentB}!important;}
 .fcm-set-label{color:${t}!important;}
 .fcm-set-note{color:${textDim}!important;}
-.fcm-set-desc,.fcm-dbstat{background:${panel1}!important;color:${textDim}!important;}
+.fcm-settings-section{color:${accentB}!important;border-bottom-color:${a}!important;}
+.fcm-settings-wrap label,.fcm-settings-wrap label span{color:${textDim}!important;}
+.fcm-settings-wrap input[type="color"]{background:${panel1}!important;border-color:${border}!important;}
+.fcm-avatar-options{background:${panel1}!important;border-color:${border}!important;}
+.fcm-set-desc,.fcm-dbstat{background:${panel1}!important;color:${textDim}!important;border-color:${a}!important;}
+.fcm-people-hint,.fcm-page-bar{background:${panel1}!important;color:${textDim}!important;border-color:${border}!important;}
+.fcm-unknown-id-box,.fcm-help-card{background:${panel1}!important;border-color:${border}!important;color:${textDim}!important;}
+.fcm-unknown-id-title{color:${accentB}!important;}
+.fcm-help-title{color:${accentB}!important;}.fcm-help-text,.fcm-help-item,.fcm-help-item span{color:${textDim}!important;}.fcm-help-item .fcm-help-dot{color:${a}!important;}.fcm-help-footer{color:${textDim}!important;}
+.fcm-toolbar .fcm-lbl-sm{color:${textDim}!important;}
+.fcm-color-edit-label{color:${textDim}!important;}.fcm-color-button{border-color:${a}!important;}
+.fcm-room-card{border-color:${border}!important;background:transparent!important;}
+.fcm-room-card:hover{background:${rowHover}!important;}
+.fcm-room-name,.fcm-room-creator{color:${t}!important}.fcm-room-desc,.fcm-room-count{color:${textDim}!important;}
+.fcm-room-link,.fcm-room-private{color:${a}!important;border-bottom-color:${a}!important;}.fcm-empty-value,.fcm-empty,.fcm-offline,.fcm-room{color:${textDim}!important;}
+.fcm-zone-filter-btn{background:transparent!important;border-color:${border}!important;color:${textDim}!important;}.fcm-zone-filter-btn.active{background:${panelSelected}!important;border-color:${a}!important;color:${accentB}!important;}
+.fcm-wce-tag{background:transparent!important;border-color:${a}!important;color:${a}!important;}
+.fcm-btn-red,.fcm-btn-green,.fcm-btn-purple,.fcm-btn-blue,.fcm-btn-orange{background:transparent!important;}
+.fcm-btn-red:hover,.fcm-btn-green:hover,.fcm-btn-purple:hover,.fcm-btn-blue:hover,.fcm-btn-orange:hover{background:${rowHover}!important;}
+.fcm-warn{background:color-mix(in srgb, ${a} 50%, transparent)!important;color:${t}!important;border-color:${border}!important;text-align:center!important;}
+#fcm-panel input[type="checkbox"]{accent-color:${a}!important;}
+#fcm-panel *{scrollbar-color:${a} ${panelRaised};scrollbar-width:auto;}
+#fcm-panel *::-webkit-scrollbar{width:10px;height:10px;}#fcm-panel *::-webkit-scrollbar-track{background:${panelRaised}!important;border-left:1px solid ${border}!important;}#fcm-panel *::-webkit-scrollbar-thumb{background:${a}!important;border:2px solid ${panelRaised}!important;border-radius:7px;}#fcm-panel *::-webkit-scrollbar-thumb:hover{background:${accentB}!important;}
+.fcm-overlay{background:rgba(0,0,0,.55)!important;}
+.fcm-dialog{background:${p}!important;border-color:${a}!important;color:${t}!important;}
+.fcm-dialog div{color:${t}!important;}.fcm-dialog span{color:${textDim}!important;}
+.fcm-dialog textarea,.fcm-dialog input{background:${panel1}!important;border-color:${border}!important;color:${t}!important;scrollbar-color:${a} ${panel1};}
+.fcm-dialog textarea::placeholder,.fcm-dialog input::placeholder{color:${textDim}!important;}
+.fcm-dialog button{background:transparent!important;}.fcm-dialog button:hover{background:${rowHover}!important;}
+.fcm-chat-card,.fcm-room-share-message{background:color-mix(in srgb, ${p} 92%, transparent)!important;border-color:${a}!important;color:${t}!important;}
+.fcm-chat-card div{color:${t}!important;}.fcm-chat-card span{color:${textDim}!important;}.fcm-chat-card button{background:transparent!important;}
+.fcm-room-share-intro,.fcm-room-share-creator,.fcm-room-share-description{color:${textDim}!important;}
+.fcm-room-share-name{color:${t}!important;}.fcm-room-share-count{color:${a}!important;}
+.fcm-room-share-description{border-color:${border}!important;scrollbar-color:${a} ${panel1};}
+.fcm-room-share-badge{background:transparent!important;border-color:${a}!important;color:${a}!important;}
+.fcm-room-share-button{background:transparent!important;border-color:${a}!important;color:${a}!important;}.fcm-room-share-button:hover{background:${rowHover}!important;}
+.fcm-settings-nav{background:${panel1}!important;border-color:${borderSoft}!important;}
+.fcm-settings-nav button{color:${textDim}!important;border-color:${borderSoft}!important;}
+.fcm-settings-nav button:hover,.fcm-settings-nav button.active{color:${accentB}!important;border-color:${a}!important;background:${rowHover}!important;}
+.fcm-theme-presets .fcm-btn.active{color:${a}!important;border-color:${a}!important;background:${panelSelected}!important;box-shadow:0 0 0 1px ${a} inset!important;}
+.fcm-settings-wrap::-webkit-scrollbar-track,.fcm-scroll::-webkit-scrollbar-track{background:${panelRaised}!important;}
+.fcm-settings-wrap::-webkit-scrollbar-thumb,.fcm-scroll::-webkit-scrollbar-thumb{background:${a}!important;border-color:${panelRaised}!important;}
+.fcm-tog.on{background:${mix(a, 38, p)}!important;border-color:${a}!important;}
+.fcm-tog.on .fcm-tog-dot{background:${accentB}!important;}
+.fcm-tog{background:${panel1}!important;border-color:${border}!important;}.fcm-tog .fcm-tog-dot{background:${textDim}!important;}
 `;
+        window.dispatchEvent(new CustomEvent('fcm-theme-change'));
     }
 
     function injectStyles() {
@@ -70,7 +136,7 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 #fcm-panel,#fcm-panel *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
 #fcm-panel *{user-select:none;} #fcm-panel input,#fcm-panel textarea{user-select:text!important;}
 #fcm-panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(1050px,96vw);height:min(650px,92vh);
-  background:#1e1635;border:2px solid #5a48a8;border-radius:14px;box-shadow:0 12px 60px rgba(0,0,0,.75);z-index:99990;display:flex;flex-direction:column;overflow:hidden;}
+  background:#1a1821;border:2px solid #7648fe;border-radius:14px;box-shadow:0 12px 60px rgba(0,0,0,.75);z-index:99990;display:flex;flex-direction:column;overflow:hidden;}
 #fcm-panel.hidden{display:none!important;}
 #fcm-mini{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);width:220px;height:40px;background:#1e1635;border:2px solid #5a48a8;border-radius:20px;display:none;align-items:center;justify-content:center;gap:10px;cursor:pointer;z-index:99990;color:#c4a0e0;font-size:12px;transition:all .15s;}
 #fcm-mini.visible{display:flex;} #fcm-mini:hover{border-color:#b090f0;background:#261a48;}
@@ -105,7 +171,7 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-scroll{flex:1;overflow-y:auto;overflow-x:auto;min-height:0;}
 .fcm-scroll::-webkit-scrollbar{width:5px;height:5px;}
 .fcm-scroll::-webkit-scrollbar-track{background:#1a1030;}
-.fcm-scroll::-webkit-scrollbar-thumb{background:#4838a0;border-radius:3px;}
+.fcm-scroll::-webkit-scrollbar-thumb{background:#7648fe;border-radius:3px;}
 .fcm-count{font-size:11px;color:#9080b8;padding:6px 14px;background:#1a1230;border-top:1px solid #2a2048;letter-spacing:1px;flex-shrink:0;text-align:center;}
 .fcm-tbl{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;}
 .fcm-tbl th{background:#261a4a;color:#c4a0e0;font-size:10px;letter-spacing:1.2px;padding:9px 10px;text-align:center;border-bottom:2px solid #4a3890;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;}
@@ -156,6 +222,11 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-warn{padding:8px 16px;font-size:11px;color:#f0a060;background:#20100a;border-bottom:1px solid #601c08;flex-shrink:0;}
 .fcm-onesided-warn{padding:8px 14px;font-size:11px;color:#e8a040;background:#1e1205;border:1px solid #604010;border-radius:6px;margin:8px 14px;line-height:1.5;}
 .fcm-settings-wrap{padding:16px 24px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
+.fcm-settings-wrap::-webkit-scrollbar{width:7px}.fcm-settings-wrap::-webkit-scrollbar-track{background:#111016}.fcm-settings-wrap::-webkit-scrollbar-thumb{background:#7648fe;border-radius:5px}
+.fcm-settings-nav{position:sticky;top:-16px;z-index:5;display:flex;gap:8px;padding:10px 24px;background:#1a1821;border-bottom:1px solid #332b50;margin:-16px -24px 4px;width:calc(100% + 48px);}
+.fcm-settings-nav button{flex:1;padding:8px 12px;border-radius:8px;border:1px solid #40366c;background:transparent;color:#aaa1c4;font-weight:700;cursor:pointer;}
+.fcm-settings-section{scroll-margin-top:58px;}
+.fcm-theme-presets{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.fcm-theme-presets .fcm-btn{font-size:12px;padding:6px 10px}
 .fcm-set-row{display:flex;align-items:flex-start;gap:14px;padding:3px 0;}
 .fcm-tog{width:42px;height:22px;border-radius:11px;border:1px solid #4838a0;background:#1a1030;cursor:pointer;position:relative;transition:all .2s;flex-shrink:0;margin-top:2px;margin-right:4px;}
 .fcm-tog.on{background:#3a1858;border-color:#b080e8;}
@@ -176,6 +247,7 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-unknown-id-box{margin:16px;padding:14px 16px;background:#1a1030;border:1px solid #5a48a8;border-radius:10px;display:flex;flex-direction:column;gap:10px;}
 .fcm-unknown-id-title{color:#d0a8f0;font-size:13px;font-weight:700;}
 .fcm-seen-date{font-size:10px;color:#6050a0;margin-top:2px;}
+.fcm-empty-value{font-size:11px;}
 /* Whisper avatar: drawn on BC canvas, no DOM overlay needed */
 /* OOC flash */
 @keyframes fcm-ooc-flash{0%{box-shadow:0 0 0 3px #ff4040cc,0 0 16px #ff404088;border-color:#ff4040;}50%{box-shadow:0 0 0 6px #ff404066,0 0 24px #ff404044;border-color:#ff8080;}100%{box-shadow:0 0 0 3px #ff4040cc,0 0 16px #ff404088;border-color:#ff4040;}}

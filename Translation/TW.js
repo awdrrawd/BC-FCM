@@ -239,7 +239,7 @@
         "sortFavFirst": { "TW": "最愛優先" },
         "sortFriendFirst": { "TW": "好友優先" },
         "sortNameOnly": { "TW": "名稱優先" },
-        "setSecUI": { "TW": "⚙ UI 管理" },
+        "setSecUI": { "TW": "⚙ 主設置" },
         "setSecChat": { "TW": "⚙ 聊天室管理" },
         "avCacheCleared": { "TW": "✓ 頭像快取已清除" },
         "noFriendsToLoad": { "TW": "沒有需要載入的好友" },

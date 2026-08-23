@@ -239,7 +239,7 @@
         "sortFavFirst": { "EN": "Fav First" },
         "sortFriendFirst": { "EN": "Friends First" },
         "sortNameOnly": { "EN": "Name" },
-        "setSecUI": { "EN": "⚙ UI Management" },
+        "setSecUI": { "EN": "⚙ Main Settings" },
         "setSecChat": { "EN": "⚙ Chat Room" },
         "avCacheCleared": { "EN": "✓ Cache cleared" },
         "noFriendsToLoad": { "EN": "No friends need loading" },
