@@ -2,9 +2,14 @@ import { cfg, saveCfg, FCM_ICON_SVG } from '../core/config.js';
 import { getDisplayName, inRoomFn, onlineFriends, buildFriendList, getAllRels, isFav } from '../data/data.js';
 import { Snapshot } from '../data/profile-db.js';
 import { ChatStore, AudioStore } from './chat-store.js';
+import { T, FCM_LANGS, FCM_LANG_NAMES } from '../i18n/i18n.js';
+import { translate } from '../chat/translate.js';
 import CHAT_ICON from '../../assets/icons/chat.svg?raw';
 import HISTORY_ICON from '../../assets/icons/history.svg?raw';
 import GROUP_ICON from '../../assets/icons/group.svg?raw';
+
+const cssEsc = s => (window.CSS && CSS.escape) ? CSS.escape(String(s)) : String(s).replace(/["\\]/g, '\\$&');
+const TRANSLATE_PROVIDERS = [['mymemory', 'chatProvMyMemory'], ['google', 'chatProvGoogle'], ['libretranslate', 'chatProvLibre'], ['custom', 'chatProvCustom'], ['deepl', 'chatProvDeepl']];
 
 let root = null;
 let selectedMember = null;
@@ -130,6 +135,16 @@ async function recordMessage(data, { notify = true } = {}) {
         showIncomingBalloon(message);
         playNotificationSound();
         sendStatusAutoReply(message);
+    }
+    // D2：收到消息后（开启时）异步翻译，原文照存，仅本地多渲染一行译文
+    if (cfg.translateEnabled && cfg.translateAuto && message.direction === 'in') {
+        translate(message.content, cfg.translateTarget).then(translated => {
+            if (!translated) return;
+            message.translatedContent = translated;
+            ChatStore.put(message).catch(() => {});
+            const span = root?.querySelector(`.fcm-chat-message[data-msg-id="${cssEsc(message.id)}"] [data-translated]`);
+            if (span) { span.textContent = translated; span.classList.add('show'); }
+        }).catch(() => {});
     }
 }
 
@@ -265,10 +280,10 @@ function contactRows(rows, { history = false } = {}) {
 function notificationsHtml() {
     const rows = notificationTab === 'recent' ? recentConversations() : historyMessages();
     return `<div class="fcm-chat-subtabs">
-        <button class="${notificationTab === 'recent' ? 'active' : ''}" data-notification-tab="recent">最近聊天</button>
-        <button class="${notificationTab === 'history' ? 'active' : ''}" data-notification-tab="history">歷史對話</button>
+        <button class="${notificationTab === 'recent' ? 'active' : ''}" data-notification-tab="recent">${T('chatRecent')}</button>
+        <button class="${notificationTab === 'history' ? 'active' : ''}" data-notification-tab="history">${T('chatHistory')}</button>
     </div>
-    <div class="fcm-chat-scroll">${contactRows(rows, { history: true }) || '<div class="fcm-chat-empty">尚無聊天記錄</div>'}</div>`;
+    <div class="fcm-chat-scroll">${contactRows(rows, { history: true }) || `<div class="fcm-chat-empty">${T('chatNoRecord')}</div>`}</div>`;
 }
 
 function groupDefinitions() {
@@ -279,9 +294,9 @@ function groupDefinitions() {
         id, label, members: Object.entries(cfg.chatMemberGroups || {}).filter(([, groups]) => Array.isArray(groups) && groups.includes(id)).map(([mn]) => Number(mn)),
     }));
     return [
-        { id: 'room', label: '房間', members: roomMembers },
-        { id: 'favorites', label: '關注', members: favorites },
-        { id: 'contacts', label: '全部聯絡人', members: contacts },
+        { id: 'room', label: T('chatRoom'), members: roomMembers },
+        { id: 'favorites', label: T('chatFavorites'), members: favorites },
+        { id: 'contacts', label: T('chatAllContacts'), members: contacts },
         ...manual,
     ];
 }
@@ -290,27 +305,38 @@ function groupsHtml() {
     const groups = groupDefinitions();
     const group = groups.find(item => item.id === selectedGroup) || groups[0];
     const rows = group.members.map(memberNumber => ({ memberNumber, timestamp: 0, unread: 0 }));
-    return `<div class="fcm-chat-list-title">快速群組</div>
-        <div class="fcm-chat-group-create"><input data-group-name maxlength="24" placeholder="新增自訂群組…"><button data-add-group>＋</button></div>
+    return `<div class="fcm-chat-list-title">${T('chatGroups')}</div>
+        <div class="fcm-chat-group-create"><input data-group-name maxlength="24" placeholder="${T('chatNewGroup')}"><button data-add-group>＋</button></div>
         <div class="fcm-chat-group-tabs">${groups.map(item => `<button class="${item.id === group.id ? 'active' : ''}" data-group="${item.id}">${esc(item.label)}</button>`).join('')}</div>
-        <div class="fcm-chat-scroll">${contactRows(rows) || '<div class="fcm-chat-empty">此群組沒有成員</div>'}</div>`;
+        <div class="fcm-chat-scroll">${contactRows(rows) || `<div class="fcm-chat-empty">${T('chatGroupEmpty')}</div>`}</div>`;
 }
 
 function settingsHtml() {
-    return `<div class="fcm-chat-list-title">聊天設定</div>
+    const targetOpts = FCM_LANGS.filter(l => l !== 'auto').map(l => `<option value="${l}" ${cfg.translateTarget === l ? 'selected' : ''}>${FCM_LANG_NAMES[l] || l}</option>`).join('');
+    const providerOpts = TRANSLATE_PROVIDERS.map(([v, key]) => `<option value="${v}" ${cfg.translatorProvider === v ? 'selected' : ''}>${T(key)}</option>`).join('');
+    return `<div class="fcm-chat-list-title">${T('chatSettingsTitle')}</div>
         <div class="fcm-chat-settings fcm-set-like">
-            <div class="fcm-chat-setting-row"><span><b>顯示懸浮氣球</b><small>讓主氣球保持顯示</small></span><button class="fcm-chat-switch ${cfg.persistentBalloon ? 'on' : ''}" data-setting="persistent"><i></i></button></div>
-            <div class="fcm-chat-setting-row"><span><b>用戶獨立氣球</b><small>每位傳訊玩家使用獨立氣球</small></span><button class="fcm-chat-switch ${cfg.individualBalloons ? 'on' : ''}" data-setting="individual"><i></i></button></div>
-            <div class="fcm-chat-setting-row"><span><b>接管 FCM 私訊／悄悄話按鈕</b><small>按下後開啟對應玩家的聊天</small></span><button class="fcm-chat-switch ${cfg.takeoverFcmChatButtons ? 'on' : ''}" data-setting="takeover"><i></i></button></div>
-            <div class="fcm-chat-setting-row"><span><b>通知音效</b><small>收到新訊息時播放音效</small></span><button class="fcm-chat-switch ${cfg.notificationAudio ? 'on' : ''}" data-setting="audio"><i></i></button></div>
-            <div class="fcm-chat-setting-row"><span><b>通知動畫</b><small>新訊息到達時播放提示動畫</small></span><button class="fcm-chat-switch ${cfg.notificationAnimation ? 'on' : ''}" data-setting="animation"><i></i></button></div>
-            <div class="fcm-chat-setting-row"><span><b>通知音效</b><small>選擇遊戲內建提示音</small></span><select data-chat-sound>${[['Audio/BeepAlarm.mp3','BeepAlarm'],['Audio/BellMedium.mp3','BellMedium'],['Audio/Belt1.mp3','Belt1'],['Audio/BrushHair4.mp3','BrushHair4'],['Audio/VibrationTone4ShortLoop.mp3','VibrationTone4ShortLoop'],['custom','自訂音效']].map(([value,label]) => `<option value="${value}" ${cfg.notificationSound === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
-            <div class="fcm-chat-setting-row"><span><b>自訂音效</b><small>上傳音訊並保存於獨立的 FCM Chat Audio DB</small></span><input data-custom-sound type="file" accept="audio/*"></div>
-            <div class="fcm-chat-setting-row"><span><b>聊天主題</b><small>可跟隨 FCM 或獨立使用預設主題</small></span><select data-chat-theme-mode><option value="follow" ${cfg.chatThemeMode !== 'preset' ? 'selected' : ''}>跟隨 FCM</option><option value="preset" ${cfg.chatThemeMode === 'preset' ? 'selected' : ''}>獨立主題</option></select></div>
-            <div class="fcm-chat-setting-row"><span><b>獨立主題</b><small>選擇 CHAT 使用的主題</small></span><select data-chat-theme-preset>${['violet','eu','electronic','jp','cn','silentblack','minimalwhite'].map(value => `<option value="${value}" ${cfg.chatThemePreset === value ? 'selected' : ''}>${value}</option>`).join('')}</select></div>
-            <div class="fcm-chat-setting-row"><span><b>CHAT 頭像來源</b><small>與 FCM 頭像來源分開設定</small></span><select data-chat-avatar-mode><option value="follow" ${cfg.chatAvatarMode === 'follow' ? 'selected' : ''}>跟隨 FCM</option><option value="url" ${cfg.chatAvatarMode === 'url' ? 'selected' : ''}>URL 頭像</option><option value="game" ${cfg.chatAvatarMode === 'game' ? 'selected' : ''}>遊戲頭像</option></select></div>
-            <div class="fcm-chat-setting-row"><span><b>CHAT URL 頭像</b><small>僅在 CHAT 頭像來源選擇 URL 時使用</small></span><input data-chat-avatar-url value="${esc(cfg.chatAvatarUrl || '')}" placeholder="https://…"></div>
-            <div class="fcm-chat-setting-row"><span><b>頭像形狀</b><small>聊天列表與氣球的頭像外觀</small></span><select data-chat-avatar-shape><option value="round" ${cfg.chatAvatarShape === 'round' ? 'selected' : ''}>圓形</option><option value="square" ${cfg.chatAvatarShape !== 'round' ? 'selected' : ''}>方形</option></select></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatPersistentBalloon')}</b><small>${T('chatPersistentBalloonNote')}</small></span><button class="fcm-chat-switch ${cfg.persistentBalloon ? 'on' : ''}" data-setting="persistent"><i></i></button></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatIndividualBalloons')}</b><small>${T('chatIndividualBalloonsNote')}</small></span><button class="fcm-chat-switch ${cfg.individualBalloons ? 'on' : ''}" data-setting="individual"><i></i></button></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatTakeover')}</b><small>${T('chatTakeoverNote')}</small></span><button class="fcm-chat-switch ${cfg.takeoverFcmChatButtons ? 'on' : ''}" data-setting="takeover"><i></i></button></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatNotifyAudio')}</b><small>${T('chatNotifyAudioNote')}</small></span><button class="fcm-chat-switch ${cfg.notificationAudio ? 'on' : ''}" data-setting="audio"><i></i></button></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatNotifyAnim')}</b><small>${T('chatNotifyAnimNote')}</small></span><button class="fcm-chat-switch ${cfg.notificationAnimation ? 'on' : ''}" data-setting="animation"><i></i></button></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatSoundLabel')}</b><small>${T('chatSoundNote')}</small></span><select data-chat-sound>${[['Audio/BeepAlarm.mp3','BeepAlarm'],['Audio/BellMedium.mp3','BellMedium'],['Audio/Belt1.mp3','Belt1'],['Audio/BrushHair4.mp3','BrushHair4'],['Audio/VibrationTone4ShortLoop.mp3','VibrationTone4ShortLoop'],['custom', T('chatSoundCustom')]].map(([value,label]) => `<option value="${value}" ${cfg.notificationSound === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatSoundCustom')}</b><small>${T('chatSoundCustomNote')}</small></span><input data-custom-sound type="file" accept="audio/*"></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatThemeLabel')}</b><small>${T('chatThemeNote')}</small></span><select data-chat-theme-mode><option value="follow" ${cfg.chatThemeMode !== 'preset' ? 'selected' : ''}>${T('chatThemeFollow')}</option><option value="preset" ${cfg.chatThemeMode === 'preset' ? 'selected' : ''}>${T('chatThemePreset')}</option></select></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatThemePresetLabel')}</b><small>${T('chatThemePresetNote')}</small></span><select data-chat-theme-preset>${['violet','eu','electronic','jp','cn','silentblack','minimalwhite'].map(value => `<option value="${value}" ${cfg.chatThemePreset === value ? 'selected' : ''}>${value}</option>`).join('')}</select></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatAvatarSourceLabel')}</b><small>${T('chatAvatarSourceNote')}</small></span><select data-chat-avatar-mode><option value="follow" ${cfg.chatAvatarMode === 'follow' ? 'selected' : ''}>${T('chatAvatarFollow')}</option><option value="url" ${cfg.chatAvatarMode === 'url' ? 'selected' : ''}>${T('chatAvatarUrl')}</option><option value="game" ${cfg.chatAvatarMode === 'game' ? 'selected' : ''}>${T('chatAvatarGame')}</option></select></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatAvatarUrlLabel')}</b><small>${T('chatAvatarUrlNote')}</small></span><input data-chat-avatar-url value="${esc(cfg.chatAvatarUrl || '')}" placeholder="https://…"></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatAvatarShapeLabel')}</b><small>${T('chatAvatarShapeNote')}</small></span><select data-chat-avatar-shape><option value="round" ${cfg.chatAvatarShape === 'round' ? 'selected' : ''}>${T('chatAvatarShapeRound')}</option><option value="square" ${cfg.chatAvatarShape !== 'round' ? 'selected' : ''}>${T('chatAvatarShapeSquare')}</option></select></div>
+        </div>
+        <div class="fcm-chat-list-title">${T('chatTranslateTitle')}</div>
+        <div class="fcm-chat-settings fcm-set-like">
+            <div class="fcm-chat-setting-row"><span><b>${T('chatTranslateEnable')}</b><small>${T('chatTranslateEnableNote')}</small></span><button class="fcm-chat-switch ${cfg.translateEnabled ? 'on' : ''}" data-setting="translateEnabled"><i></i></button></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatTranslateAuto')}</b><small>${T('chatTranslateAutoNote')}</small></span><button class="fcm-chat-switch ${cfg.translateAuto ? 'on' : ''}" data-setting="translateAuto"><i></i></button></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatTranslateTarget')}</b><small></small></span><select data-translate-target>${targetOpts}</select></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatTranslateProvider')}</b><small></small></span><select data-translate-provider>${providerOpts}</select></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatTranslateEndpoint')}</b><small></small></span><input data-translate-endpoint value="${esc(cfg.translatorEndpoint || '')}" placeholder="https://…"></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('chatTranslateKey')}</b><small>${T('chatTranslateKeyNote')}</small></span><input data-translate-key type="password" value="${esc(cfg.translatorKey || '')}" placeholder="•••••"></div>
         </div>`;
 }
 
@@ -319,20 +345,20 @@ function profileHtml() {
     const signature = mine.signature || Player?.OnlineSharedSettings?.LCData?.MessageSetting?.Signature || '';
     return `<div class="fcm-chat-profile">
         <div class="fcm-chat-profile-head">${avatarHtml(Player?.MemberNumber || 0, 88)}<div><b>${esc(Player?.Nickname || Player?.Name || '')}</b><small>#${Number(Player?.MemberNumber || 0)}</small></div></div>
-        <label>URL 頭像<input data-profile-avatar-url value="${esc(cfg.avatarUrl || '')}" placeholder="https://…"></label>
-        <label>個人簡介<textarea data-profile-signature maxlength="100" rows="3">${esc(signature)}</textarea></label>
-        <div class="fcm-profile-statuses" data-profile-statuses data-value="${esc(cfg.chatStatus || 'online')}"><span>狀態</span><button class="${cfg.chatStatus === 'online' ? 'active' : ''}" data-profile-status="online"><i class="online"></i>在線</button><button class="${cfg.chatStatus === 'busy' ? 'active' : ''}" data-profile-status="busy"><i class="busy"></i>忙碌</button><button class="${cfg.chatStatus === 'afk' ? 'active' : ''}" data-profile-status="afk"><i class="afk"></i>AFK</button></div>
-        <label class="fcm-profile-message"><span>忙碌信息</span><textarea data-profile-busy rows="2">${esc(cfg.busyMessage || mine.busyMessage || '')}</textarea><button class="fcm-chat-switch ${cfg.busyAutoReply ? 'on' : ''}" data-profile-reply="busy"><i></i></button></label>
-        <label class="fcm-profile-message"><span>AFK 信息</span><textarea data-profile-afk rows="2">${esc(cfg.afkMessage || mine.afkMessage || '')}</textarea><button class="fcm-chat-switch ${cfg.afkAutoReply ? 'on' : ''}" data-profile-reply="afk"><i></i></button></label>
-        <button data-save-profile>保存個人資料</button>
+        <label>${T('chatProfileUrlAvatar')}<input data-profile-avatar-url value="${esc(cfg.avatarUrl || '')}" placeholder="https://…"></label>
+        <label>${T('chatProfileSignature')}<textarea data-profile-signature maxlength="100" rows="3">${esc(signature)}</textarea></label>
+        <div class="fcm-profile-statuses" data-profile-statuses data-value="${esc(cfg.chatStatus || 'online')}"><span>${T('chatProfileStatus')}</span><button class="${cfg.chatStatus === 'online' ? 'active' : ''}" data-profile-status="online"><i class="online"></i>${T('chatStatusOnline')}</button><button class="${cfg.chatStatus === 'busy' ? 'active' : ''}" data-profile-status="busy"><i class="busy"></i>${T('chatStatusBusy')}</button><button class="${cfg.chatStatus === 'afk' ? 'active' : ''}" data-profile-status="afk"><i class="afk"></i>${T('chatStatusAFK')}</button></div>
+        <label class="fcm-profile-message"><span>${T('chatBusyMessage')}</span><textarea data-profile-busy rows="2">${esc(cfg.busyMessage || mine.busyMessage || '')}</textarea><button class="fcm-chat-switch ${cfg.busyAutoReply ? 'on' : ''}" data-profile-reply="busy"><i></i></button></label>
+        <label class="fcm-profile-message"><span>${T('chatAfkMessage')}</span><textarea data-profile-afk rows="2">${esc(cfg.afkMessage || mine.afkMessage || '')}</textarea><button class="fcm-chat-switch ${cfg.afkAutoReply ? 'on' : ''}" data-profile-reply="afk"><i></i></button></label>
+        <button data-save-profile>${T('chatSaveProfile')}</button>
     </div>`;
 }
 
 function chatListHtml() {
-    return `<div class="fcm-chat-search"><input data-search value="${esc(search)}" placeholder="搜尋玩家…"></div>
-        <div class="fcm-chat-presence"><button class="${presenceFilter === 'online' ? 'active' : ''}" data-presence="online">在線</button><button class="${presenceFilter === 'offline' ? 'active' : ''}" data-presence="offline">不在線</button></div>
-        <div class="fcm-chat-tags"><button class="${relationFilter === 'owner' ? 'active' : ''}" data-rel="owner">主人／戀人</button><button class="${relationFilter === 'sub' ? 'active' : ''}" data-rel="sub">奴隸</button><button class="${relationFilter === 'follow' ? 'active' : ''}" data-rel="follow">關注</button></div>
-        <div class="fcm-chat-scroll">${contactRows(filteredContacts()) || '<div class="fcm-chat-empty">這個分類目前沒有玩家</div>'}</div>`;
+    return `<div class="fcm-chat-search"><input data-search value="${esc(search)}" placeholder="${T('chatSearchPlayers')}"></div>
+        <div class="fcm-chat-presence"><button class="${presenceFilter === 'online' ? 'active' : ''}" data-presence="online">${T('chatPresenceOnline')}</button><button class="${presenceFilter === 'offline' ? 'active' : ''}" data-presence="offline">${T('chatPresenceOffline')}</button></div>
+        <div class="fcm-chat-tags"><button class="${relationFilter === 'owner' ? 'active' : ''}" data-rel="owner">${T('chatRelOwnerLover')}</button><button class="${relationFilter === 'sub' ? 'active' : ''}" data-rel="sub">${T('chatRelSub')}</button><button class="${relationFilter === 'follow' ? 'active' : ''}" data-rel="follow">${T('chatRelFollow')}</button></div>
+        <div class="fcm-chat-scroll">${contactRows(filteredContacts()) || `<div class="fcm-chat-empty">${T('chatEmptyCategory')}</div>`}</div>`;
 }
 
 function listHtml() {
@@ -344,21 +370,21 @@ function listHtml() {
 }
 
 function conversationHtml() {
-    if (!selectedMember) return '<div class="fcm-chat-empty">選擇一位玩家開始對話</div>';
+    if (!selectedMember) return `<div class="fcm-chat-empty">${T('chatSelectPlayer')}</div>`;
     const available = capability(selectedMember);
     const room = onlineFriends.find(f => Number(f.MemberNumber) === selectedMember)?.ChatRoomName || '';
     const rows = messages.filter(message => message.memberNumber === selectedMember);
     return `<header class="fcm-chat-conversation-header">
-        ${cfg.chatLayout === 'stacked' ? '<button class="fcm-chat-back" data-back title="返回"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></button>' : ''}
+        ${cfg.chatLayout === 'stacked' ? '<button class="fcm-chat-back" data-back title="'+T('chatBack')+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"/></svg></button>' : ''}
         ${avatarHtml(selectedMember, 38)}
-        <span><b>${esc(getDisplayName(selectedMember))}</b><small>${esc(room || (isOnline(selectedMember) ? '在線（不同房間）' : '不在線'))}</small></span>
+        <span><b>${esc(getDisplayName(selectedMember))}</b><small>${esc(room || (isOnline(selectedMember) ? T('chatOnlineDiffRoom') : T('chatOffline')))}</small></span>
     </header>
-    <div class="fcm-chat-messages">${rows.map(message => `<div class="fcm-chat-message ${message.direction}"><span>${esc(message.content)}</span><time>${new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>`).join('') || '<div class="fcm-chat-empty">尚無訊息</div>'}</div>
-    <div class="fcm-chat-actions"><button data-invite ${available === 'none' ? 'disabled' : ''}>邀請到房間</button><button data-delete>刪除全部訊息</button><button data-export>保存訊息</button><select data-assign-group><option value="">分類群組…</option>${Object.entries(cfg.chatGroups || {}).map(([id, label]) => `<option value="${esc(id)}">${esc(label)}</option>`).join('')}</select></div>
+    <div class="fcm-chat-messages">${rows.map(message => `<div class="fcm-chat-message ${message.direction}" data-msg-id="${esc(message.id)}"><span class="fcm-chat-content">${esc(message.content)}</span>${message.direction === 'in' && message.translatedContent ? `<span class="fcm-chat-translated" data-translated>${esc(message.translatedContent)}</span>` : ''}<time>${new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>`).join('') || `<div class="fcm-chat-empty">${T('chatNoMessages')}</div>`}</div>
+    <div class="fcm-chat-actions"><button data-invite ${available === 'none' ? 'disabled' : ''}>${T('chatInviteRoom')}</button><button data-delete>${T('chatDeleteAll')}</button><button data-export>${T('chatSaveMessages')}</button><select data-assign-group><option value="">${T('chatAssignGroup')}</option>${Object.entries(cfg.chatGroups || {}).map(([id, label]) => `<option value="${esc(id)}">${esc(label)}</option>`).join('')}</select></div>
     <div class="fcm-chat-compose">
         <div class="fcm-chat-channels"><button class="${channel === 'whisper' ? 'active' : ''}" data-channel="whisper" ${!inRoomFn(selectedMember) ? 'disabled' : ''}>Whisper</button><button class="${channel === 'beep' ? 'active' : ''}" data-channel="beep" ${!isOnline(selectedMember) ? 'disabled' : ''}>BEEP</button></div>
-        <textarea data-input rows="2" ${available === 'none' ? 'disabled' : ''} placeholder="${available === 'none' ? '玩家目前不在線' : '輸入訊息…'}"></textarea>
-        <button data-send ${available === 'none' ? 'disabled' : ''}>發送</button>
+        <textarea data-input rows="2" ${available === 'none' ? 'disabled' : ''} placeholder="${available === 'none' ? T('chatPlayerOffline') : T('chatInputPlaceholder')}"></textarea>
+        <button data-send ${available === 'none' ? 'disabled' : ''}>${T('chatSend')}</button>
     </div>`;
 }
 
@@ -366,21 +392,21 @@ function renderChat() {
     if (!root) return;
     const [chatPanel, chatText, chatAccent] = chatColors();
     root.innerHTML = `<div id="fcm-chat-panel" class="${maximized ? 'maximized' : ''}" data-layout-mode="${esc(cfg.chatLayout || 'split')}" data-theme="${esc(cfg.chatThemeMode === 'preset' ? cfg.chatThemePreset : cfg.themePreset || 'violet')}" style="--s:${esc(chatPanel)};--tx:${esc(chatText)};--ac:${esc(chatAccent)}">
-        <div class="fcm-chat-titlebar"><b>FCM-Chat</b><span></span><button class="${cfg.chatLayout === 'stacked' ? 'active' : ''}" data-layout title="切換分版／合併"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="8" height="16"/><rect x="13" y="4" width="8" height="16"/></svg><i>${cfg.chatLayout === 'stacked' ? '合併' : '分版'}</i></button><button class="${maximized ? 'active' : ''}" data-max title="最大化／還原"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><i>${maximized ? '還原' : '全版'}</i></button><button data-min title="縮小">—</button><button data-close title="關閉">×</button></div>
+        <div class="fcm-chat-titlebar"><b>FCM-Chat</b><span></span><button class="${cfg.chatLayout === 'stacked' ? 'active' : ''}" data-layout title="${T('chatToggleLayout')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="8" height="16"/><rect x="13" y="4" width="8" height="16"/></svg><i>${cfg.chatLayout === 'stacked' ? T('chatLayoutMerged') : T('chatLayoutSplit')}</i></button><button class="${maximized ? 'active' : ''}" data-max title="${T('chatToggleMax')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><i>${maximized ? T('chatRestore') : T('chatMaximize')}</i></button><button data-min title="${T('chatMinimize')}">—</button><button data-close title="${T('chatClose')}">×</button></div>
         <div class="fcm-chat-body view-${esc(activeView)} ${cfg.chatLayout === 'stacked' ? 'stacked' : ''} ${activeView === 'profile' || activeView === 'settings' ? 'wide-view' : ''}">
             <nav class="fcm-chat-rail">
-                <button class="fcm-chat-rail-button fcm-chat-self ${activeView === 'profile' ? 'active' : ''}" data-view="profile" title="個人資料">${avatarHtml(Player?.MemberNumber || 0, 34)}</button>
-                <button class="fcm-chat-rail-button ${activeView === 'notifications' ? 'active' : ''}" data-view="notifications" title="通知">${HISTORY_ICON}</button>
-                <button class="fcm-chat-rail-button ${activeView === 'chat' ? 'active' : ''}" data-view="chat" title="聊天">${CHAT_ICON}</button>
-                <button class="fcm-chat-rail-button ${activeView === 'groups' ? 'active' : ''}" data-view="groups" title="快速群組">${GROUP_ICON}</button>
+                <button class="fcm-chat-rail-button fcm-chat-self ${activeView === 'profile' ? 'active' : ''}" data-view="profile" title="${T('chatProfileTab')}">${avatarHtml(Player?.MemberNumber || 0, 34)}</button>
+                <button class="fcm-chat-rail-button ${activeView === 'notifications' ? 'active' : ''}" data-view="notifications" title="${T('chatNotificationsTab')}">${HISTORY_ICON}</button>
+                <button class="fcm-chat-rail-button ${activeView === 'chat' ? 'active' : ''}" data-view="chat" title="${T('chatChatTab')}">${CHAT_ICON}</button>
+                <button class="fcm-chat-rail-button ${activeView === 'groups' ? 'active' : ''}" data-view="groups" title="${T('chatGroupsTab')}">${GROUP_ICON}</button>
                 <span></span>
-                <button class="fcm-chat-rail-button" data-status title="狀態"><i class="fcm-status-dot ${esc(cfg.chatStatus || 'online')}"></i></button>
-                <button class="fcm-chat-rail-button ${activeView === 'settings' ? 'active' : ''}" data-view="settings" title="設定">⚙</button>
+                <button class="fcm-chat-rail-button" data-status title="${T('chatStatusTab')}"><i class="fcm-status-dot ${esc(cfg.chatStatus || 'online')}"></i></button>
+                <button class="fcm-chat-rail-button ${activeView === 'settings' ? 'active' : ''}" data-view="settings" title="${T('chatSettingsTab')}">⚙</button>
             </nav>
             <aside class="fcm-chat-list ${stackedDetail ? 'slide-out' : ''}">${listHtml()}</aside>
             <main class="fcm-chat-main ${stackedDetail ? 'slide-in' : ''}">${conversationHtml()}</main>
         </div>
-        <div class="fcm-chat-status-menu"><button data-status-value="online"><i class="online"></i>在線</button><button data-status-value="busy"><i class="busy"></i>忙碌</button><button data-status-value="afk"><i class="afk"></i>AFK</button></div>
+        <div class="fcm-chat-status-menu"><button data-status-value="online"><i class="online"></i>${T('chatStatusOnline')}</button><button data-status-value="busy"><i class="busy"></i>${T('chatStatusBusy')}</button><button data-status-value="afk"><i class="afk"></i>${T('chatStatusAFK')}</button></div>
     </div>`;
     positionPanel();
     bindEvents();
@@ -395,7 +421,7 @@ function bindEvents() {
     root.querySelector('[data-min]')?.addEventListener('click', minimizeChat);
     root.querySelector('[data-max]')?.addEventListener('click', event => {
         event.stopPropagation(); maximized = !maximized; panel.classList.toggle('maximized', maximized);
-        event.currentTarget.classList.toggle('active', maximized); const label=event.currentTarget.querySelector('i'); if(label) label.textContent=maximized?'還原':'全版';
+        event.currentTarget.classList.toggle('active', maximized); const label=event.currentTarget.querySelector('i'); if(label) label.textContent=maximized?T('chatRestore'):T('chatMaximize');
     });
     root.querySelector('button[data-layout]')?.addEventListener('click', event => { event.stopPropagation(); cfg.chatLayout = cfg.chatLayout === 'stacked' ? 'split' : 'stacked'; saveCfg(); renderChat(); });
     root.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { activeView = button.dataset.view; stackedDetail = false; renderChat(); }));
@@ -441,6 +467,8 @@ function bindEvents() {
         if (button.dataset.setting === 'takeover') cfg.takeoverFcmChatButtons = !cfg.takeoverFcmChatButtons;
         if (button.dataset.setting === 'audio') cfg.notificationAudio = !cfg.notificationAudio;
         if (button.dataset.setting === 'animation') cfg.notificationAnimation = !cfg.notificationAnimation;
+        if (button.dataset.setting === 'translateEnabled') cfg.translateEnabled = !cfg.translateEnabled;
+        if (button.dataset.setting === 'translateAuto') cfg.translateAuto = !cfg.translateAuto;
         saveCfg(); refreshChatSettings(); if (root?.style.display !== 'none') renderChat();
     }));
     root.querySelector('[data-chat-sound]')?.addEventListener('change', event => { cfg.notificationSound = event.target.value; saveCfg(); });
@@ -453,6 +481,10 @@ function bindEvents() {
     root.querySelector('[data-chat-theme-preset]')?.addEventListener('change', event => { cfg.chatThemePreset = event.target.value; cfg.chatThemeMode = 'preset'; saveCfg(); renderChat(); refreshChatSettings(); });
     root.querySelector('[data-chat-avatar-mode]')?.addEventListener('change', event => { cfg.chatAvatarMode = event.target.value; saveCfg(); renderChat(); });
     root.querySelector('[data-chat-avatar-url]')?.addEventListener('change', event => { cfg.chatAvatarUrl = event.target.value.trim(); saveCfg(); renderChat(); });
+    root.querySelector('[data-translate-target]')?.addEventListener('change', event => { cfg.translateTarget = event.target.value; saveCfg(); });
+    root.querySelector('[data-translate-provider]')?.addEventListener('change', event => { cfg.translatorProvider = event.target.value; saveCfg(); });
+    root.querySelector('[data-translate-endpoint]')?.addEventListener('change', event => { cfg.translatorEndpoint = event.target.value.trim(); saveCfg(); });
+    root.querySelector('[data-translate-key]')?.addEventListener('change', event => { cfg.translatorKey = event.target.value; saveCfg(); });
     root.querySelector('[data-save-profile]')?.addEventListener('click', saveOwnProfile);
     root.querySelectorAll('[data-profile-status]').forEach(button => button.addEventListener('click', () => { const box=root.querySelector('[data-profile-statuses]'); box.dataset.value=button.dataset.profileStatus; box.querySelectorAll('button').forEach(item=>item.classList.toggle('active',item===button)); }));
     root.querySelectorAll('[data-profile-reply]').forEach(button => button.addEventListener('click', () => { const key=button.dataset.profileReply==='busy'?'busyAutoReply':'afkAutoReply'; cfg[key]=!cfg[key]; button.classList.toggle('on',cfg[key]); }));
@@ -549,7 +581,7 @@ function showFcmConfirm(message) {
     return new Promise(resolve => {
         const overlay = document.createElement('div'); overlay.className = 'fcm-chat-modal-overlay';
         overlay.style.cssText = `--s:${cfg.panelColor};--tx:${cfg.fontColor};--ac:${cfg.accentColor}`;
-        overlay.innerHTML = `<div class="fcm-chat-modal"><div>${esc(message)}</div><div><button data-modal-cancel>取消</button><button data-modal-ok>確認刪除</button></div></div>`;
+        overlay.innerHTML = `<div class="fcm-chat-modal"><div>${esc(message)}</div><div><button data-modal-cancel>${T('chatCancel')}</button><button data-modal-ok>${T('chatConfirmDelete')}</button></div></div>`;
         const finish = value => { overlay.remove(); resolve(value); };
         overlay.querySelector('[data-modal-cancel]').addEventListener('click', () => finish(false));
         overlay.querySelector('[data-modal-ok]').addEventListener('click', () => finish(true));
@@ -559,7 +591,7 @@ function showFcmConfirm(message) {
 }
 
 async function deleteConversation() {
-    if (!selectedMember || !await showFcmConfirm(`刪除與「${getDisplayName(selectedMember)}」的全部本機聊天記錄？`)) return;
+    if (!selectedMember || !await showFcmConfirm(T('chatConfirmDeleteConv', getDisplayName(selectedMember)))) return;
     await ChatStore.deleteMember(selectedMember);
     messages = messages.filter(message => message.memberNumber !== selectedMember);
     renderChat();
@@ -718,7 +750,9 @@ function injectStyles() {
 .fcm-chat-main.slide-in .fcm-chat-conversation-header,.fcm-chat-main.slide-in .fcm-chat-messages,.fcm-chat-main.slide-in .fcm-chat-actions,.fcm-chat-main.slide-in .fcm-chat-compose{animation:fcm-chat-enter-right .32s cubic-bezier(.2,.8,.2,1) both}.fcm-chat-list:not(.slide-out) .fcm-chat-scroll{animation:fcm-chat-enter-left .32s cubic-bezier(.2,.8,.2,1) both}@keyframes fcm-chat-enter-right{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:translateX(0)}}@keyframes fcm-chat-enter-left{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:translateX(0)}}
 .fcm-chat-user-balloon>.fcm-chat-avatar{background:color-mix(in srgb,var(--s) 82%,var(--ac))!important}
 .fcm-chat-rail-button svg{width:23px!important;height:23px!important;display:block}.fcm-chat-rail-button svg path,.fcm-chat-rail-button svg circle,.fcm-chat-rail-button svg rect{fill:currentColor!important;stroke:currentColor!important}.fcm-profile-statuses{display:flex;align-items:center;gap:12px;max-width:620px}.fcm-profile-statuses>span{width:110px;color:var(--dim)}.fcm-profile-statuses button{display:flex;align-items:center;gap:5px;background:transparent;color:var(--dim);border:1px solid transparent;border-radius:7px;padding:5px 8px}.fcm-profile-statuses button.active{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-profile-statuses button>i{width:15px;height:15px;border-radius:50%;background:#58c878}.fcm-profile-statuses button>i.busy{background:#e85d68}.fcm-profile-statuses button>i.afk{background:#e9bd4b}.fcm-profile-message{max-width:620px!important;display:grid!important;grid-template-columns:110px minmax(0,1fr) 34px;align-items:center;gap:10px}.fcm-profile-message textarea{grid-column:2}.fcm-profile-message .fcm-chat-switch{grid-column:3;grid-row:1/3}.fcm-chat-settings input[type="file"],.fcm-chat-settings input[type="text"],.fcm-chat-settings [data-chat-avatar-url]{max-width:240px;background:var(--surface-alt);color:var(--tx);border:1px solid var(--border);border-radius:7px;padding:6px}
-@media(max-width:650px){#fcm-chat-panel{width:96vw}.fcm-chat-body{grid-template-columns:48px 210px minmax(0,1fr)}}`;
+@media(max-width:650px){#fcm-chat-panel{width:96vw}.fcm-chat-body{grid-template-columns:48px 210px minmax(0,1fr)}}
+.fcm-chat-translated{display:block;margin-top:3px;padding:5px 8px;font-size:11px;line-height:1.35;color:color-mix(in srgb,var(--ac) 72%,var(--tx));background:color-mix(in srgb,var(--ac) 10%,transparent);border-left:2px solid var(--ac);border-radius:5px}.fcm-chat-translated:empty{display:none}
+`;
     document.head.appendChild(style);
 }
 
