@@ -4,6 +4,7 @@ import './core/config.js';
 import { openPanel, closePanel, togglePanel } from './panel/panel.js';
 import { init } from './core/core-init.js';
 import { openChat, closeChat } from './communication/chat.js';
+import { installThemeSelects } from './ui/theme-select.js';
 
 if (FCM_ALREADY_LOADED) {
     console.warn('[FCM] Already loaded, skipping duplicate initialization.');
@@ -17,5 +18,6 @@ if (FCM_ALREADY_LOADED) {
         closeChat: () => closeChat(),
     });
 
+    installThemeSelects();
     init();
 }
