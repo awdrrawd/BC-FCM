@@ -152,13 +152,29 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
         renderCurrent();
     }
 
-    // 切換語言後由設定頁（panel-settings.js）呼叫：整個面板重建再以設定頁開啟。
-    function reopenForLang() {
-        if (panelEl) { panelEl.remove(); panelEl = null; }
-        if (miniEl) { miniEl.remove(); miniEl = null; }
-        panelOpen = false; panelMini = false;
-        buildPanel(); uiTab = 'settings'; openPanel();
+    // 語言切換：就地刷新標題／頁籤／當前分頁文字，不整個銷毀重建面板（CHAT 端亦以同一套
+    // fcm-language-change 事件即時更新，兩邊互相即時反映，而非各自依賴一次性重建）。
+    function refreshChrome() {
+        if (!panelEl) return;
+        const title = panelEl.querySelector('#fcm-title'); if (title) title.textContent = T('panelTitle');
+        const hdrBtns = panelEl.querySelectorAll('#fcm-hdr .fcm-hbtn');
+        if (hdrBtns[0]) hdrBtns[0].textContent = T('minimize');
+        if (hdrBtns[1]) hdrBtns[1].textContent = T('close');
+        const tabDefs = [['friends', T('tabFriends')], ['room', T('tabRoom')], ['roomSearch', T('tabRoomSearch')], ['people', T('tabPeople')], ['settings', T('tabSettings')], ['help', T('tabHelp')]];
+        panelEl.querySelectorAll('#fcm-tabs .fcm-tab').forEach((el, index) => { if (tabDefs[index]) el.textContent = tabDefs[index][1]; });
+        if (miniEl) { const lbl = miniEl.querySelector('.fcm-mini-lbl'); if (lbl) lbl.textContent = T('miniLabel'); }
+        renderCurrent();
     }
+    // 由設定頁（panel-settings.js）語言切換後呼叫：面板若未開啟則正常開啟到設定頁；
+    // 若已開啟，僅就地刷新文字並廣播事件，讓 CHAT（若開啟中）同步即時刷新。
+    function reopenForLang() {
+        uiTab = 'settings';
+        if (!panelEl || !panelOpen) { openPanel(); }
+        else { panelEl.querySelectorAll('.fcm-tab').forEach(x => x.classList.toggle('active', x.dataset.tab === uiTab)); refreshChrome(); }
+        window.dispatchEvent(new CustomEvent('fcm-language-change'));
+    }
+    // CHAT 端切換語言時會廣播同一事件；FCM 面板若已開啟，就地刷新即可，不需重建。
+    window.addEventListener('fcm-language-change', refreshChrome);
 
     function minimizePanel() { if (!panelEl) return; panelEl.classList.add('hidden'); if (miniEl) miniEl.classList.add('visible'); panelMini = true; _stopFriendPoll(); _removeWhisperAvatar(); }
     function restorePanel() { if (!panelEl) buildPanel(); panelEl.classList.remove('hidden'); if (miniEl) miniEl.classList.remove('visible'); panelMini = false; _startFriendPoll(); renderCurrent(); }

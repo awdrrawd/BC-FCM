@@ -105,6 +105,8 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
         if (!['round', 'square'].includes(cfg.chatAvatarShape)) cfg.chatAvatarShape = 'square';
         cfg.chatFontSize = Math.max(10, Math.min(24, Number(cfg.chatFontSize) || 13));
         if (!['system', 'heiti', 'ming', 'kai', 'mono'].includes(cfg.chatFontFamily)) cfg.chatFontFamily = 'system';
+        // BrushHair4 音效已移除；曾選用它的使用者改回預設提示音，避免播放失敗的靜音狀態。
+        if (cfg.notificationSound === 'Audio/BrushHair4.mp3') cfg.notificationSound = 'Audio/BeepAlarm.mp3';
     }
     function saveCfg() {
         try { localStorage.setItem('LikoFCM', JSON.stringify(cfg)); } catch {}

@@ -342,7 +342,7 @@ function renderSettings(container) {
     const soundLabel = document.createElement('div'); soundLabel.className = 'fcm-set-label'; soundLabel.textContent = T('notificationSound');
     soundInfo.appendChild(soundLabel);
     const soundSelect = document.createElement('select'); soundSelect.className = 'fcm-sel';
-    [['', T('off')], ['Audio/BeepAlarm.mp3', 'BeepAlarm'], ['Audio/BellMedium.mp3', 'BellMedium'], ['Audio/Belt1.mp3', 'Belt1'], ['Audio/BrushHair4.mp3', 'BrushHair4'], ['Audio/VibrationTone4ShortLoop.mp3', 'VibrationTone4ShortLoop'], ['custom', T('chatSoundCustom')]].forEach(([value, label]) => {
+    [['', T('off')], ['Audio/BeepAlarm.mp3', 'BeepAlarm'], ['Audio/BellMedium.mp3', 'BellMedium'], ['Audio/Belt1.mp3', 'Belt1'], ['Audio/VibrationTone4ShortLoop.mp3', 'VibrationTone4ShortLoop'], ['custom', T('chatSoundCustom')]].forEach(([value, label]) => {
         const o = document.createElement('option'); o.value = value; o.textContent = label; o.selected = (!cfg.notificationAudio && !value) || (cfg.notificationAudio && cfg.notificationSound === value); soundSelect.appendChild(o);
     });
     const soundFile = document.createElement('input'); soundFile.type = 'file'; soundFile.accept = 'audio/*'; soundFile.hidden = true;
