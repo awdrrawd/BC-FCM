@@ -5,7 +5,7 @@ import { onlineFriends, showNickname, setShowNickname, getDisplayName, matchesSe
 import { showRoomJoinConfirm, roomInfoFromResult, makeIdCell } from '../chat/actions.js';
 import { makeAvEl, makeFavStar, makeRelEl, mkBtn, makeSearchWrap, makeSortSel, makeCountBar, buildMgmtBtns, buildPersonOps, _autoQueueVisible, refreshSnapshotsForList } from './panel-widgets.js';
 import { queryRoomInfo, getCachedRoomInfo, fetchRoomFull } from './panel-rooms-data.js';
-import { renderCurrent, refreshPanel, getRenderToken } from './panel.js';
+import { renderCurrent, refreshPanel, getRenderToken } from './panel-controller.js';
 // ════════════════════════════════════════
 //  FCM module: panel-friends.js  (split from panel.js)
 //  好友（個人關係）頁。searchQ / sortMode / filters 為本頁狀態；
@@ -151,7 +151,7 @@ async function renderFriends(container, _myToken) {
                     .catch(() => fallback);
                 showRoomJoinConfirm({ room: ri2.name, priv: !!ri2.isPrivate }, promise);
             }); else rl.style.color = '#808080';
-            if (ri2.isPrivate) { const b2 = document.createElement('span'); b2.style.cssText = 'font-size:10px;color:#c090f0;margin-left:2px;'; b2.textContent = T('roomPrivShort'); rl.appendChild(b2); }
+            if (ri2.isPrivate) { const b2 = document.createElement('span'); b2.className = 'fcm-room-private'; b2.style.cssText = 'font-size:10px;color:#c090f0;margin-left:2px;'; b2.textContent = T('roomPrivShort'); rl.appendChild(b2); }
             return rl;
         }
         if (ri && ri.name) {
@@ -165,7 +165,7 @@ async function renderFriends(container, _myToken) {
                 queryRoomInfo(ri.name, friendSpace, data => { if (data && rt.isConnected) { rt.innerHTML = ''; rt.appendChild(_buildRoomLink(ri, data.MemberCount, data.MemberLimit)); } });
             }
         } else if (ri && !ri.name && ri.isPrivate) {
-            const sp = document.createElement('span'); sp.style.cssText = 'font-size:11px;color:#c090f0;font-weight:600;';
+            const sp = document.createElement('span'); sp.className = 'fcm-room-private'; sp.style.cssText = 'font-size:11px;color:#c090f0;font-weight:600;';
             sp.textContent = T('roomPrivateHidden'); rt.appendChild(sp);
         } else { rt.innerHTML = '<span class="fcm-room">—</span>'; }
         tr.appendChild(rt);

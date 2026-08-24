@@ -1,5 +1,5 @@
 import { T } from '../i18n/i18n.js';
-import { _pc } from './profile-db.js';
+import { profileCache as _pc } from './profile-cache.js';
 import { cfg, saveCfg } from '../core/config.js';
 // ════════════════════════════════════════
 //  FCM module: data.js
@@ -163,7 +163,6 @@ import { cfg, saveCfg } from '../core/config.js';
         }
         return null;
     }
-    function getRoomName(mn) { const r = getRoomInfo(mn); return r ? r.name : null; }
     function getRoomPerms(mn) {
         if (!ChatRoomData) return ['visit']; mn = parseInt(mn);
         const p = []; if (ChatRoomData.Admin && ChatRoomData.Admin.includes(mn)) p.push('admin'); if (ChatRoomData.Whitelist && ChatRoomData.Whitelist.includes(mn)) p.push('pass'); if (ChatRoomData.Ban && ChatRoomData.Ban.includes(mn)) p.push('ban'); if (!p.length) p.push('visit'); return p;
@@ -236,4 +235,4 @@ import { cfg, saveCfg } from '../core/config.js';
     function setOnlineFriends(v) { onlineFriends = v; }
     function setShowNickname(v) { showNickname = v; }
 
-export { onlineFriends, setOnlineFriends, showNickname, setShowNickname, parseAFC, getSubSet, getRel, getAllRels, REL_ORDER, getDisplayName, matchesSearch, buildFriendList, getZone, getRoomInfo, getRoomName, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep, _getWhisperTargetMN, isFav, toggleFav };
+export { onlineFriends, setOnlineFriends, showNickname, setShowNickname, getRel, getAllRels, REL_ORDER, getDisplayName, matchesSearch, buildFriendList, getZone, getRoomInfo, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep, _getWhisperTargetMN, isFav, toggleFav };

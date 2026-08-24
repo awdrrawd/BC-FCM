@@ -7,6 +7,8 @@ import { renderSettings } from './panel-settings.js';
 import { renderFriends, resetFriendsSearch } from './panel-friends.js';
 import { renderRoom, resetRoomAdminSearch } from './panel-room.js';
 import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
+import { installDragScroll } from '../ui/drag-scroll.js';
+import { setPanelController } from './panel-controller.js';
 // ════════════════════════════════════════
 //  FCM module: panel.js  (orchestration core — split from Plugins/liko-FCM.user.js)
 //  面板骨架與生命週期：建立/開關/拖曳、頁籤切換、renderCurrent 分派。
@@ -21,7 +23,7 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
     let uiTab = 'friends';
     // 手動刷新的 5 秒冷卻計時；_friendPoll：面板開著時的定期抓取（BC 在聊天室內不會自動輪詢 OnlineFriends）
     let _lastRefresh = 0, _friendPoll = null;
-
+    let _commandRegistered = false;
 
     // ═══════════════════════════════════════════════════════════
     //  PANEL BUILD
@@ -32,8 +34,8 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
         const panel = document.createElement('div'); panel.id = 'fcm-panel'; panel.classList.add('hidden');
         const hdr = document.createElement('div'); hdr.id = 'fcm-hdr';
         const title = document.createElement('div'); title.id = 'fcm-title'; title.textContent = T('panelTitle');
-        const minBtn = document.createElement('div'); minBtn.className = 'fcm-hbtn'; minBtn.textContent = T('minimize'); minBtn.addEventListener('click', minimizePanel);
-        const closeBtn = document.createElement('div'); closeBtn.className = 'fcm-hbtn'; closeBtn.textContent = T('close'); closeBtn.addEventListener('click', closePanel);
+        const minBtn = document.createElement('button'); minBtn.type = 'button'; minBtn.className = 'fcm-hbtn fcm-chat-icon-action'; minBtn.title = T('minimize'); minBtn.textContent = T('minimize'); minBtn.addEventListener('click', minimizePanel);
+        const closeBtn = document.createElement('button'); closeBtn.type = 'button'; closeBtn.className = 'fcm-hbtn fcm-chat-icon-action'; closeBtn.title = T('close'); closeBtn.textContent = T('close'); closeBtn.addEventListener('click', closePanel);
         hdr.appendChild(title); hdr.appendChild(minBtn); hdr.appendChild(closeBtn);
         const tabBar = document.createElement('div'); tabBar.id = 'fcm-tabs';
         [['friends', T('tabFriends')], ['room', T('tabRoom')], ['roomSearch', T('tabRoomSearch')], ['people', T('tabPeople')], ['settings', T('tabSettings')], ['help', T('tabHelp')]].forEach(([key, label]) => {
@@ -98,6 +100,7 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
         (p || Promise.resolve()).then(() => {
             if (_myToken !== _renderToken) return;
             if (savedScroll > 0) { const ns = content.querySelector('.fcm-scroll'); if (ns) ns.scrollTop = savedScroll; }
+            installDragScroll(content, '.fcm-scroll,.fcm-settings-wrap');
         }).catch(e => console.warn('🐈‍⬛ [FCM] render:', e));
     }
 
@@ -138,13 +141,29 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
         renderCurrent();
     }
 
-    // 切換語言後由設定頁（panel-settings.js）呼叫：整個面板重建再以設定頁開啟。
-    function reopenForLang() {
-        if (panelEl) { panelEl.remove(); panelEl = null; }
-        if (miniEl) { miniEl.remove(); miniEl = null; }
-        panelOpen = false; panelMini = false;
-        buildPanel(); uiTab = 'settings'; openPanel();
+    // 語言切換：就地刷新標題／頁籤／當前分頁文字，不整個銷毀重建面板（CHAT 端亦以同一套
+    // fcm-language-change 事件即時更新，兩邊互相即時反映，而非各自依賴一次性重建）。
+    function refreshChrome() {
+        if (!panelEl) return;
+        const title = panelEl.querySelector('#fcm-title'); if (title) title.textContent = T('panelTitle');
+        const hdrBtns = panelEl.querySelectorAll('#fcm-hdr .fcm-hbtn');
+        if (hdrBtns[0]) hdrBtns[0].textContent = T('minimize');
+        if (hdrBtns[1]) hdrBtns[1].textContent = T('close');
+        const tabDefs = [['friends', T('tabFriends')], ['room', T('tabRoom')], ['roomSearch', T('tabRoomSearch')], ['people', T('tabPeople')], ['settings', T('tabSettings')], ['help', T('tabHelp')]];
+        panelEl.querySelectorAll('#fcm-tabs .fcm-tab').forEach((el, index) => { if (tabDefs[index]) el.textContent = tabDefs[index][1]; });
+        if (miniEl) { const lbl = miniEl.querySelector('.fcm-mini-lbl'); if (lbl) lbl.textContent = T('miniLabel'); }
+        renderCurrent();
     }
+    // 由設定頁（panel-settings.js）語言切換後呼叫：面板若未開啟則正常開啟到設定頁；
+    // 若已開啟，僅就地刷新文字並廣播事件，讓 CHAT（若開啟中）同步即時刷新。
+    function reopenForLang() {
+        uiTab = 'settings';
+        if (!panelEl || !panelOpen) { openPanel(); }
+        else { panelEl.querySelectorAll('.fcm-tab').forEach(x => x.classList.toggle('active', x.dataset.tab === uiTab)); refreshChrome(); }
+        window.dispatchEvent(new CustomEvent('fcm-language-change'));
+    }
+    // CHAT 端切換語言時會廣播同一事件；FCM 面板若已開啟，就地刷新即可，不需重建。
+    window.addEventListener('fcm-language-change', refreshChrome);
 
     function minimizePanel() { if (!panelEl) return; panelEl.classList.add('hidden'); if (miniEl) miniEl.classList.add('visible'); panelMini = true; _stopFriendPoll(); _removeWhisperAvatar(); }
     function restorePanel() { if (!panelEl) buildPanel(); panelEl.classList.remove('hidden'); if (miniEl) miniEl.classList.remove('visible'); panelMini = false; _startFriendPoll(); renderCurrent(); }
@@ -163,7 +182,9 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
     function togglePanel() { if (panelOpen || panelMini) closePanel(); else openPanel(); }
 
     function registerCommand() {
+        if (_commandRegistered) return;
         if (typeof CommandCombine === 'function') {
+            _commandRegistered = true;
             CommandCombine([{
                 Tag: 'profiles',
                 Description: T('cmdProfilesDesc'),
@@ -182,4 +203,6 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
         openPanel();
     }
 
-export { renderCurrent, refreshPanel, buildPanel, openPanel, closePanel, minimizePanel, restorePanel, togglePanel, registerCommand, openPeopleSearch, getRenderToken, reopenForLang, panelOpen, panelMini, uiTab };
+    setPanelController({ renderCurrent, refreshPanel, minimizePanel, closePanel, reopenForLang, getRenderToken });
+
+export { renderCurrent, refreshPanel, buildPanel, openPanel, closePanel, minimizePanel, togglePanel, registerCommand, openPeopleSearch, getRenderToken, reopenForLang, panelOpen, panelMini, uiTab };

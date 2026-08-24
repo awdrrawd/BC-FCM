@@ -153,7 +153,7 @@ async function renderRoom(container) {
         if (_hasBundle && !isMe) {
             shareTd.appendChild(mkBtn(T('btnShare'), 'fcm-btn-purple', () => wpsShareProfile(mn)));
         } else {
-            shareTd.innerHTML = '<span style="color:#4a3870;font-size:11px;">—</span>';
+            shareTd.innerHTML = '<span class="fcm-empty-value">—</span>';
         }
         tr.appendChild(shareTd);
         tbody.appendChild(tr);

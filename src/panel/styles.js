@@ -1,4 +1,5 @@
 import { cfg, THEME_DEFAULTS } from '../core/config.js';
+import { chatFontFamily } from '../communication/chat-font.js';
 // ════════════════════════════════════════
 //  FCM module: styles.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -13,37 +14,64 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
         const t = (cfg && cfg.fontColor)   || THEME_DEFAULTS.fontColor;
         const a = (cfg && cfg.accentColor) || THEME_DEFAULTS.accentColor;
         let el = document.getElementById('fcm-theme');
-        const isDefault = p === THEME_DEFAULTS.panelColor && t === THEME_DEFAULTS.fontColor && a === THEME_DEFAULTS.accentColor;
-        if (isDefault) { if (el) el.remove(); return; }
         if (!el) { el = document.createElement('style'); el.id = 'fcm-theme'; document.head.appendChild(el); }
         const mix = (c1, pct, c2) => `color-mix(in srgb, ${c1} ${pct}%, ${c2})`;
-        const panel2     = mix(p, 88, '#000');          // 稍深：分隔線
-        const panel1     = mix(p, 80, '#000');          // 更深：工具列 / 分頁列 / 計數列底
+        const presetTokens = {
+            violet: ['#13101a','#322744','#2c2140','#2a2338','#9c93b8'],
+            eu: ['#1e2636','#262f44','#303a54','#2f3a52','#aab2c9'],
+            electronic: ['#10161d','#16202b','#17324a','#1c2a33','#6f8a99'],
+            jp: ['#efe8d8','#e6ddc8','#ded1b2','#d8cdb3','#7a7266'],
+            cn: ['#241a17','#2e211d','#3a2620','#4a332b','#b8a58f'],
+            silentblack: ['#121212','#1c1c1c','#262626','#232323','#7a7a7a'],
+            minimalwhite: ['#f2f2f2','#ececec','#e2e2e2','#e0e0e0','#8a8a8a'],
+        };
+        const preset = presetTokens[cfg?.themePreset];
+        const colorScheme = ['jp', 'minimalwhite'].includes(cfg?.themePreset) ? 'light' : 'dark';
+        const panel2     = preset?.[3] || mix(p, 88, '#000');
+        const panel1     = preset?.[0] || mix(p, 80, '#000');
+        const panelRaised = preset?.[1] || mix(p, 82, a);
+        const panelSelected = preset?.[2] || mix(p, 72, a);
         const panelHead  = mix(p, 78, a);               // 帶強調色的表頭
-        const rowHover   = mix(p, 82, a);               // 列 hover
+        const rowHover   = panelRaised;                 // 列 hover
         const inputBg    = mix(p, 70, '#000');          // 輸入框底
-        const border     = mix(a, 55, '#000');          // 邊框（較深強調色）
+        const border     = preset?.[3] || mix(a, 55, '#000');
         const borderSoft = mix(a, 40, p);               // 柔邊框
-        const textDim    = mix(t, 62, p);               // 次要文字
+        const textDim    = preset?.[4] || mix(t, 62, p);
         const accentB    = mix(a, 72, '#fff');          // 亮強調（標題 / 選中分頁）
         const hdrGrad    = mix(p, 84, a);               // 標題列漸層起點
+        // 卷軸滑軌底色：與 CHAT 面板的 --surface-alt 公式對齊（面板色與黑混合，不摻強調色），
+        //  讓兩套面板的卷軸看起來明度一致，而不是 FCM 這邊偏強調色調的另一種顏色。
+        const surfaceAlt = mix(p, 86, '#000');
+        const glow       = (px, pct) => `0 0 ${px}px color-mix(in srgb,${a} ${pct}%,transparent)`;
+        // 字體大小／字型與 CHAT 面板共用同一組設定（cfg.chatFontSize / cfg.chatFontFamily），
+        //  這樣兩邊看到的是「同一套」文字尺寸與字型，而不是各自寫死、各調各的。
+        const baseFontSize = Number(cfg.chatFontSize) || 13;
         // 只主題化「純色」按鈕（查看／悄悄話／重新整理…）；語意化的彩色按鈕
         //  （私訊藍／好友綠／黑單紅／幽靈紫／管理橘…）排除在外，保留辨識色。
         const _plainBtn = ':not(.fcm-btn-red):not(.fcm-btn-green):not(.fcm-btn-purple):not(.fcm-btn-blue):not(.fcm-btn-orange)';
         el.textContent = `
-#fcm-panel{background:${p}!important;border-color:${border}!important;color:${t}!important;}
+#fcm-panel{background:${p}!important;border-color:${a}!important;color:${t}!important;}
+#fcm-panel,#fcm-panel *{font-family:${chatFontFamily()}!important;}
+/* 語言下拉需要保留「Twemoji Country Flags」萬國旗字體，不能被上面這條全域字型覆蓋掉；
+   #fcm-panel 底下加上 class 選擇器，特異度比「#fcm-panel *」的萬用選擇器更高，才能蓋過上面。 */
+#fcm-panel .fcm-lang-flag-select,#fcm-panel .fcm-lang-flag-select option{font-family:"Twemoji Country Flags",-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif!important;}
+.fcm-name,.fcm-room-name,.fcm-tbl{font-size:${baseFontSize}px!important;}
+.fcm-set-label{font-size:${Math.round(baseFontSize * 1.15)}px!important;}
+.fcm-set-note,.fcm-id,.fcm-search,.fcm-sel{font-size:${Math.max(10, baseFontSize - 1)}px!important;}
 #fcm-mini{background:${p}!important;border-color:${border}!important;color:${textDim}!important;}
-#fcm-mini:hover{background:${rowHover}!important;border-color:${a}!important;}
+#fcm-mini:hover{background:${rowHover}!important;border-color:${a}!important;box-shadow:${glow(9,20)}!important;}
 .fcm-mini-pill{background:${border}!important;}
-#fcm-hdr{background:linear-gradient(135deg, ${hdrGrad}, ${p})!important;border-bottom-color:${border}!important;}
+#fcm-hdr{background:linear-gradient(135deg, ${hdrGrad}, ${p})!important;border-bottom-color:${a}!important;}
 #fcm-title{color:${accentB}!important;}
-.fcm-hbtn{background:${panel1}!important;border-color:${border}!important;color:${textDim}!important;}
-.fcm-hbtn:hover{background:${rowHover}!important;color:${accentB}!important;border-color:${a}!important;}
+.fcm-hbtn{background:transparent!important;border-color:${a}!important;color:${textDim}!important;}
+.fcm-hbtn:hover{background:${rowHover}!important;color:${accentB}!important;border-color:${a}!important;box-shadow:${glow(10,18)}!important;}
 #fcm-tabs{background:${panel1}!important;border-bottom-color:${border}!important;}
 .fcm-tab{color:${textDim}!important;}
-.fcm-tab:hover{color:${accentB}!important;background:${rowHover}!important;}
+.fcm-tab:hover{color:${accentB}!important;background:${rowHover}!important;box-shadow:${glow(10,18)} inset!important;}
 .fcm-tab.active{color:${accentB}!important;border-bottom-color:${a}!important;background:${p}!important;}
-.fcm-toolbar{background:${panel1}!important;border-bottom-color:${borderSoft}!important;}
+.fcm-toolbar{background:${panel1}!important;border-bottom-color:${borderSoft}!important;color:${textDim}!important;}
+.fcm-nick-tog,.fcm-ftog{background:transparent!important;border-color:${border}!important;color:${textDim}!important;}
+.fcm-nick-tog:hover,.fcm-ftog:hover,.fcm-ftog.on{background:${panelSelected}!important;border-color:${a}!important;color:${accentB}!important;box-shadow:${glow(10,18)}!important;}
 .fcm-subtabs{background:${panel1}!important;border-bottom-color:${borderSoft}!important;}
 .fcm-stab{color:${textDim}!important;}
 .fcm-stab.active{color:${accentB}!important;border-bottom-color:${a}!important;}
@@ -52,15 +80,82 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-tbl th{background:${panelHead}!important;color:${textDim}!important;border-bottom-color:${border}!important;}
 .fcm-tbl td{border-bottom-color:${panel2}!important;}
 .fcm-row:hover td{background:${rowHover}!important;}
+.fcm-row td{border-bottom-color:${border}!important;}
 .fcm-name{color:${t}!important;}
+.fcm-av{background:${panel1}!important;border-color:${border}!important;color:${a}!important;}
+.fcm-you{color:${a}!important;}.fcm-id,.fcm-id-copy{color:${textDim}!important;}.fcm-id-copy:hover{color:${a}!important;}.fcm-zone{color:${accentB}!important;}
 .fcm-search{background:${inputBg}!important;border-color:${border}!important;color:${t}!important;}
-.fcm-sel{background:${inputBg}!important;border-color:${border}!important;color:${textDim}!important;}
-.fcm-btn${_plainBtn}{background:${p}!important;border-color:${border}!important;color:${textDim}!important;}
-.fcm-btn${_plainBtn}:hover{background:${rowHover}!important;border-color:${a}!important;color:${accentB}!important;}
+.fcm-search::placeholder{color:${textDim}!important;}.fcm-clear-btn{color:${textDim}!important;}.fcm-clear-btn:hover{color:${a}!important;}
+.fcm-search:hover{border-color:${a}!important;}.fcm-search:focus{background:${panel1}!important;border-color:${a}!important;color:${t}!important;box-shadow:0 0 0 2px color-mix(in srgb, ${a} 24%, transparent)!important;}
+.fcm-search::selection{background:${a}!important;color:${p}!important;}
+.fcm-sel{background-color:${inputBg}!important;border-color:${a}!important;color:${t}!important;color-scheme:${colorScheme};scrollbar-color:${a} ${inputBg}!important;}
+.fcm-sel:hover,.fcm-sel:focus{border-color:${a}!important;outline:none!important;box-shadow:0 0 0 2px color-mix(in srgb, ${a} 20%, transparent)!important;}
+.fcm-sel option{background:${inputBg}!important;color:${t}!important;}.fcm-sel option:checked{background:${a} linear-gradient(0deg,${a},${a})!important;color:${p}!important;}.fcm-sel option:disabled{color:${textDim}!important;}
+.fcm-btn${_plainBtn}{background:${p}!important;border-color:${a}!important;color:${textDim}!important;}
+#fcm-panel .fcm-btn{border-color:${a}!important;}
+.fcm-btn${_plainBtn}:hover{background:${rowHover}!important;border-color:${a}!important;color:${accentB}!important;box-shadow:${glow(10,18)}!important;}
+/* 設定頁內的按鈕（快取管理／匯出匯入等）跟 CHAT 的按鈕一樣，一律套用主題邊框色，
+   不再保留語意色（紅/藍/綠/紫/橘），維持與 CHAT 面板一致的視覺風格。 */
+.fcm-settings-wrap .fcm-btn-red,.fcm-settings-wrap .fcm-btn-green,.fcm-settings-wrap .fcm-btn-purple,.fcm-settings-wrap .fcm-btn-blue,.fcm-settings-wrap .fcm-btn-orange{background:${p}!important;border-color:${border}!important;color:${textDim}!important;}
+.fcm-settings-wrap .fcm-btn-red:hover,.fcm-settings-wrap .fcm-btn-green:hover,.fcm-settings-wrap .fcm-btn-purple:hover,.fcm-settings-wrap .fcm-btn-blue:hover,.fcm-settings-wrap .fcm-btn-orange:hover{background:${rowHover}!important;border-color:${a}!important;color:${accentB}!important;box-shadow:${glow(10,18)}!important;}
 .fcm-set-label{color:${t}!important;}
 .fcm-set-note{color:${textDim}!important;}
-.fcm-set-desc,.fcm-dbstat{background:${panel1}!important;color:${textDim}!important;}
+.fcm-set-row:hover{background:color-mix(in srgb,${a} 9%,transparent)!important;box-shadow:0 0 0 1px color-mix(in srgb,${a} 20%,transparent) inset!important;}
+.fcm-icon-btn{color:${a}!important;border-color:${border}!important}.fcm-icon-btn:not(:disabled):hover{background:${rowHover}!important;border-color:${a}!important;box-shadow:${glow(9,20)}!important;}.fcm-icon-btn:disabled{color:${textDim}!important}
+.fcm-settings-section{color:${accentB}!important;border-bottom-color:${a}!important;}
+.fcm-settings-wrap label,.fcm-settings-wrap label span{color:${textDim}!important;}
+.fcm-settings-wrap input[type="color"]{background:${panel1}!important;border-color:${border}!important;}
+.fcm-avatar-options{background:${panel1}!important;border-color:${border}!important;}
+.fcm-dbstat{background:${panel1}!important;color:${textDim}!important;border-color:${a}!important;}
+.fcm-people-hint,.fcm-page-bar{background:${panel1}!important;color:${textDim}!important;border-color:${border}!important;}
+.fcm-unknown-id-box,.fcm-help-card{background:${panel1}!important;border-color:${border}!important;color:${textDim}!important;}
+.fcm-unknown-id-title{color:${accentB}!important;}
+.fcm-help-title{color:${accentB}!important;}.fcm-help-text,.fcm-help-item,.fcm-help-item span{color:${textDim}!important;}.fcm-help-item .fcm-help-dot{color:${a}!important;}.fcm-help-footer{color:${textDim}!important;}
+.fcm-toolbar .fcm-lbl-sm{color:${textDim}!important;}
+.fcm-color-edit-label{color:${textDim}!important;}.fcm-color-button{border-color:${a}!important;}
+/* 只有「一般房間」(fcm-room-default) 套用主題邊框色；自己/最愛/好友房間保留 JS 指定的專屬染色框，
+   不被主題色蓋掉，這樣才能重現原版 FCM 對自己／好友／最愛房間外框染色的效果。 */
+.fcm-room-card.fcm-room-default{border-color:${border}!important;background:transparent!important;}
+.fcm-room-card.fcm-room-default:hover{background:${rowHover}!important;}
+.fcm-room-name,.fcm-room-creator{color:${t}!important}.fcm-room-desc,.fcm-room-count{color:${textDim}!important;}
+.fcm-room-link,.fcm-room-private{color:${a}!important;border-bottom-color:${a}!important;}.fcm-empty-value,.fcm-empty,.fcm-offline,.fcm-room{color:${textDim}!important;}
+.fcm-zone-filter-btn{background:transparent!important;border-color:${border}!important;color:${textDim}!important;}.fcm-zone-filter-btn:hover{border-color:${a}!important;color:${accentB}!important;box-shadow:${glow(9,18)}!important;}.fcm-zone-filter-btn.active{background:${panelSelected}!important;border-color:${a}!important;color:${accentB}!important;}
+.fcm-wce-tag{background:transparent!important;border-color:${a}!important;color:${a}!important;}
+.fcm-btn-red,.fcm-btn-green,.fcm-btn-purple,.fcm-btn-blue,.fcm-btn-orange{background:transparent!important;}
+.fcm-btn-red:hover,.fcm-btn-green:hover,.fcm-btn-purple:hover,.fcm-btn-blue:hover,.fcm-btn-orange:hover{background:${rowHover}!important;filter:brightness(1.15);}
+.fcm-warn{background:color-mix(in srgb, ${a} 50%, transparent)!important;color:${t}!important;border-color:${border}!important;text-align:center!important;}
+#fcm-panel input[type="checkbox"]{accent-color:${a}!important;}
+/* 卷軸：底色與明暗處理比照 CHAT 面板（滑軌= 面板色與黑混合，滑塊 hover 用提高亮度而非整個換色）。 */
+#fcm-panel *{scrollbar-color:${a} ${surfaceAlt};scrollbar-width:auto;}
+#fcm-panel *::-webkit-scrollbar{width:9px;height:9px;}#fcm-panel *::-webkit-scrollbar-track{background:${surfaceAlt}!important;border-radius:8px;}#fcm-panel *::-webkit-scrollbar-thumb{background:${a}!important;border:2px solid ${surfaceAlt}!important;border-radius:8px;}#fcm-panel *::-webkit-scrollbar-thumb:hover{filter:brightness(1.18)!important;}
+.fcm-overlay{background:rgba(0,0,0,.55)!important;}
+.fcm-dialog{background:${p}!important;border-color:${a}!important;color:${t}!important;}
+.fcm-dialog div{color:${t}!important;}.fcm-dialog span{color:${textDim}!important;}
+.fcm-dialog textarea,.fcm-dialog input{background:${panel1}!important;border-color:${border}!important;color:${t}!important;scrollbar-color:${a} ${panel1};}
+.fcm-dialog textarea::placeholder,.fcm-dialog input::placeholder{color:${textDim}!important;}
+.fcm-dialog button{background:transparent!important;}.fcm-dialog button:hover{background:${rowHover}!important;}
+.fcm-chat-card,.fcm-room-share-message{background:color-mix(in srgb, ${p} 92%, transparent)!important;border-color:${a}!important;color:${t}!important;}
+.fcm-chat-card div{color:${t}!important;}.fcm-chat-card span{color:${textDim}!important;}.fcm-chat-card button{background:transparent!important;}
+.fcm-room-share-intro,.fcm-room-share-creator,.fcm-room-share-description{color:${textDim}!important;}
+.fcm-room-share-name{color:${t}!important;}.fcm-room-share-count{color:${a}!important;}
+.fcm-room-share-description{border-color:${border}!important;scrollbar-color:${a} ${panel1};}
+.fcm-room-share-badge{background:transparent!important;border-color:${a}!important;color:${a}!important;}
+.fcm-room-share-button{background:transparent!important;border-color:${a}!important;color:${a}!important;}.fcm-room-share-button:hover{background:${rowHover}!important;box-shadow:${glow(10,18)}!important;}
+.fcm-settings-nav{background:${panel1}!important;border-color:${borderSoft}!important;}
+.fcm-settings-nav button{color:${textDim}!important;border-color:${borderSoft}!important;}
+.fcm-settings-nav button:hover,.fcm-settings-nav button.active{color:${accentB}!important;border-color:${a}!important;background:${rowHover}!important;box-shadow:${glow(10,18)}!important;}
+.fcm-theme-options{background:${panel1}!important;border-color:${border}!important;}
+.fcm-theme-presets .fcm-btn.active{color:${a}!important;border-color:${a}!important;background:${panelSelected}!important;box-shadow:0 0 0 1px ${a} inset!important;}
+.fcm-settings-wrap::-webkit-scrollbar-track,.fcm-scroll::-webkit-scrollbar-track{background:${surfaceAlt}!important;}
+.fcm-settings-wrap::-webkit-scrollbar-thumb,.fcm-scroll::-webkit-scrollbar-thumb{background:${a}!important;border-color:${surfaceAlt}!important;}
+.fcm-settings-wrap::-webkit-scrollbar-thumb:hover,.fcm-scroll::-webkit-scrollbar-thumb:hover{filter:brightness(1.18)!important;}
+.fcm-tog.on{background:${mix(a, 38, p)}!important;border-color:${a}!important;}
+.fcm-tog.on .fcm-tog-dot{background:${accentB}!important;}
+.fcm-tog{background:${panel1}!important;border-color:${border}!important;}.fcm-tog .fcm-tog-dot{background:${textDim}!important;}
+.fcm-tog:hover{border-color:${a}!important;background:color-mix(in srgb,${a} 14%,${panel1})!important;box-shadow:${glow(9,22)}!important;}
+.fcm-tog:hover .fcm-tog-dot{background:color-mix(in srgb,${a} 70%,${t})!important;}
 `;
+        window.dispatchEvent(new CustomEvent('fcm-theme-change'));
     }
 
     function injectStyles() {
@@ -70,7 +165,7 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 #fcm-panel,#fcm-panel *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
 #fcm-panel *{user-select:none;} #fcm-panel input,#fcm-panel textarea{user-select:text!important;}
 #fcm-panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(1050px,96vw);height:min(650px,92vh);
-  background:#1e1635;border:2px solid #5a48a8;border-radius:14px;box-shadow:0 12px 60px rgba(0,0,0,.75);z-index:99990;display:flex;flex-direction:column;overflow:hidden;}
+  background:#1a1821;border:2px solid #7648fe;border-radius:14px;box-shadow:0 12px 60px rgba(0,0,0,.75);z-index:99990;display:flex;flex-direction:column;overflow:hidden;}
 #fcm-panel.hidden{display:none!important;}
 #fcm-mini{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);width:220px;height:40px;background:#1e1635;border:2px solid #5a48a8;border-radius:20px;display:none;align-items:center;justify-content:center;gap:10px;cursor:pointer;z-index:99990;color:#c4a0e0;font-size:12px;transition:all .15s;}
 #fcm-mini.visible{display:flex;} #fcm-mini:hover{border-color:#b090f0;background:#261a48;}
@@ -78,7 +173,7 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-mini-lbl{font-size:9px;color:#8068a8;letter-spacing:1.2px;}
 #fcm-hdr{background:linear-gradient(135deg,#2a2050,#1e1635);padding:10px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #4a3890;cursor:move;flex-shrink:0;min-height:46px;}
 #fcm-title{color:#e8c8ff;font-size:13px;letter-spacing:2px;font-weight:700;flex:1;}
-.fcm-hbtn{width:28px;height:28px;border-radius:50%;background:#261a40;border:1px solid #5a48a8;color:#c4a0e0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;transition:all .15s;flex-shrink:0;}
+.fcm-hbtn{width:30px;height:30px;padding:0;border-radius:6px;background:transparent;border:1px solid #5a48a8;color:#c4a0e0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;transition:all .15s;flex-shrink:0;}
 .fcm-hbtn:hover{background:#3a2860;color:#f0d8ff;border-color:#9070d8;}
 #fcm-tabs{display:flex;background:#1a1230;border-bottom:1px solid #4a3890;flex-shrink:0;}
 .fcm-tab{padding:10px 22px;color:#7060a0;cursor:pointer;font-size:11px;letter-spacing:1.2px;font-weight:700;border-bottom:2px solid transparent;transition:all .15s;}
@@ -92,6 +187,8 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-clear-btn:hover{color:#f0d8ff;}
 .fcm-sel{background:#1a1030;border:1px solid #5048a0;border-radius:8px;padding:5px 6px;color:#c4a0e0;font-size:11px;outline:none;cursor:pointer;max-width:110px;flex-shrink:0;}
 .fcm-sel option{background:#1a1030;}
+.fcm-sel{appearance:none;-webkit-appearance:none;padding-right:28px!important;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%)!important;background-position:calc(100% - 13px) 50%,calc(100% - 9px) 50%!important;background-size:4px 4px,4px 4px!important;background-repeat:no-repeat!important;}
+.fcm-sel::-webkit-scrollbar{width:9px}.fcm-sel::-webkit-scrollbar-track{background:#111016;border-radius:8px}.fcm-sel::-webkit-scrollbar-thumb{background:#7648fe;border:2px solid #111016;border-radius:8px}
 .fcm-lbl-sm{font-size:10px;color:#6050a0;letter-spacing:1px;font-weight:700;white-space:nowrap;flex-shrink:0;}
 .fcm-spacer{flex:1;}
 .fcm-ftog{padding:3px 10px;border-radius:12px;border:1px solid #4838a0;background:transparent;color:#6058a0;font-size:10px;cursor:pointer;transition:all .15s;font-weight:700;white-space:nowrap;flex-shrink:0;}
@@ -105,7 +202,7 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-scroll{flex:1;overflow-y:auto;overflow-x:auto;min-height:0;}
 .fcm-scroll::-webkit-scrollbar{width:5px;height:5px;}
 .fcm-scroll::-webkit-scrollbar-track{background:#1a1030;}
-.fcm-scroll::-webkit-scrollbar-thumb{background:#4838a0;border-radius:3px;}
+.fcm-scroll::-webkit-scrollbar-thumb{background:#7648fe;border-radius:3px;}
 .fcm-count{font-size:11px;color:#9080b8;padding:6px 14px;background:#1a1230;border-top:1px solid #2a2048;letter-spacing:1px;flex-shrink:0;text-align:center;}
 .fcm-tbl{width:100%;border-collapse:collapse;font-size:12px;table-layout:fixed;}
 .fcm-tbl th{background:#261a4a;color:#c4a0e0;font-size:10px;letter-spacing:1.2px;padding:9px 10px;text-align:center;border-bottom:2px solid #4a3890;font-weight:700;white-space:nowrap;position:sticky;top:0;z-index:2;}
@@ -156,15 +253,23 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-warn{padding:8px 16px;font-size:11px;color:#f0a060;background:#20100a;border-bottom:1px solid #601c08;flex-shrink:0;}
 .fcm-onesided-warn{padding:8px 14px;font-size:11px;color:#e8a040;background:#1e1205;border:1px solid #604010;border-radius:6px;margin:8px 14px;line-height:1.5;}
 .fcm-settings-wrap{padding:16px 24px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
+.fcm-settings-wrap::-webkit-scrollbar{width:9px}.fcm-settings-wrap::-webkit-scrollbar-track{background:#111016;border-radius:0 0 10px 0}.fcm-settings-wrap::-webkit-scrollbar-thumb{background:#7648fe;border:2px solid #111016;border-radius:9px}
+.fcm-scroll,.fcm-settings-wrap{cursor:default}.drag-scrolling{cursor:grabbing!important;scroll-behavior:auto!important;user-select:none!important}
+.fcm-settings-nav{position:sticky;top:-16px;z-index:5;display:flex;gap:8px;padding:10px 24px;background:#1a1821;border-bottom:1px solid #332b50;margin:-16px -24px 4px;width:calc(100% + 48px);}
+.fcm-settings-nav button{flex:1;padding:8px 12px;border-radius:8px;border:1px solid #40366c;background:transparent;color:#aaa1c4;font-weight:700;cursor:pointer;}
+.fcm-settings-section{scroll-margin-top:58px;}
+.fcm-theme-presets{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.fcm-theme-presets .fcm-btn{font-size:12px;padding:6px 10px}
+.fcm-theme-manage{padding:6px 11px;flex-shrink:0}.fcm-theme-options{margin:0 0 5px;padding:10px 12px;border:1px solid #40366c;border-radius:8px;background:#1a1030}.fcm-theme-options .fcm-theme-presets{margin-top:0}
 .fcm-set-row{display:flex;align-items:flex-start;gap:14px;padding:3px 0;}
+.fcm-set-row{border-radius:8px;transition:background-color .16s ease,box-shadow .16s ease}.fcm-set-row:hover{background:color-mix(in srgb,#7648fe 9%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,#7648fe 20%,transparent) inset}
 .fcm-tog{width:42px;height:22px;border-radius:11px;border:1px solid #4838a0;background:#1a1030;cursor:pointer;position:relative;transition:all .2s;flex-shrink:0;margin-top:2px;margin-right:4px;}
 .fcm-tog.on{background:#3a1858;border-color:#b080e8;}
 .fcm-tog-dot{position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#4838a8;transition:all .2s;}
 .fcm-tog.on .fcm-tog-dot{left:23px;background:#d090f8;}
 .fcm-set-label{color:#e8d4ff;font-size:15px;font-weight:600;}
 .fcm-set-note{color:#a090c8;font-size:12px;margin-top:5px;line-height:1.6;}
-.fcm-set-desc{color:#a090c8;font-size:12px;margin-top:6px;padding:8px 12px;background:#1a1030;border-radius:6px;border-left:2px solid #5048a0;line-height:1.6;}
 .fcm-settings-wrap .fcm-sel{max-width:none;width:auto;font-size:12px;padding:6px 10px;flex-shrink:0;}
+.fcm-icon-btn{width:32px;height:32px;padding:5px;border-radius:8px;border:1px solid #5048a0;background:transparent;color:#7648fe;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:background-color .15s ease,border-color .15s ease,color .15s ease,box-shadow .15s ease}.fcm-icon-btn:disabled{color:#605870;cursor:default;opacity:.65}.fcm-icon-btn svg{width:20px;height:20px}.fcm-icon-btn svg *{fill:currentColor!important;stroke:currentColor!important}.fcm-sound-preview:not(:disabled):hover{background:color-mix(in srgb,#7648fe 14%,transparent);border-color:#7648fe}
 .fcm-tab-disabled{opacity:0.4;cursor:not-allowed !important;}
 .fcm-tab-disabled:hover{color:#7060a0 !important;background:transparent !important;}
 .fcm-dbstat{font-size:12px;color:#8070a8;padding:10px 14px;background:#1a1030;border-radius:8px;border:1px solid #3a2870;margin-top:4px;}
@@ -176,6 +281,7 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-unknown-id-box{margin:16px;padding:14px 16px;background:#1a1030;border:1px solid #5a48a8;border-radius:10px;display:flex;flex-direction:column;gap:10px;}
 .fcm-unknown-id-title{color:#d0a8f0;font-size:13px;font-weight:700;}
 .fcm-seen-date{font-size:10px;color:#6050a0;margin-top:2px;}
+.fcm-empty-value{font-size:11px;}
 /* Whisper avatar: drawn on BC canvas, no DOM overlay needed */
 /* OOC flash */
 @keyframes fcm-ooc-flash{0%{box-shadow:0 0 0 3px #ff4040cc,0 0 16px #ff404088;border-color:#ff4040;}50%{box-shadow:0 0 0 6px #ff404066,0 0 24px #ff404044;border-color:#ff8080;}100%{box-shadow:0 0 0 3px #ff4040cc,0 0 16px #ff404088;border-color:#ff4040;}}

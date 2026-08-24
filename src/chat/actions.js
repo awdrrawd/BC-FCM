@@ -1,7 +1,7 @@
 import { T } from '../i18n/i18n.js';
 import { PDB } from '../data/profile-db.js';
 import { amAdmin, inRoomFn, getDisplayName, isFriendOf } from '../data/data.js';
-import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
+import { renderCurrent, minimizePanel, closePanel } from '../panel/panel-controller.js';
 // ════════════════════════════════════════
 //  FCM module: actions.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -55,10 +55,10 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
         // next painted frame so the click itself remains responsive.
         const sendAfterPaint = callback => requestAnimationFrame(() => setTimeout(callback, 0));
         const ex = document.getElementById('fcm-beep-overlay'); if (ex) { ex.remove(); return; }
-        const overlay = document.createElement('div'); overlay.id = 'fcm-beep-overlay';
+        const overlay = document.createElement('div'); overlay.id = 'fcm-beep-overlay'; overlay.className = 'fcm-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:center;justify-content:center;';
         overlay.addEventListener('click', () => overlay.remove());
-        const pop = document.createElement('div');
+        const pop = document.createElement('div'); pop.className = 'fcm-dialog';
         pop.style.cssText = 'background:#241840;border:2px solid #8060c8;border-radius:16px;padding:26px;width:min(520px,92vw);box-shadow:0 10px 50px rgba(0,0,0,.85);display:flex;flex-direction:column;gap:16px;';
         pop.addEventListener('click', e => e.stopPropagation());
         const titleEl = document.createElement('div'); titleEl.style.cssText = 'color:#d0a8f0;font-size:16px;font-weight:700;text-align:center;'; titleEl.textContent = T('beepTitle', name);
@@ -132,7 +132,7 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
     }
     function doRemoveFriend(mn) { mn = parseInt(mn); if (typeof ChatRoomListManipulation === 'function') { ChatRoomListManipulation(Player.FriendList, false, mn.toString()); setTimeout(renderCurrent, 400); } }
 
-    // 實際加入房間（無確認）。供簡易確認（navigateToRoom）與詳細資訊確認（showRoomJoinConfirm）共用。
+    // 實際加入房間（無確認），由詳細資訊確認流程共用。
     function _doJoinRoom(roomName) {
         // Blur all FCM search inputs to prevent their keydown handlers from
         // leaking Enter/Shift+Enter events into the new room context (Nami bug fix)
@@ -155,19 +155,14 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
         }, 150);
     }
 
-    // 只知道房名時的簡易文字確認（例如好友列表的房間連結）。
-    function navigateToRoom(roomName) {
-        showConfirm(T('confirmRoom', roomName), () => _doJoinRoom(roomName), T('roomGo'));
-    }
-
     // ── Bug fix: showConfirm — stopPropagation on Enter to prevent
     // BC's room-join handler from firing after the confirm dialog closes.
     // Also guards against double-fire via _confirmed flag.
     function showConfirm(msg, onOk, okLabel) {
         const ex = document.getElementById('fcm-confirm-overlay'); if (ex) ex.remove();
-        const overlay = document.createElement('div'); overlay.id = 'fcm-confirm-overlay';
+        const overlay = document.createElement('div'); overlay.id = 'fcm-confirm-overlay'; overlay.className = 'fcm-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center;';
-        const box = document.createElement('div');
+        const box = document.createElement('div'); box.className = 'fcm-dialog';
         box.style.cssText = 'background:#241840;border:2px solid #7060c0;border-radius:14px;padding:28px 24px;width:min(380px,88vw);box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:20px;font-family:-apple-system,sans-serif;';
         box.addEventListener('click', e => e.stopPropagation());
         const msgEl = document.createElement('div'); msgEl.style.cssText = 'color:#e8d0ff;font-size:14px;text-align:center;line-height:1.7;white-space:pre-wrap;'; msgEl.textContent = msg;
@@ -211,14 +206,14 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
     // 這才是本功能的本意。AccountBeep 反而受伺服器好友限制（雙方皆非好友時被丟棄）。
     // Content 用自訂標記、且「絕不」攜帶任何房間欄位，避免被 BC 或其他 mod 的牽引處理器誤判成換房指令。
     // BC 對未知 Hidden Content 不做任何處理，故沒裝 FCM 的人完全不會看到。
-    const FRIENDREQ_MSG = 'FCMFriendReq';
+    const FRIENDREQ_MSG = 'FCM-InviteFriends';
 
     function showAddFriendConfirm(mn, dname, oneSided) {
         mn = parseInt(mn);
         const ex = document.getElementById('fcm-confirm-overlay'); if (ex) ex.remove();
-        const overlay = document.createElement('div'); overlay.id = 'fcm-confirm-overlay';
+        const overlay = document.createElement('div'); overlay.id = 'fcm-confirm-overlay'; overlay.className = 'fcm-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center;';
-        const box = document.createElement('div');
+        const box = document.createElement('div'); box.className = 'fcm-dialog';
         box.style.cssText = 'background:#241840;border:2px solid #7060c0;border-radius:14px;padding:26px 24px;width:min(400px,90vw);box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:18px;font-family:-apple-system,sans-serif;';
         box.addEventListener('click', e => e.stopPropagation());
 
@@ -254,15 +249,10 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
 
     function sendFriendReqNotify(mn) {
         mn = parseInt(mn);
-        // leash 走同房投遞：對方不在本房則無法送達，明確提示而非假裝已送出。
-        if (!inRoomFn(mn)) { if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('friendReqNeedRoom'), 5000); return; }
         try {
-            // Hidden＋Target：只送給該成員，不帶任何房間資訊，故不會觸發真正的牽引/換房。
-            ServerSend('ChatRoomChat', {
-                Type: 'Hidden',
-                Content: FRIENDREQ_MSG,
-                Target: mn,
-            });
+            // 借用 Leash 通道送 FCM 標籤，但刻意不附 ChatRoomName / ChatRoomSpace。
+            // 接收端 FCM 會在 ServerAccountBeep hook 中攔截，不交給遊戲牽引流程。
+            ServerSend('AccountBeep', { MemberNumber: mn, BeepType: 'Leash', IsSecret: true, Message: FRIENDREQ_MSG });
             if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('friendReqSent', getDisplayName(mn)), 5000);
         } catch (e) { console.warn('🐈‍⬛ [FCM] sendFriendReqNotify:', e); }
     }
@@ -275,8 +265,16 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
         if (document.getElementById(uiId)) return;   // 已有一張，避免重複
         const dname = fromName || getDisplayName(fromNum);
 
-        const el = _appendChatCard(uiId);
+        const anchorId = `${uiId}-anchor`;
+        if (typeof ChatRoomSendLocal !== 'function') return;
+        ChatRoomSendLocal(`<span id="${anchorId}"></span>`);
+        const anchor = document.getElementById(anchorId);
+        const el = anchor?.closest('.ChatMessage') || anchor?.parentElement;
         if (!el) return;
+        el.id = uiId;
+        el.classList.add('fcm-chat-card');
+        el.style.cssText = 'background:rgba(40,15,55,.93);border:2px solid #9060d0;border-radius:8px;padding:10px 14px;margin:6px 4px;font-size:1em;line-height:1.5;color:#eee;';
+        el.replaceChildren();
         const title = document.createElement('div');
         title.style.cssText = 'font-weight:bold;font-size:1.02em;margin-bottom:8px;color:#ffd0e6;';
         title.textContent = T('friendReqIncoming', `${dname} (${fromNum})`);
@@ -344,6 +342,7 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
     //  右下角加「加入房間」。沒插件的人讀不到 ROOMSHARE_TAG，只會看到普通系統訊息。
     function _mkRoomJoinBtn(info) {
         const b = document.createElement('button');
+        b.className = 'fcm-room-share-button';
         b.style.cssText = 'padding:6px 20px;background:#1a3860;color:#90d0ff;border:1px solid #4090d8;border-radius:6px;cursor:pointer;font-size:.9em;font-weight:700;white-space:nowrap;';
         b.textContent = '🚪 ' + T('roomJoinRoomBtn');
         // 點加入 → 先跳出詳細資訊確認框（房名／作者／人數／資訊），再實際加入
@@ -356,6 +355,7 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
     //  pending=true 時（資料尚在載入）：未知的人數／描述顯示淡色「⋯」佔位，載入後由外層抽換。
     function _buildRoomDetail(info, pending) {
         const detail = document.createElement('div');
+        detail.className = 'fcm-room-share-detail';
         detail.style.cssText = 'display:flex;flex-direction:column;gap:8px;min-width:0;';
 
         // 標題列：左＝房名-作者(＋私人/類型標籤)，右＝人數
@@ -364,14 +364,16 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
         const titleWrap = document.createElement('div');
         titleWrap.style.cssText = 'min-width:0;display:flex;align-items:baseline;gap:6px;flex-wrap:wrap;';
         const nameEl = document.createElement('span');
+        nameEl.className = 'fcm-room-share-name';
         nameEl.style.cssText = 'color:#e8c8ff;font-size:1.05em;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:240px;';
         nameEl.textContent = info.room; nameEl.title = info.room;
         titleWrap.appendChild(nameEl);
-        if (info.creator) { const cr = document.createElement('span'); cr.style.cssText = 'color:#c8a0e8;font-size:.95em;font-weight:600;'; cr.textContent = '- ' + info.creator; titleWrap.appendChild(cr); }
-        if (info.priv) { const pv = document.createElement('span'); pv.style.cssText = 'font-size:.72em;background:#2a1048;border:1px solid #8060b0;color:#c090f0;border-radius:6px;padding:1px 6px;'; pv.textContent = T('roomPrivateLabel'); titleWrap.appendChild(pv); }
+        if (info.creator) { const cr = document.createElement('span'); cr.className = 'fcm-room-share-creator'; cr.style.cssText = 'color:#c8a0e8;font-size:.95em;font-weight:600;'; cr.textContent = '- ' + info.creator; titleWrap.appendChild(cr); }
+        if (info.priv) { const pv = document.createElement('span'); pv.className = 'fcm-room-share-badge'; pv.style.cssText = 'font-size:.72em;background:#2a1048;border:1px solid #8060b0;color:#c090f0;border-radius:6px;padding:1px 6px;'; pv.textContent = T('roomPrivateLabel'); titleWrap.appendChild(pv); }
         if (info.type) { const tp = document.createElement('span'); tp.style.cssText = 'font-size:.72em;background:#182a1a;border:1px solid #3a7048;color:#78d090;border-radius:5px;padding:1px 6px;'; tp.textContent = info.type; titleWrap.appendChild(tp); }
         head.appendChild(titleWrap);
         const cntEl = document.createElement('span');
+        cntEl.className = 'fcm-room-share-count';
         cntEl.style.cssText = 'color:#90d0ff;font-size:.95em;font-weight:700;white-space:nowrap;flex-shrink:0;';
         if (info.count != null) cntEl.textContent = `👥 ${info.count}${info.limit != null ? '/' + info.limit : ''}`;
         else if (pending) { cntEl.textContent = '⋯'; cntEl.style.opacity = '.4'; }
@@ -381,6 +383,7 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
         // 資訊（描述）：有才顯示；pending 時保留一列淡色佔位，過長時卡內捲動
         if (info.desc || pending) {
             const body = document.createElement('div');
+            body.className = 'fcm-room-share-description';
             body.style.cssText = 'color:#b8a8d8;font-size:.9em;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:120px;overflow-y:auto;border-top:1px solid #3a2a5a;border-bottom:1px solid #3a2a5a;padding:6px 0;';
             if (info.desc) body.textContent = info.desc;
             else { body.textContent = '⋯'; body.style.opacity = '.4'; }
@@ -408,9 +411,9 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
     function showRoomJoinConfirm(info, infoPromise) {
         if (!info || !info.room) return;
         const ex = document.getElementById('fcm-confirm-overlay'); if (ex) ex.remove();
-        const overlay = document.createElement('div'); overlay.id = 'fcm-confirm-overlay';
+        const overlay = document.createElement('div'); overlay.id = 'fcm-confirm-overlay'; overlay.className = 'fcm-overlay';
         overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center;';
-        const box = document.createElement('div');
+        const box = document.createElement('div'); box.className = 'fcm-dialog';
         box.style.cssText = 'background:rgb(36,24,64);border:2px solid rgb(112,96,192);border-radius:14px;padding:28px 24px;width:min(380px,88vw);box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:20px;font-family:-apple-system,sans-serif;';
         box.addEventListener('click', e => e.stopPropagation());
         const detailWrap = document.createElement('div');
@@ -485,6 +488,7 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
             }
             if (msgEl) {
                 msgEl.dataset.fcmRoomshare = '1';
+                msgEl.classList.add('fcm-room-share-message');
                 // 就地換成結構化房卡外觀（清掉原本純文字，改用房卡）
                 msgEl.style.background = 'rgba(40,15,55,.55)';
                 msgEl.style.border = '1px solid #6a4da8';
@@ -494,6 +498,7 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
                 msgEl.innerHTML = '';
                 if (entry.Sharer) {
                     const intro = document.createElement('div');
+                    intro.className = 'fcm-room-share-intro';
                     intro.style.cssText = 'color:#a890c8;font-size:.82em;margin-bottom:6px;';
                     intro.textContent = T('roomShareIntro', entry.Sharer);
                     msgEl.appendChild(intro);
@@ -509,6 +514,29 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
         } catch (e) { console.warn('🐈‍⬛ [FCM] handleIncomingRoomShare:', e); }
     }
 
+    function showIncomingRoomInvite(fromNum, fromName, info) {
+        if (!info?.room) return;
+        const uiId = `fcm-roominvite-${parseInt(fromNum)}-${String(info.room).replace(/[^a-z0-9_-]/gi, '').slice(0, 24)}`;
+        setTimeout(() => {
+            document.getElementById(uiId)?.remove();
+            const log = document.getElementById('TextAreaChatLog');
+            const rows = log?.querySelectorAll(`.ChatMessageBeep[data-sender="${parseInt(fromNum)}"]`) || [];
+            const el = rows.length ? rows[rows.length - 1] : _appendChatCard(uiId);
+            if (!el) return;
+            el.id = uiId;
+            el.classList.add('fcm-chat-card', 'fcm-room-share-message');
+            el.style.cssText = 'background:rgba(40,15,55,.93);border:2px solid #9060d0;border-radius:8px;padding:10px 14px;margin:6px 4px;font-size:1em;line-height:1.5;color:#eee;text-align:left;';
+            el.replaceChildren();
+            const intro = document.createElement('div');
+            intro.className = 'fcm-room-share-intro';
+            intro.style.cssText = 'color:#a890c8;font-size:.82em;margin-bottom:6px;';
+            intro.textContent = T('chatRoomInviteIncoming', fromName || getDisplayName(fromNum));
+            el.appendChild(intro);
+            el.appendChild(_buildRoomShareCard(info));
+            _scrollChatToEnd();
+        }, 0);
+    }
+
     // ── 聊天記錄卡片輔助（參考 AFC createProposalUI）─────────────────
     function _appendChatCard(uiId) {
         if (document.getElementById(uiId)) return null;
@@ -516,7 +544,7 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
         const floating = !container;
         if (floating) container = document.body;
         if (!container) return null;
-        const el = document.createElement('div'); el.id = uiId;
+        const el = document.createElement('div'); el.id = uiId; el.className = 'fcm-chat-card';
         el.style.cssText = floating
             ? 'position:fixed;bottom:120px;left:50%;transform:translateX(-50%);z-index:99999;max-width:600px;width:90vw;background:rgba(40,15,55,.97);border:2px solid #9060d0;border-radius:10px;padding:12px 16px;font-size:1em;line-height:1.6;color:#eee;box-shadow:0 4px 24px rgba(0,0,0,.7);'
             : 'background:rgba(40,15,55,.93);border:2px solid #9060d0;border-radius:8px;padding:10px 14px;margin:6px 4px;font-size:1em;line-height:1.5;color:#eee;';
@@ -536,5 +564,5 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
         return td;
     }
 
-export { roomOp, doView, doBeep, doWhisper, doAddFriend, doToggleList, doRemoveFriend, navigateToRoom, showConfirm, makeIdCell,
-         showAddFriendConfirm, shareRoomToChat, showRoomJoinConfirm, roomInfoFromResult, handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSHARE_TAG };
+export { roomOp, doView, doBeep, doWhisper, doAddFriend, doToggleList, doRemoveFriend, showConfirm, makeIdCell,
+         showAddFriendConfirm, shareRoomToChat, showRoomJoinConfirm, roomInfoFromResult, handleIncomingFriendReq, handleIncomingRoomShare, showIncomingRoomInvite, FRIENDREQ_MSG, ROOMSHARE_TAG };
