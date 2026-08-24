@@ -83,8 +83,10 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
         chatFontFamily: 'system',
         communicationEnabled: false,
         persistentBalloon: false,
+        balloonPlacement: 'off',
         takeoverFcmChatButtons: false,
         individualBalloons: false,
+        userBalloonPlacement: 'off',
         notificationAnimation: true,
         notificationAudio: true,
         notificationSound: 'Audio/BeepAlarm.mp3',
@@ -93,6 +95,8 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
         chatBalloonPosition: null,
         chatUserBalloonPositions: {},
         chatStatus: 'online',
+        profileNickname: '',
+        statusMessage: '',
     };
     function loadCfg() {
         try { const s = localStorage.getItem('LikoFCM'); if (s) Object.assign(cfg, JSON.parse(s)); } catch {}
@@ -104,7 +108,13 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
         if (!['round', 'square'].includes(cfg.avatarShape)) cfg.avatarShape = 'square';
         if (!['round', 'square'].includes(cfg.chatAvatarShape)) cfg.chatAvatarShape = 'square';
         cfg.chatFontSize = Math.max(10, Math.min(24, Number(cfg.chatFontSize) || 13));
-        if (!['system', 'heiti', 'ming', 'kai', 'mono'].includes(cfg.chatFontFamily)) cfg.chatFontFamily = 'system';
+        if (!['system', 'heiti', 'ming', 'kai', 'mono', 'jhenghei', 'yahei', 'pmingliu', 'mingliu', 'dfkai', 'notoSansTC', 'notoSerifTC', 'sourceHanSans', 'sourceHanSerif'].includes(cfg.chatFontFamily)) cfg.chatFontFamily = 'system';
+        const placements = ['off', 'top-left', 'middle-left', 'bottom-left', 'top-right', 'middle-right', 'bottom-right'];
+        // Boolean settings from older versions map to the former bottom-right default.
+        if (!placements.includes(cfg.balloonPlacement) || (cfg.balloonPlacement === 'off' && cfg.persistentBalloon)) cfg.balloonPlacement = cfg.persistentBalloon ? 'bottom-right' : 'off';
+        if (!placements.includes(cfg.userBalloonPlacement) || (cfg.userBalloonPlacement === 'off' && cfg.individualBalloons)) cfg.userBalloonPlacement = cfg.individualBalloons ? 'bottom-right' : 'off';
+        cfg.persistentBalloon = cfg.balloonPlacement !== 'off';
+        cfg.individualBalloons = cfg.userBalloonPlacement !== 'off';
         // BrushHair4 音效已移除；曾選用它的使用者改回預設提示音，避免播放失敗的靜音狀態。
         if (cfg.notificationSound === 'Audio/BrushHair4.mp3') cfg.notificationSound = 'Audio/BeepAlarm.mp3';
     }

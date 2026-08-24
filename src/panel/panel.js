@@ -45,8 +45,8 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
         const panel = document.createElement('div'); panel.id = 'fcm-panel'; panel.classList.add('hidden');
         const hdr = document.createElement('div'); hdr.id = 'fcm-hdr';
         const title = document.createElement('div'); title.id = 'fcm-title'; title.textContent = T('panelTitle');
-        const minBtn = document.createElement('div'); minBtn.className = 'fcm-hbtn'; minBtn.textContent = T('minimize'); minBtn.addEventListener('click', minimizePanel);
-        const closeBtn = document.createElement('div'); closeBtn.className = 'fcm-hbtn'; closeBtn.textContent = T('close'); closeBtn.addEventListener('click', closePanel);
+        const minBtn = document.createElement('button'); minBtn.type = 'button'; minBtn.className = 'fcm-hbtn fcm-chat-icon-action'; minBtn.title = T('minimize'); minBtn.textContent = T('minimize'); minBtn.addEventListener('click', minimizePanel);
+        const closeBtn = document.createElement('button'); closeBtn.type = 'button'; closeBtn.className = 'fcm-hbtn fcm-chat-icon-action'; closeBtn.title = T('close'); closeBtn.textContent = T('close'); closeBtn.addEventListener('click', closePanel);
         hdr.appendChild(title); hdr.appendChild(minBtn); hdr.appendChild(closeBtn);
         const tabBar = document.createElement('div'); tabBar.id = 'fcm-tabs';
         [['friends', T('tabFriends')], ['room', T('tabRoom')], ['roomSearch', T('tabRoomSearch')], ['people', T('tabPeople')], ['settings', T('tabSettings')], ['help', T('tabHelp')]].forEach(([key, label]) => {

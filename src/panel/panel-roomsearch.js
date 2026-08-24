@@ -112,17 +112,24 @@ async function renderRoomSearch(container) {
             const cStr = mc !== null ? `(${mc}${ml !== null ? '/'+ml : ''})` : '';
             const card = document.createElement('div'); card.className = 'fcm-room-card';
             // Priority: current room (pink) > fav (gold) > friends (green) > default
-            let cardBorder;
+            // 不管房間有沒有特別屬性，都給完整外框＋相同 margin，避免「加入」按鈕因為預設房間只有
+            // border-bottom 而少了左右邊框寬度，導致每列的按鈕排序（水平位置）跟有色框的房間對不齊。
+            let cardBorder, stateCls;
             if (isCurrent) {
                 cardBorder = 'border:2px solid #e060a0;border-radius:8px;margin:3px 4px;background:rgba(220,80,140,.08);';
+                stateCls = 'fcm-room-current';
             } else if (isFav) {
                 cardBorder = 'border:1.5px solid #c8a020;border-radius:8px;margin:3px 4px;background:rgba(200,160,32,.06);';
+                stateCls = 'fcm-room-fav';
             } else if (friendsHere.length > 0) {
                 cardBorder = 'border:1.5px solid #409060;border-radius:8px;margin:3px 4px;background:rgba(40,128,64,.06);';
+                stateCls = 'fcm-room-friend';
             } else {
-                cardBorder = 'border-bottom:1px solid #2a2048;';
+                cardBorder = 'border:1.5px solid #2a2048;border-radius:8px;margin:3px 4px;background:transparent;';
+                stateCls = 'fcm-room-default';
             }
-            card.style.cssText = `display:flex;align-items:center;gap:10px;padding:10px 12px;transition:background .1s;${cardBorder}`;
+            card.classList.add(stateCls);
+            card.style.cssText = `display:flex;align-items:center;gap:10px;padding:10px 12px;transition:background .1s,border-color .1s;${cardBorder}`;
             card.addEventListener('mouseenter', () => { if (!isFav && !friendsHere.length && !isCurrent) card.style.background = '#261a4a'; });
             card.addEventListener('mouseleave', () => { if (!isFav && !friendsHere.length && !isCurrent) card.style.background = ''; });
             // 房間屬性判定（依 BC 原碼：Access/Visibility 非 ["All"] 即上鎖/私人；MapType 判類型）

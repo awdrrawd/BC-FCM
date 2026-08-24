@@ -50,17 +50,20 @@ import { chatFontFamily } from '../communication/chat-font.js';
         //  （私訊藍／好友綠／黑單紅／幽靈紫／管理橘…）排除在外，保留辨識色。
         const _plainBtn = ':not(.fcm-btn-red):not(.fcm-btn-green):not(.fcm-btn-purple):not(.fcm-btn-blue):not(.fcm-btn-orange)';
         el.textContent = `
-#fcm-panel{background:${p}!important;border-color:${border}!important;color:${t}!important;}
+#fcm-panel{background:${p}!important;border-color:${a}!important;color:${t}!important;}
 #fcm-panel,#fcm-panel *{font-family:${chatFontFamily()}!important;}
+/* 語言下拉需要保留「Twemoji Country Flags」萬國旗字體，不能被上面這條全域字型覆蓋掉；
+   #fcm-panel 底下加上 class 選擇器，特異度比「#fcm-panel *」的萬用選擇器更高，才能蓋過上面。 */
+#fcm-panel .fcm-lang-flag-select,#fcm-panel .fcm-lang-flag-select option{font-family:"Twemoji Country Flags",-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif!important;}
 .fcm-name,.fcm-room-name,.fcm-tbl{font-size:${baseFontSize}px!important;}
 .fcm-set-label{font-size:${Math.round(baseFontSize * 1.15)}px!important;}
 .fcm-set-note,.fcm-id,.fcm-search,.fcm-sel{font-size:${Math.max(10, baseFontSize - 1)}px!important;}
 #fcm-mini{background:${p}!important;border-color:${border}!important;color:${textDim}!important;}
 #fcm-mini:hover{background:${rowHover}!important;border-color:${a}!important;box-shadow:${glow(9,20)}!important;}
 .fcm-mini-pill{background:${border}!important;}
-#fcm-hdr{background:linear-gradient(135deg, ${hdrGrad}, ${p})!important;border-bottom-color:${border}!important;}
+#fcm-hdr{background:linear-gradient(135deg, ${hdrGrad}, ${p})!important;border-bottom-color:${a}!important;}
 #fcm-title{color:${accentB}!important;}
-.fcm-hbtn{background:${panel1}!important;border-color:${border}!important;color:${textDim}!important;}
+.fcm-hbtn{background:transparent!important;border-color:${a}!important;color:${textDim}!important;}
 .fcm-hbtn:hover{background:${rowHover}!important;color:${accentB}!important;border-color:${a}!important;box-shadow:${glow(10,18)}!important;}
 #fcm-tabs{background:${panel1}!important;border-bottom-color:${border}!important;}
 .fcm-tab{color:${textDim}!important;}
@@ -85,11 +88,16 @@ import { chatFontFamily } from '../communication/chat-font.js';
 .fcm-search::placeholder{color:${textDim}!important;}.fcm-clear-btn{color:${textDim}!important;}.fcm-clear-btn:hover{color:${a}!important;}
 .fcm-search:hover{border-color:${a}!important;}.fcm-search:focus{background:${panel1}!important;border-color:${a}!important;color:${t}!important;box-shadow:0 0 0 2px color-mix(in srgb, ${a} 24%, transparent)!important;}
 .fcm-search::selection{background:${a}!important;color:${p}!important;}
-.fcm-sel{background-color:${inputBg}!important;border-color:${border}!important;color:${t}!important;color-scheme:${colorScheme};}
+.fcm-sel{background-color:${inputBg}!important;border-color:${a}!important;color:${t}!important;color-scheme:${colorScheme};scrollbar-color:${a} ${inputBg}!important;}
 .fcm-sel:hover,.fcm-sel:focus{border-color:${a}!important;outline:none!important;box-shadow:0 0 0 2px color-mix(in srgb, ${a} 20%, transparent)!important;}
-.fcm-sel option{background:${panel1}!important;color:${t}!important;}.fcm-sel option:checked{background:${a} linear-gradient(0deg,${a},${a})!important;color:${p}!important;}.fcm-sel option:disabled{color:${textDim}!important;}
-.fcm-btn${_plainBtn}{background:${p}!important;border-color:${border}!important;color:${textDim}!important;}
+.fcm-sel option{background:${inputBg}!important;color:${t}!important;}.fcm-sel option:checked{background:${a} linear-gradient(0deg,${a},${a})!important;color:${p}!important;}.fcm-sel option:disabled{color:${textDim}!important;}
+.fcm-btn${_plainBtn}{background:${p}!important;border-color:${a}!important;color:${textDim}!important;}
+#fcm-panel .fcm-btn{border-color:${a}!important;}
 .fcm-btn${_plainBtn}:hover{background:${rowHover}!important;border-color:${a}!important;color:${accentB}!important;box-shadow:${glow(10,18)}!important;}
+/* 設定頁內的按鈕（快取管理／匯出匯入等）跟 CHAT 的按鈕一樣，一律套用主題邊框色，
+   不再保留語意色（紅/藍/綠/紫/橘），維持與 CHAT 面板一致的視覺風格。 */
+.fcm-settings-wrap .fcm-btn-red,.fcm-settings-wrap .fcm-btn-green,.fcm-settings-wrap .fcm-btn-purple,.fcm-settings-wrap .fcm-btn-blue,.fcm-settings-wrap .fcm-btn-orange{background:${p}!important;border-color:${border}!important;color:${textDim}!important;}
+.fcm-settings-wrap .fcm-btn-red:hover,.fcm-settings-wrap .fcm-btn-green:hover,.fcm-settings-wrap .fcm-btn-purple:hover,.fcm-settings-wrap .fcm-btn-blue:hover,.fcm-settings-wrap .fcm-btn-orange:hover{background:${rowHover}!important;border-color:${a}!important;color:${accentB}!important;box-shadow:${glow(10,18)}!important;}
 .fcm-set-label{color:${t}!important;}
 .fcm-set-note{color:${textDim}!important;}
 .fcm-set-row:hover{background:color-mix(in srgb,${a} 9%,transparent)!important;box-shadow:0 0 0 1px color-mix(in srgb,${a} 20%,transparent) inset!important;}
@@ -105,8 +113,10 @@ import { chatFontFamily } from '../communication/chat-font.js';
 .fcm-help-title{color:${accentB}!important;}.fcm-help-text,.fcm-help-item,.fcm-help-item span{color:${textDim}!important;}.fcm-help-item .fcm-help-dot{color:${a}!important;}.fcm-help-footer{color:${textDim}!important;}
 .fcm-toolbar .fcm-lbl-sm{color:${textDim}!important;}
 .fcm-color-edit-label{color:${textDim}!important;}.fcm-color-button{border-color:${a}!important;}
-.fcm-room-card{border-color:${border}!important;background:transparent!important;}
-.fcm-room-card:hover{background:${rowHover}!important;}
+/* 只有「一般房間」(fcm-room-default) 套用主題邊框色；自己/最愛/好友房間保留 JS 指定的專屬染色框，
+   不被主題色蓋掉，這樣才能重現原版 FCM 對自己／好友／最愛房間外框染色的效果。 */
+.fcm-room-card.fcm-room-default{border-color:${border}!important;background:transparent!important;}
+.fcm-room-card.fcm-room-default:hover{background:${rowHover}!important;}
 .fcm-room-name,.fcm-room-creator{color:${t}!important}.fcm-room-desc,.fcm-room-count{color:${textDim}!important;}
 .fcm-room-link,.fcm-room-private{color:${a}!important;border-bottom-color:${a}!important;}.fcm-empty-value,.fcm-empty,.fcm-offline,.fcm-room{color:${textDim}!important;}
 .fcm-zone-filter-btn{background:transparent!important;border-color:${border}!important;color:${textDim}!important;}.fcm-zone-filter-btn:hover{border-color:${a}!important;color:${accentB}!important;box-shadow:${glow(9,18)}!important;}.fcm-zone-filter-btn.active{background:${panelSelected}!important;border-color:${a}!important;color:${accentB}!important;}
@@ -163,7 +173,7 @@ import { chatFontFamily } from '../communication/chat-font.js';
 .fcm-mini-lbl{font-size:9px;color:#8068a8;letter-spacing:1.2px;}
 #fcm-hdr{background:linear-gradient(135deg,#2a2050,#1e1635);padding:10px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #4a3890;cursor:move;flex-shrink:0;min-height:46px;}
 #fcm-title{color:#e8c8ff;font-size:13px;letter-spacing:2px;font-weight:700;flex:1;}
-.fcm-hbtn{width:28px;height:28px;border-radius:50%;background:#261a40;border:1px solid #5a48a8;color:#c4a0e0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:17px;line-height:1;transition:all .15s;flex-shrink:0;}
+.fcm-hbtn{width:30px;height:30px;padding:0;border-radius:6px;background:transparent;border:1px solid #5a48a8;color:#c4a0e0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;transition:all .15s;flex-shrink:0;}
 .fcm-hbtn:hover{background:#3a2860;color:#f0d8ff;border-color:#9070d8;}
 #fcm-tabs{display:flex;background:#1a1230;border-bottom:1px solid #4a3890;flex-shrink:0;}
 .fcm-tab{padding:10px 22px;color:#7060a0;cursor:pointer;font-size:11px;letter-spacing:1.2px;font-weight:700;border-bottom:2px solid transparent;transition:all .15s;}

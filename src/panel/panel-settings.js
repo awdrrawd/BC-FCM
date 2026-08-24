@@ -27,6 +27,19 @@ function renderSettings(container) {
         info.appendChild(lbl); info.appendChild(nt); row.appendChild(info); row.appendChild(tog);
         return row;
     }
+    function balloonSelectRow(label, note, cfgKey, legacyKey) {
+        const row = document.createElement('div'); row.className = 'fcm-set-row';
+        const info = document.createElement('div'); info.style.flex = '1';
+        const lbl = document.createElement('div'); lbl.className = 'fcm-set-label'; lbl.textContent = label;
+        const nt = document.createElement('div'); nt.className = 'fcm-set-note'; nt.textContent = note;
+        const select = document.createElement('select'); select.className = 'fcm-sel';
+        [['off', T('balloonOff')], ['top-left', `⬉ ${T('balloonTopLeft')}`], ['middle-left', `⭠ ${T('balloonMiddleLeft')}`], ['bottom-left', `⬋ ${T('balloonBottomLeft')}`], ['top-right', `⬈ ${T('balloonTopRight')}`], ['middle-right', `⭢ ${T('balloonMiddleRight')}`], ['bottom-right', `⬊ ${T('balloonBottomRight')}`]].forEach(([value, text]) => {
+            const option = document.createElement('option'); option.value = value; option.textContent = text; option.selected = cfg[cfgKey] === value; select.appendChild(option);
+        });
+        select.addEventListener('change', () => { cfg[cfgKey] = select.value; cfg[legacyKey] = select.value !== 'off'; saveCfg(); refreshChatSettings(); });
+        info.appendChild(lbl); info.appendChild(nt); row.appendChild(info); row.appendChild(select);
+        return row;
+    }
     const nav = document.createElement('div'); nav.className = 'fcm-settings-nav';
     const navItems = [['main', T('settingsTabMain')], ['communication', T('settingsTabCommunication')], ['chat', T('settingsTabChat')]];
     navItems.forEach(([id, label], index) => {
@@ -56,7 +69,7 @@ function renderSettings(container) {
     const langInfo = document.createElement('div'); langInfo.style.flex = '1';
     const langLbl = document.createElement('div'); langLbl.className = 'fcm-set-label'; langLbl.textContent = T('langLabel');
     langInfo.appendChild(langLbl);   // 語言不需要說明文字
-    const langSel = document.createElement('select'); langSel.className = 'fcm-sel'; langSel.style.flexShrink = '0';
+    const langSel = document.createElement('select'); langSel.className = 'fcm-sel fcm-lang-flag-select'; langSel.style.flexShrink = '0';
     // 國旗字體用 inline style（保證生效，不被主題 CSS 層疊蓋掉）：白嫖 BC 的 "Twemoji Country Flags"。
     // select 本體 + 每個 option 都要設：因為 .fcm-sel option 有自訂背景色，Chromium 會用 styled
     // popup 渲染下拉清單，該模式下 option 不繼承 select 的字體，不各自設國旗就會退化成 TW/CN 字母。
@@ -329,11 +342,11 @@ function renderSettings(container) {
     sectionHeader(T('setSecCommunication'), 'communication');
     wrap.appendChild(settingRow(T('communicationEnabled'), T('communicationEnabledNote'), cfg.communicationEnabled, v => { cfg.communicationEnabled = v; saveCfg(); refreshChatSettings(); }));
     divider();
-    wrap.appendChild(settingRow(T('persistentBalloon'), T('persistentBalloonNote'), cfg.persistentBalloon, v => { cfg.persistentBalloon = v; saveCfg(); refreshChatSettings(); }));
+    wrap.appendChild(balloonSelectRow(T('persistentBalloon'), T('persistentBalloonNote'), 'balloonPlacement', 'persistentBalloon'));
     divider();
     wrap.appendChild(settingRow(T('takeoverChatButtons'), T('takeoverChatButtonsNote'), cfg.takeoverFcmChatButtons, v => { cfg.takeoverFcmChatButtons = v; saveCfg(); }));
     divider();
-    wrap.appendChild(settingRow(T('individualBalloons'), T('individualBalloonsNote'), cfg.individualBalloons, v => { cfg.individualBalloons = v; saveCfg(); refreshChatSettings(); }));
+    wrap.appendChild(balloonSelectRow(T('individualBalloons'), T('individualBalloonsNote'), 'userBalloonPlacement', 'individualBalloons'));
     divider();
     wrap.appendChild(settingRow(T('notificationAnimation'), T('notificationAnimationNote'), cfg.notificationAnimation, v => { cfg.notificationAnimation = v; saveCfg(); }));
     divider();

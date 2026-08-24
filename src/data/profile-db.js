@@ -18,11 +18,13 @@ import { inRoomFn } from './data.js';
                 } catch { res(false); }
             });
         },
-        _face(C, sz = 44) {
+        _face(C, sz = 100) {
             try {
                 const src = C && C.Canvas; if (!src || !src.width) return '';
                 const cv = document.createElement('canvas'); cv.width = cv.height = sz;
                 const ctx = cv.getContext('2d');
+                ctx.imageSmoothingEnabled = true;
+                ctx.imageSmoothingQuality = 'high';
                 ctx.fillStyle = '#1a0028'; ctx.fillRect(0, 0, sz, sz);
                 const cropSize = 210;
                 ctx.drawImage(src, src.width / 2 - cropSize / 2, 740, cropSize, cropSize, 0, 0, sz, sz);
@@ -200,9 +202,23 @@ import { inRoomFn } from './data.js';
     async function syncRoomAvatar(C) {
         const mn = parseInt(C?.MemberNumber);
         if (!mn || mn === parseInt(Player?.MemberNumber)) return null;
-        const record = await Snapshot.getRecord(mn);
+        let record = await Snapshot.getRecord(mn);
         const shared = _sharedFcmProfile(C);
         const remoteTime = Number(shared?.avatarUpdatedAt) || 0;
+        if (record?.blob && typeof createImageBitmap === 'function') {
+            try {
+                const bitmap = await createImageBitmap(record.blob);
+                const lowResolution = bitmap.width < 90 || bitmap.height < 90;
+                bitmap.close();
+                if (lowResolution) {
+                    const upgraded = PDB._face(C, 100);
+                    if (upgraded) {
+                        await Snapshot.save(mn, upgraded, { source: 'resolution-upgrade', sourceUpdatedAt: remoteTime });
+                        record = await Snapshot.getRecord(mn);
+                    }
+                }
+            } catch {}
+        }
         if (shared?.avatarMode === 'none') return record ? Snapshot.get(mn) : null;
         if (shared && (shared.avatarUrl || shared.avatarSnapshot)) {
             if (record && (remoteTime === 0 || Number(record.sourceUpdatedAt) >= remoteTime)) return Snapshot.get(mn);
@@ -311,7 +327,7 @@ import { inRoomFn } from './data.js';
             let prev = '', stable = 0, url = '';
             for (let i = 0; i < 40; i++) {
                 await new Promise(r => requestAnimationFrame(r));
-                const cur = PDB._face(C, 44);
+                const cur = PDB._face(C, 100);
                 if (cur && cur.length > 800) {
                     if (cur === prev) {
                         stable++;
@@ -339,7 +355,7 @@ import { inRoomFn } from './data.js';
         let stable = 0, prev = '';
         const check = () => {
             if (Snapshot._cache[mn]) return;
-            const url = PDB._face(C, 44);
+            const url = PDB._face(C, 100);
             if (url && url.length > 800) {
                 if (url === prev) {
                     stable++;
