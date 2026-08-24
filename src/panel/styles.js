@@ -73,18 +73,20 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-search::placeholder{color:${textDim}!important;}.fcm-clear-btn{color:${textDim}!important;}.fcm-clear-btn:hover{color:${a}!important;}
 .fcm-search:hover{border-color:${a}!important;}.fcm-search:focus{background:${panel1}!important;border-color:${a}!important;color:${t}!important;box-shadow:0 0 0 2px color-mix(in srgb, ${a} 24%, transparent)!important;}
 .fcm-search::selection{background:${a}!important;color:${p}!important;}
-.fcm-sel{background:${inputBg}!important;border-color:${border}!important;color:${t}!important;color-scheme:${colorScheme};}
+.fcm-sel{background-color:${inputBg}!important;border-color:${border}!important;color:${t}!important;color-scheme:${colorScheme};}
 .fcm-sel:hover,.fcm-sel:focus{border-color:${a}!important;outline:none!important;box-shadow:0 0 0 2px color-mix(in srgb, ${a} 20%, transparent)!important;}
-.fcm-sel option{background:${panel1}!important;color:${t}!important;}.fcm-sel option:checked{background:${a}!important;color:${p}!important;}.fcm-sel option:disabled{color:${textDim}!important;}
+.fcm-sel option{background:${panel1}!important;color:${t}!important;}.fcm-sel option:checked{background:${a} linear-gradient(0deg,${a},${a})!important;color:${p}!important;}.fcm-sel option:disabled{color:${textDim}!important;}
 .fcm-btn${_plainBtn}{background:${p}!important;border-color:${border}!important;color:${textDim}!important;}
 .fcm-btn${_plainBtn}:hover{background:${rowHover}!important;border-color:${a}!important;color:${accentB}!important;}
 .fcm-set-label{color:${t}!important;}
 .fcm-set-note{color:${textDim}!important;}
+.fcm-set-row:hover{background:color-mix(in srgb,${a} 9%,transparent)!important;box-shadow:0 0 0 1px color-mix(in srgb,${a} 20%,transparent) inset!important;}
+.fcm-icon-btn{color:${a}!important;border-color:${border}!important}.fcm-icon-btn:not(:disabled):hover{background:${rowHover}!important;border-color:${a}!important}.fcm-icon-btn:disabled{color:${textDim}!important}
 .fcm-settings-section{color:${accentB}!important;border-bottom-color:${a}!important;}
 .fcm-settings-wrap label,.fcm-settings-wrap label span{color:${textDim}!important;}
 .fcm-settings-wrap input[type="color"]{background:${panel1}!important;border-color:${border}!important;}
 .fcm-avatar-options{background:${panel1}!important;border-color:${border}!important;}
-.fcm-set-desc,.fcm-dbstat{background:${panel1}!important;color:${textDim}!important;border-color:${a}!important;}
+.fcm-dbstat{background:${panel1}!important;color:${textDim}!important;border-color:${a}!important;}
 .fcm-people-hint,.fcm-page-bar{background:${panel1}!important;color:${textDim}!important;border-color:${border}!important;}
 .fcm-unknown-id-box,.fcm-help-card{background:${panel1}!important;border-color:${border}!important;color:${textDim}!important;}
 .fcm-unknown-id-title{color:${accentB}!important;}
@@ -119,6 +121,7 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-settings-nav{background:${panel1}!important;border-color:${borderSoft}!important;}
 .fcm-settings-nav button{color:${textDim}!important;border-color:${borderSoft}!important;}
 .fcm-settings-nav button:hover,.fcm-settings-nav button.active{color:${accentB}!important;border-color:${a}!important;background:${rowHover}!important;}
+.fcm-theme-options{background:${panel1}!important;border-color:${border}!important;}
 .fcm-theme-presets .fcm-btn.active{color:${a}!important;border-color:${a}!important;background:${panelSelected}!important;box-shadow:0 0 0 1px ${a} inset!important;}
 .fcm-settings-wrap::-webkit-scrollbar-track,.fcm-scroll::-webkit-scrollbar-track{background:${panelRaised}!important;}
 .fcm-settings-wrap::-webkit-scrollbar-thumb,.fcm-scroll::-webkit-scrollbar-thumb{background:${a}!important;border-color:${panelRaised}!important;}
@@ -158,6 +161,8 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-clear-btn:hover{color:#f0d8ff;}
 .fcm-sel{background:#1a1030;border:1px solid #5048a0;border-radius:8px;padding:5px 6px;color:#c4a0e0;font-size:11px;outline:none;cursor:pointer;max-width:110px;flex-shrink:0;}
 .fcm-sel option{background:#1a1030;}
+.fcm-sel{appearance:none;-webkit-appearance:none;padding-right:28px!important;background-image:linear-gradient(45deg,transparent 50%,currentColor 50%),linear-gradient(135deg,currentColor 50%,transparent 50%)!important;background-position:calc(100% - 13px) 50%,calc(100% - 9px) 50%!important;background-size:4px 4px,4px 4px!important;background-repeat:no-repeat!important;}
+.fcm-sel::-webkit-scrollbar{width:9px}.fcm-sel::-webkit-scrollbar-track{background:#111016;border-radius:8px}.fcm-sel::-webkit-scrollbar-thumb{background:#7648fe;border:2px solid #111016;border-radius:8px}
 .fcm-lbl-sm{font-size:10px;color:#6050a0;letter-spacing:1px;font-weight:700;white-space:nowrap;flex-shrink:0;}
 .fcm-spacer{flex:1;}
 .fcm-ftog{padding:3px 10px;border-radius:12px;border:1px solid #4838a0;background:transparent;color:#6058a0;font-size:10px;cursor:pointer;transition:all .15s;font-weight:700;white-space:nowrap;flex-shrink:0;}
@@ -222,20 +227,22 @@ import { cfg, THEME_DEFAULTS } from '../core/config.js';
 .fcm-warn{padding:8px 16px;font-size:11px;color:#f0a060;background:#20100a;border-bottom:1px solid #601c08;flex-shrink:0;}
 .fcm-onesided-warn{padding:8px 14px;font-size:11px;color:#e8a040;background:#1e1205;border:1px solid #604010;border-radius:6px;margin:8px 14px;line-height:1.5;}
 .fcm-settings-wrap{padding:16px 24px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
-.fcm-settings-wrap::-webkit-scrollbar{width:7px}.fcm-settings-wrap::-webkit-scrollbar-track{background:#111016}.fcm-settings-wrap::-webkit-scrollbar-thumb{background:#7648fe;border-radius:5px}
+.fcm-settings-wrap::-webkit-scrollbar{width:9px}.fcm-settings-wrap::-webkit-scrollbar-track{background:#111016;border-radius:0 0 10px 0}.fcm-settings-wrap::-webkit-scrollbar-thumb{background:#7648fe;border:2px solid #111016;border-radius:9px}
 .fcm-settings-nav{position:sticky;top:-16px;z-index:5;display:flex;gap:8px;padding:10px 24px;background:#1a1821;border-bottom:1px solid #332b50;margin:-16px -24px 4px;width:calc(100% + 48px);}
 .fcm-settings-nav button{flex:1;padding:8px 12px;border-radius:8px;border:1px solid #40366c;background:transparent;color:#aaa1c4;font-weight:700;cursor:pointer;}
 .fcm-settings-section{scroll-margin-top:58px;}
 .fcm-theme-presets{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.fcm-theme-presets .fcm-btn{font-size:12px;padding:6px 10px}
+.fcm-theme-manage{padding:6px 11px;flex-shrink:0}.fcm-theme-options{margin:0 0 5px;padding:10px 12px;border:1px solid #40366c;border-radius:8px;background:#1a1030}.fcm-theme-options .fcm-theme-presets{margin-top:0}
 .fcm-set-row{display:flex;align-items:flex-start;gap:14px;padding:3px 0;}
+.fcm-set-row{border-radius:8px;transition:background-color .16s ease,box-shadow .16s ease}.fcm-set-row:hover{background:color-mix(in srgb,#7648fe 9%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,#7648fe 20%,transparent) inset}
 .fcm-tog{width:42px;height:22px;border-radius:11px;border:1px solid #4838a0;background:#1a1030;cursor:pointer;position:relative;transition:all .2s;flex-shrink:0;margin-top:2px;margin-right:4px;}
 .fcm-tog.on{background:#3a1858;border-color:#b080e8;}
 .fcm-tog-dot{position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#4838a8;transition:all .2s;}
 .fcm-tog.on .fcm-tog-dot{left:23px;background:#d090f8;}
 .fcm-set-label{color:#e8d4ff;font-size:15px;font-weight:600;}
 .fcm-set-note{color:#a090c8;font-size:12px;margin-top:5px;line-height:1.6;}
-.fcm-set-desc{color:#a090c8;font-size:12px;margin-top:6px;padding:8px 12px;background:#1a1030;border-radius:6px;border-left:2px solid #5048a0;line-height:1.6;}
 .fcm-settings-wrap .fcm-sel{max-width:none;width:auto;font-size:12px;padding:6px 10px;flex-shrink:0;}
+.fcm-icon-btn{width:32px;height:32px;padding:5px;border-radius:8px;border:1px solid #5048a0;background:transparent;color:#7648fe;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}.fcm-icon-btn:disabled{color:#605870;cursor:default;opacity:.65}.fcm-icon-btn svg{width:20px;height:20px}.fcm-icon-btn svg *{fill:currentColor!important;stroke:currentColor!important}.fcm-sound-preview:not(:disabled):hover{background:color-mix(in srgb,#7648fe 14%,transparent);border-color:#7648fe}
 .fcm-tab-disabled{opacity:0.4;cursor:not-allowed !important;}
 .fcm-tab-disabled:hover{color:#7060a0 !important;background:transparent !important;}
 .fcm-dbstat{font-size:12px;color:#8070a8;padding:10px 14px;background:#1a1030;border-radius:8px;border:1px solid #3a2870;margin-top:4px;}

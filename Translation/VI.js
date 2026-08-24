@@ -121,11 +121,11 @@
         chatTranslateProvider: 'Dịch vụ dịch',
         chatTranslateTarget: 'Ngôn ngữ đích',
         chatTranslateTitle: 'Dịch tin nhắn',
-    chatProvMyMemory: { VI: 'MyMemory' },
-    chatProvLibre: { VI: 'LibreTranslate' },
-    chatProvCustom: { VI: 'Tùy chỉnh' },
-    chatProvDeepl: { VI: 'DeepL' },
-    chatProvGoogle: { VI: 'Google Dịch' }
+    chatProvMyMemory: 'MyMemory',
+    chatProvLibre: 'LibreTranslate',
+    chatProvCustom: 'Tùy chỉnh',
+    chatProvDeepl: 'DeepL',
+    chatProvGoogle: 'Google Dịch'
     };
     var T = {}; Object.keys(V).forEach(function (k) { T[k] = { VI: V[k] }; });
     I.register('FCM', T);

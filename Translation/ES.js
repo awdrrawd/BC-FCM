@@ -121,11 +121,11 @@
         chatTranslateProvider: 'Servicio de traducción',
         chatTranslateTarget: 'Lengua objetivo',
         chatTranslateTitle: 'Traducción de mensajes',
-    chatProvMyMemory: { ES: 'MyMemory' },
-    chatProvLibre: { ES: 'LibreTranslate' },
-    chatProvCustom: { ES: 'Personalizado' },
-    chatProvDeepl: { ES: 'DeepL' },
-    chatProvGoogle: { ES: 'Google Translate' }
+    chatProvMyMemory: 'MyMemory',
+    chatProvLibre: 'LibreTranslate',
+    chatProvCustom: 'Personalizado',
+    chatProvDeepl: 'DeepL',
+    chatProvGoogle: 'Google Translate'
     };
     var T = {}; Object.keys(V).forEach(function (k) { T[k] = { ES: V[k] }; });
     I.register('FCM', T);

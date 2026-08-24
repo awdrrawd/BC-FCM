@@ -76,6 +76,11 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
         chatAvatarUrl: '',
         chatThemeMode: 'follow',
         chatThemePreset: 'violet',
+        chatPanelColor: THEME_DEFAULTS.panelColor,
+        chatFontColor: THEME_DEFAULTS.fontColor,
+        chatAccentColor: THEME_DEFAULTS.accentColor,
+        chatFontSize: 13,
+        chatFontFamily: 'system',
         communicationEnabled: false,
         persistentBalloon: false,
         takeoverFcmChatButtons: false,
@@ -105,6 +110,8 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
         }
         if (!['round', 'square'].includes(cfg.avatarShape)) cfg.avatarShape = 'square';
         if (!['round', 'square'].includes(cfg.chatAvatarShape)) cfg.chatAvatarShape = 'square';
+        cfg.chatFontSize = Math.max(10, Math.min(24, Number(cfg.chatFontSize) || 13));
+        if (!['system', 'serif', 'mono', 'rounded'].includes(cfg.chatFontFamily)) cfg.chatFontFamily = 'system';
     }
     function saveCfg() {
         try { localStorage.setItem('LikoFCM', JSON.stringify(cfg)); } catch {}

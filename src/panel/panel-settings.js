@@ -7,7 +7,9 @@ import { mkBtn, mkToggle, refreshSnapshotsForList } from './panel-widgets.js';
 import { exportProfiles, importProfiles } from './panel-people.js';
 import { _applyWhisperStyle, _removeWhisperAvatar, _installOocProtect, _uninstallOocProtect } from '../chat/chat-fx.js';
 import { renderCurrent, reopenForLang } from './panel.js';
-import { refreshChatSettings } from '../communication/chat.js';
+import { refreshChatSettings, playNotificationSound, saveCustomNotificationSound } from '../communication/chat.js';
+import ALARM_MUTED_ICON from '../../assets/icons/alarm-muted.svg?raw';
+import ALARM_ACTIVE_ICON from '../../assets/icons/alarm-active.svg?raw';
 // ════════════════════════════════════════
 //  FCM module: panel-settings.js  (split from panel.js)
 //  設定頁。與 index 唯一的耦合是「切換語言後重建面板」，已抽成 reopenForLang()。
@@ -78,14 +80,14 @@ function renderSettings(container) {
     // ── Theme Colors (面板底色 / 字體顏色 / 強調色) ──
     const themeRow = document.createElement('div'); themeRow.className = 'fcm-set-row'; themeRow.style.alignItems = 'flex-start';
     const themeInfo = document.createElement('div'); themeInfo.style.flex = '1';
-    const themeLbl = document.createElement('div'); themeLbl.className = 'fcm-set-label'; themeLbl.textContent = T('themeColorLabel');
+    const themeLbl = document.createElement('div'); themeLbl.className = 'fcm-set-label'; themeLbl.textContent = T('themeSettingsLabel');
     const themeNote = document.createElement('div'); themeNote.className = 'fcm-set-note'; themeNote.textContent = T('themeColorNote');
     const pickers = document.createElement('div'); pickers.style.cssText = 'display:flex;gap:16px;flex-wrap:wrap;align-items:center;margin-top:9px;';
     const colorField = (labelKey, cfgKey) => {
         const box = document.createElement('label'); box.style.cssText = 'display:inline-flex;align-items:center;gap:6px;font-size:12px;color:#a090c8;cursor:pointer;';
         const inp = document.createElement('input'); inp.type = 'color'; inp.value = cfg[cfgKey] || THEME_DEFAULTS[cfgKey];
         inp.style.cssText = 'width:32px;height:24px;border-radius:6px;border:1px solid #5048a0;background:#1a1030;cursor:pointer;padding:1px;';
-        inp.addEventListener('input', () => { cfg[cfgKey] = inp.value; cfg.themePreset = 'custom'; saveCfg(); applyTheme(); });
+        inp.addEventListener('input', () => { cfg[cfgKey] = inp.value; cfg.themePreset = 'custom'; saveCfg(); applyTheme(); updateThemeButton(); });
         const span = document.createElement('span'); span.textContent = T(labelKey);
         box.appendChild(inp); box.appendChild(span); box._inp = inp;
         return box;
@@ -98,7 +100,7 @@ function renderSettings(container) {
         cfg.themePreset = 'violet';
         saveCfg(); applyTheme();
         fPanel._inp.value = THEME_DEFAULTS.panelColor; fFont._inp.value = THEME_DEFAULTS.fontColor; fAccent._inp.value = THEME_DEFAULTS.accentColor;
-        presetRow.querySelectorAll('button').forEach(x => x.classList.toggle('active', x.textContent === T('themePreset_violet')));
+        presetRow.querySelectorAll('button').forEach(x => x.classList.toggle('active', x.textContent === T('themePreset_violet'))); updateThemeButton();
     });
     themeReset.style.cssText = 'font-size:11px;padding:5px 10px;';
     pickers.appendChild(fPanel); pickers.appendChild(fFont); pickers.appendChild(fAccent); pickers.appendChild(themeReset);
@@ -116,13 +118,20 @@ function renderSettings(container) {
             [cfg.panelColor, cfg.fontColor, cfg.accentColor] = colors; cfg.themePreset = key;
             fPanel._inp.value = colors[0]; fFont._inp.value = colors[1]; fAccent._inp.value = colors[2];
             presetRow.querySelectorAll('button').forEach(x => x.classList.remove('active')); b.classList.add('active');
-            saveCfg(); applyTheme();
+            saveCfg(); applyTheme(); updateThemeButton();
         });
         presetRow.appendChild(b);
     });
-    themeInfo.appendChild(themeLbl); themeInfo.appendChild(themeNote); themeInfo.appendChild(presetRow); themeInfo.appendChild(pickers);
-    themeRow.appendChild(themeInfo);
-    wrap.appendChild(themeRow);
+    const themeManageBtn = document.createElement('button'); themeManageBtn.className = 'fcm-btn fcm-theme-manage';
+    const themeName = () => cfg.themePreset === 'custom' ? T('themeCustom') : T(`themePreset_${cfg.themePreset || 'violet'}`);
+    const updateThemeButton = () => { themeManageBtn.textContent = `${T('themeSettingsLabel')} · ${themeName()}`; };
+    updateThemeButton();
+    const themePanel = document.createElement('div'); themePanel.className = 'fcm-theme-options'; themePanel.style.display = 'none';
+    themePanel.appendChild(presetRow); themePanel.appendChild(pickers);
+    themeManageBtn.addEventListener('click', () => { const open = themePanel.style.display !== 'block'; themePanel.style.display = open ? 'block' : 'none'; themeManageBtn.classList.toggle('active', open); });
+    themeInfo.appendChild(themeLbl); themeInfo.appendChild(themeNote);
+    themeRow.appendChild(themeInfo); themeRow.appendChild(themeManageBtn);
+    wrap.appendChild(themeRow); wrap.appendChild(themePanel);
     divider();
 
     // ── Avatars ───────────────────────────────
@@ -141,7 +150,6 @@ function renderSettings(container) {
         if (cfg.avatars) { cfg.avatarShape = avDisplaySelect.value; cfg.chatAvatarShape = avDisplaySelect.value; }
         saveCfg(); if (cfg.avatars) await ensureOwnAvatarSnapshot(); renderCurrent();
     });
-    avRow.appendChild(avDisplaySelect);
     const ownSnapshotBtn = document.createElement('button'); ownSnapshotBtn.className = 'fcm-btn';
     ownSnapshotBtn.textContent = T('btnUpdateOwnAvatar'); ownSnapshotBtn.style.cssText = 'font-size:11px;padding:6px 12px;flex-shrink:0;';
     ownSnapshotBtn.addEventListener('click', async () => {
@@ -153,7 +161,7 @@ function renderSettings(container) {
     const cacheBtn = document.createElement('button'); cacheBtn.className = 'fcm-btn fcm-btn-blue';
     cacheBtn.textContent = T('btnReloadAvatars'); cacheBtn.style.cssText = 'font-size:11px;padding:6px 12px;flex-shrink:0;margin-left:auto;';
     cacheBtn.title = T('reloadAvatarsNote');
-    avRow.appendChild(ownSnapshotBtn); avRow.appendChild(cacheBtn);
+    avRow.appendChild(ownSnapshotBtn); avRow.appendChild(cacheBtn); avRow.appendChild(avDisplaySelect);
     wrap.appendChild(avRow);
     const avatarModeRow = document.createElement('div'); avatarModeRow.className = 'fcm-set-row'; avatarModeRow.style.alignItems = 'center';
     const avatarModeInfo = document.createElement('div'); avatarModeInfo.style.flex = '1';
@@ -281,15 +289,19 @@ function renderSettings(container) {
     [['off', T('saveModeOff')], ['name', T('saveModeName')], ['avatar', T('saveModeAvatar')], ['full', T('saveModeFull')]].forEach(([v, l]) => {
         const o = document.createElement('option'); o.value = v; o.textContent = l; if (v === (cfg.saveMode||'off')) o.selected = true; smSel.appendChild(o);
     });
-    const smDesc = document.createElement('div'); smDesc.className = 'fcm-set-desc';
+    const smDesc = document.createElement('div'); smDesc.className = 'fcm-set-note'; smDesc.style.flexBasis = '100%';
     const updateSmDesc = () => { smDesc.textContent = T('saveModeDesc_' + (smSel.value || 'off')); };
     updateSmDesc();
     smSel.addEventListener('change', () => { cfg.saveMode = smSel.value; saveCfg(); updateSmDesc(); });
-    smRow.appendChild(smInfo); smRow.appendChild(smSel);
-    wrap.appendChild(smRow); wrap.appendChild(smDesc);
+    smInfo.appendChild(smDesc);
+
+    const manageProfilesBtn = document.createElement('button'); manageProfilesBtn.className = 'fcm-btn';
+    manageProfilesBtn.textContent = T('manageProfiles'); manageProfilesBtn.style.cssText = 'padding:6px 11px;flex-shrink:0;';
+    smRow.appendChild(smInfo); smRow.appendChild(manageProfilesBtn); smRow.appendChild(smSel);
+    wrap.appendChild(smRow);
 
     // Export / Import — placed directly under Save Mode
-    const exportRow = document.createElement('div'); exportRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;';
+    const exportRow = document.createElement('div'); exportRow.style.cssText = 'display:none;gap:8px;flex-wrap:wrap;margin-top:6px;';
     function mkActionBtn(label, note, cls, cb) {
         const b = document.createElement('button'); b.className = 'fcm-btn ' + cls; b.textContent = label; b.title = note;
         b.style.cssText = 'flex:1;padding:8px;font-size:11px;'; b.addEventListener('click', cb); return b;
@@ -306,6 +318,10 @@ function renderSettings(container) {
         inp.click();
     }));
     wrap.appendChild(exportRow);
+    manageProfilesBtn.addEventListener('click', () => {
+        const open = exportRow.style.display !== 'flex'; exportRow.style.display = open ? 'flex' : 'none';
+        manageProfilesBtn.classList.toggle('active', open);
+    });
 
     // ══════════════════════════════════════════
     //  GROUP B: communication foundation
@@ -321,17 +337,24 @@ function renderSettings(container) {
     divider();
     wrap.appendChild(settingRow(T('notificationAnimation'), T('notificationAnimationNote'), cfg.notificationAnimation, v => { cfg.notificationAnimation = v; saveCfg(); }));
     divider();
-    wrap.appendChild(settingRow(T('notificationAudio'), T('notificationAudioNote'), cfg.notificationAudio, v => { cfg.notificationAudio = v; saveCfg(); }));
     const soundRow = document.createElement('div'); soundRow.className = 'fcm-set-row'; soundRow.style.alignItems = 'center';
     const soundInfo = document.createElement('div'); soundInfo.style.flex = '1';
     const soundLabel = document.createElement('div'); soundLabel.className = 'fcm-set-label'; soundLabel.textContent = T('notificationSound');
     soundInfo.appendChild(soundLabel);
     const soundSelect = document.createElement('select'); soundSelect.className = 'fcm-sel';
-    [['Audio/BeepAlarm.mp3', 'BeepAlarm'], ['Audio/BellMedium.mp3', 'BellMedium'], ['Audio/Belt1.mp3', 'Belt1'], ['Audio/BrushHair4.mp3', 'BrushHair4'], ['Audio/VibrationTone4ShortLoop.mp3', 'VibrationTone4ShortLoop']].forEach(([value, label]) => {
-        const o = document.createElement('option'); o.value = value; o.textContent = label; o.selected = cfg.notificationSound === value; soundSelect.appendChild(o);
+    [['', T('off')], ['Audio/BeepAlarm.mp3', 'BeepAlarm'], ['Audio/BellMedium.mp3', 'BellMedium'], ['Audio/Belt1.mp3', 'Belt1'], ['Audio/BrushHair4.mp3', 'BrushHair4'], ['Audio/VibrationTone4ShortLoop.mp3', 'VibrationTone4ShortLoop'], ['custom', T('chatSoundCustom')]].forEach(([value, label]) => {
+        const o = document.createElement('option'); o.value = value; o.textContent = label; o.selected = (!cfg.notificationAudio && !value) || (cfg.notificationAudio && cfg.notificationSound === value); soundSelect.appendChild(o);
     });
-    soundSelect.addEventListener('change', () => { cfg.notificationSound = soundSelect.value; saveCfg(); try { new Audio(cfg.notificationSound).play().catch(() => {}); } catch {} });
-    soundRow.appendChild(soundInfo); soundRow.appendChild(soundSelect); wrap.appendChild(soundRow);
+    const soundFile = document.createElement('input'); soundFile.type = 'file'; soundFile.accept = 'audio/*'; soundFile.hidden = true;
+    const previewSound = document.createElement('button'); previewSound.className = 'fcm-icon-btn fcm-sound-preview';
+    const refreshSoundIcon = () => { const on = !!cfg.notificationAudio && !!cfg.notificationSound; previewSound.innerHTML = on ? ALARM_ACTIVE_ICON : ALARM_MUTED_ICON; previewSound.disabled = !on; };
+    refreshSoundIcon(); previewSound.addEventListener('click', playNotificationSound);
+    soundSelect.addEventListener('change', () => {
+        if (soundSelect.value === 'custom') { soundSelect.value = cfg.notificationAudio ? (cfg.notificationSound || '') : ''; soundFile.click(); return; }
+        cfg.notificationSound = soundSelect.value; cfg.notificationAudio = !!soundSelect.value; saveCfg(); refreshSoundIcon(); refreshChatSettings();
+    });
+    soundFile.addEventListener('change', async () => { if (await saveCustomNotificationSound(soundFile.files?.[0])) { soundSelect.value = 'custom'; refreshSoundIcon(); refreshChatSettings(); } });
+    soundRow.appendChild(soundInfo); soundRow.appendChild(previewSound); soundRow.appendChild(soundSelect); soundRow.appendChild(soundFile); wrap.appendChild(soundRow);
 
     // ══════════════════════════════════════════
     //  GROUP B: 聊天室管理

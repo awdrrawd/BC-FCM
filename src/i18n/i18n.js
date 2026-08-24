@@ -40,6 +40,20 @@ async function ensureI18n() {
     } catch (e) { console.warn('🐈‍⬛ [FCM] 翻譯載入失敗，改用內建後備:', e.message); }
 }
 
+// Settings can switch language after startup. Load that language before the
+// caller redraws its panel; otherwise it keeps showing the previously loaded
+// dictionary until FCM is restarted.
+async function ensureLang(lang) {
+    try {
+        const eng = window.Liko?.__Sys_i18n__;
+        if (!eng?.ensure) return;
+        const code = lang && lang !== 'auto' ? String(lang).toUpperCase() : fcmLang();
+        const urlMap = {};
+        for (const c of T_LANGS) urlMap[c] = assetUrl('Translation/' + c + '.js');
+        await eng.ensure(I18N_NS, urlMap, code);
+    } catch (e) { console.warn('🐈‍⬛ [FCM] 語系載入失敗:', e.message); }
+}
+
 // BC 遊戲語系碼 → 檔案碼：中文各寫法歸 TW；BC 的國家碼 JP/KR → ISO 639-1 語言碼 JA/KO
 function normLang(code) {
     const c = String(code || '').toUpperCase().trim();
@@ -69,4 +83,4 @@ function T(key, ...args) {
     return key;
 }
 
-export { isZh, T, I18N_NS, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, fcmLang, ensureI18n, assetUrl };
+export { isZh, T, I18N_NS, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, fcmLang, ensureI18n, ensureLang, assetUrl };
