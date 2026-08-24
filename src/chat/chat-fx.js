@@ -28,7 +28,8 @@ import { T } from '../i18n/i18n.js';
             try {
                 const cv = document.createElement('canvas'); cv.width = cv.height = SZ;
                 const ctx = cv.getContext('2d'), src = C.Canvas;
-                ctx.drawImage(src, src.width * 0.39, src.height * 0.40, src.width * 0.22, src.height * 0.11, 0, 0, SZ, SZ);
+                const cropSize = 210;
+                ctx.drawImage(src, src.width / 2 - cropSize / 2, 740, cropSize, cropSize, 0, 0, SZ, SZ);
                 return cv;
             } catch {}
         }
