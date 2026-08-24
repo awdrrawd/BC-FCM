@@ -366,6 +366,8 @@ const FCM_FALLBACK = {
     "chatProfileStatusMessage": { TW: "狀態訊息", EN: "Status message" },
     "chatProfileTab": { TW: "個人資料", EN: "Profile" },
     "chatProfileUrlAvatar": { TW: "URL 頭像", EN: "URL Avatar" },
+    "chatAvatarUrlHelp": { TW: "僅支援：github.io、gitlab.io、ibb.co、imgbb.com、imgchest.com、imgur.com、postimg.cc、hd-r.icu", EN: "Supported hosts only: github.io, gitlab.io, ibb.co, imgbb.com, imgchest.com, imgur.com, postimg.cc, hd-r.icu" },
+    "chatAvatarUrlUnsupported": { TW: "僅支援指定的圖片網域，請查看 URL 頭像旁的 ? 說明。", EN: "Only the listed image hosts are supported. See the ? beside URL Avatar." },
     "chatRecent": { TW: "最近聊天", EN: "Recent Chats" },
     "chatRelFollow": { TW: "關注", EN: "Follow" },
     "chatRelOwnerLover": { TW: "主人／戀人", EN: "Owner/Lover" },

@@ -1,10 +1,12 @@
 import { cfg, saveCfg, FCM_ICON_SVG } from '../core/config.js';
 import { getDisplayName, getRoomInfo, inRoomFn, onlineFriends, buildFriendList, getAllRels, isFav } from '../data/data.js';
 import { getCachedRoomInfo, queryRoomInfo } from '../panel/panel-rooms-data.js';
-import { Snapshot, syncRoomAvatar, updateOwnAvatarSnapshot } from '../data/profile-db.js';
+import { Snapshot, syncRoomAvatar, updateOwnAvatarSnapshot, updateOwnAvatarProfile } from '../data/profile-db.js';
 import { ChatStore, AudioStore } from './chat-store.js';
 import { T, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, ensureLang } from '../i18n/i18n.js';
 import { chatFontFamily, availableFontChoices } from './chat-font.js';
+import { isSupportedAvatarUrl, profileHtml as renderProfileHtml } from './chat-profile.js';
+import { chatPanelSession } from './chat-panel-session.js';
 import { applyTheme } from '../panel/styles.js';
 import CHAT_ICON from '../../assets/icons/chat.svg?raw';
 import NOTIFICATION_ICON from '../../assets/icons/notification.svg?raw';
@@ -39,7 +41,6 @@ let customAudioUrl = '';
 let justOpenedMember = null;
 const autoReplyTimes = new Map();
 const remoteProfiles = new Map();
-
 const esc = value => {
     const el = document.createElement('div');
     el.textContent = String(value ?? '');
@@ -108,7 +109,8 @@ function avatarHtml(memberNumber, size = 34, variant = 'normal') {
 
 async function hydrateChatAvatars() {
     const avatars = [...(root?.querySelectorAll('[data-avatar-member]') || [])];
-    const members = [...new Set(avatars.map(element => Number(element.dataset.avatarMember)).filter(Boolean))];
+    const selfMemberNumber = Number(Player?.MemberNumber);
+    const members = [...new Set(avatars.map(element => Number(element.dataset.avatarMember)).filter(memberNumber => memberNumber && memberNumber !== selfMemberNumber))];
     await Promise.all(members.map(async memberNumber => {
         const liveCharacter = character(memberNumber);
         if (liveCharacter) await syncRoomAvatar(liveCharacter);
@@ -380,28 +382,7 @@ function settingsHtml() {
 }
 
 function profileHtml() {
-    const mine = Player?.OnlineSharedSettings?.FCM || {};
-    const signature = mine.signature || Player?.OnlineSharedSettings?.LCData?.MessageSetting?.Signature || '';
-    const nickname = Player?.Nickname || '';
-    let canEditNickname = true;
-    try { canEditNickname = typeof globalThis.CharacterCanChangeNickname !== 'function' || globalThis.CharacterCanChangeNickname(Player); } catch {}
-    return `<div class="fcm-chat-profile">
-        <div class="fcm-chat-profile-overview">
-            <div class="fcm-chat-profile-avatar-column">${avatarHtml(Player?.MemberNumber || 0, 88, 'profile')}<button class="fcm-chat-profile-snapshot" data-profile-snapshot>${T('chatProfileSnapshot')}</button></div>
-            <div class="fcm-chat-profile-identity">
-                <div class="fcm-chat-profile-line"><span>${T('chatProfileNameId')}</span><b>${esc(Player?.Name || '')} (#${Number(Player?.MemberNumber || 0)})</b></div>
-                <div class="fcm-chat-profile-line"><span>${T('chatProfileNickname')}</span><div class="fcm-profile-nickname-display"><b data-profile-nickname-text>${esc(nickname || '—')}</b><button class="fcm-profile-edit" data-profile-nickname-edit ${canEditNickname ? '' : 'disabled'} title="${T('chatProfileEditNickname')}">${EDIT_ICON}</button></div><div class="fcm-profile-nickname-editor" data-profile-nickname-editor hidden><input data-profile-nickname maxlength="20" value="${esc(nickname)}"><button data-profile-nickname-confirm>✓</button><button data-profile-nickname-cancel>×</button></div></div>
-                <div class="fcm-chat-profile-line"><span>${T('chatProfileStatus')}</span><div class="fcm-profile-statuses" data-profile-statuses data-value="${esc(cfg.chatStatus || 'online')}"><button class="${cfg.chatStatus === 'online' ? 'active' : ''}" data-profile-status="online"><i class="online"></i>${T('chatStatusOnline')}</button><button class="${cfg.chatStatus === 'busy' ? 'active' : ''}" data-profile-status="busy"><i class="busy"></i>${T('chatStatusBusy')}</button><button class="${cfg.chatStatus === 'afk' ? 'active' : ''}" data-profile-status="afk"><i class="afk"></i>${T('chatStatusAFK')}</button></div></div>
-            </div>
-        </div>
-        <label class="fcm-chat-profile-field"><span>${T('chatProfileUrlAvatar')}</span><input data-profile-avatar-url value="${esc(cfg.avatarUrl || '')}" placeholder="https://…"></label>
-        <label class="fcm-chat-profile-field"><span>${T('chatProfileSignature')}</span><textarea data-profile-signature maxlength="100" rows="3">${esc(signature)}</textarea></label>
-        <div class="fcm-chat-profile-field"><span>${T('chatProfileStatusMessage')}</span><div class="fcm-profile-auto-replies">
-            <label><b>${T('chatBusyMessage')}</b><textarea data-profile-busy rows="3">${esc(cfg.busyMessage || mine.busyMessage || '')}</textarea><button class="fcm-chat-switch ${cfg.busyAutoReply ? 'on' : ''}" data-profile-reply="busy"><i></i></button></label>
-            <label><b>${T('chatAfkMessage')}</b><textarea data-profile-afk rows="3">${esc(cfg.afkMessage || mine.afkMessage || '')}</textarea><button class="fcm-chat-switch ${cfg.afkAutoReply ? 'on' : ''}" data-profile-reply="afk"><i></i></button></label>
-        </div></div>
-        <button data-save-profile>${T('chatSaveProfile')}</button>
-    </div>`;
+    return renderProfileHtml({ Player, cfg, T, esc, avatarHtml, editIcon: EDIT_ICON });
 }
 
 function chatListHtml() {
@@ -461,7 +442,8 @@ function refreshConversationRoomMeta() {
 function renderChat() {
     if (!root) return;
     const [chatPanel, chatText, chatAccent] = chatColors();
-    root.innerHTML = `<div id="fcm-chat-panel" class="${maximized ? 'maximized' : ''}" data-layout-mode="${esc(cfg.chatLayout || 'split')}" data-theme="${esc(cfg.chatThemeMode === 'preset' ? cfg.chatThemePreset : cfg.chatThemeMode === 'custom' ? 'custom' : cfg.themePreset || 'violet')}" style="--s:${esc(chatPanel)};--tx:${esc(chatText)};--ac:${esc(chatAccent)};--chat-font-size:${Number(cfg.chatFontSize) || 13}px;--chat-font-family:${esc(chatFontFamily())}">
+    const sessionSizeStyle = chatPanelSession.inlineSizeStyle();
+    root.innerHTML = `<div id="fcm-chat-panel" class="${maximized ? 'maximized' : ''}" data-layout-mode="${esc(cfg.chatLayout || 'split')}" data-theme="${esc(cfg.chatThemeMode === 'preset' ? cfg.chatThemePreset : cfg.chatThemeMode === 'custom' ? 'custom' : cfg.themePreset || 'violet')}" style="${sessionSizeStyle}--s:${esc(chatPanel)};--tx:${esc(chatText)};--ac:${esc(chatAccent)};--chat-font-size:${Number(cfg.chatFontSize) || 13}px;--chat-font-family:${esc(chatFontFamily())}">
         <div class="fcm-chat-titlebar"><b>FCM-Chat</b><span></span><button class="fcm-chat-icon-action ${cfg.chatLayout === 'stacked' ? 'active' : ''}" data-layout title="${T('chatToggleLayout')}">${cfg.chatLayout === 'stacked' ? SPLIT_ICON : MERGE_ICON}<i>${cfg.chatLayout === 'stacked' ? T('chatLayoutSplit') : T('chatLayoutMerged')}</i></button><button class="fcm-chat-icon-action ${maximized ? 'active' : ''}" data-max title="${T('chatToggleMax')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><i>${maximized ? T('chatRestore') : T('chatMaximize')}</i></button><button class="fcm-chat-icon-action" data-min title="${T('chatMinimize')}">—</button><button class="fcm-chat-icon-action" data-close title="${T('chatClose')}">×</button></div>
         <div class="fcm-chat-body view-${esc(activeView)} ${cfg.chatLayout === 'stacked' ? 'stacked' : ''} ${activeView === 'profile' || activeView === 'settings' ? 'wide-view' : ''}">
             <nav class="fcm-chat-rail">
@@ -489,6 +471,7 @@ function renderChat() {
 
 function bindEvents() {
     const panel = root.querySelector('#fcm-chat-panel');
+    chatPanelSession.observe(panel, () => maximized);
     makeDraggable(panel, panel.querySelector('.fcm-chat-titlebar'), 'chatPanelPosition');
     root.querySelector('[data-close]')?.addEventListener('click', closeChat);
     root.querySelector('[data-min]')?.addEventListener('click', minimizeChat);
@@ -605,8 +588,26 @@ function bindEvents() {
     root.querySelector('[data-profile-snapshot]')?.addEventListener('click', async event => {
         const button = event.currentTarget; button.disabled = true;
         const updated = await updateOwnAvatarSnapshot();
+        if (updated) {
+            const snapshot = Player?.OnlineSharedSettings?.FCM?.avatarSnapshot || '';
+            const avatar = root.querySelector(`.fcm-chat-profile [data-avatar-member="${Number(Player?.MemberNumber)}"]`);
+            if (snapshot && avatar) {
+                let img = avatar.querySelector('img');
+                if (!img) { img = document.createElement('img'); img.draggable = false; avatar.insertBefore(img, avatar.firstChild); }
+                img.src = snapshot;
+                [...avatar.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).forEach(node => node.remove());
+            }
+        }
         button.textContent = updated ? T('chatProfileSnapshotDone') : T('ownAvatarUpdateFailed');
         setTimeout(() => { if (button.isConnected) { button.disabled = false; button.textContent = T('chatProfileSnapshot'); } }, 1800);
+    });
+    root.querySelector('[data-profile-avatar-url]')?.addEventListener('change', async event => {
+        const value = event.target.value.trim();
+        event.target.setCustomValidity(isSupportedAvatarUrl(value) ? '' : T('chatAvatarUrlUnsupported'));
+        if (!event.target.reportValidity()) return;
+        cfg.avatarUrl = cfg.chatAvatarUrl = value;
+        saveCfg();
+        if (cfg.chatAvatarMode === 'url') { await updateOwnAvatarProfile('url', value); renderChat(); }
     });
     root.querySelectorAll('[data-profile-status]').forEach(button => button.addEventListener('click', () => {
         const box = root.querySelector('[data-profile-statuses]'); box.dataset.value = button.dataset.profileStatus;
@@ -694,11 +695,15 @@ function sendCurrentMessage() {
 
 function saveOwnProfile() {
     const signature = root.querySelector('[data-profile-signature]')?.value.trim() || '';
-    cfg.avatarUrl = root.querySelector('[data-profile-avatar-url]')?.value.trim() || '';
+    const avatarInput = root.querySelector('[data-profile-avatar-url]');
+    const avatarUrlValue = avatarInput?.value.trim() || '';
+    avatarInput?.setCustomValidity(isSupportedAvatarUrl(avatarUrlValue) ? '' : T('chatAvatarUrlUnsupported'));
+    if (avatarInput && !avatarInput.reportValidity()) return;
+    cfg.avatarUrl = cfg.chatAvatarUrl = avatarUrlValue;
     cfg.busyMessage = root.querySelector('[data-profile-busy]')?.value.trim() || '';
     cfg.afkMessage = root.querySelector('[data-profile-afk]')?.value.trim() || '';
     cfg.chatStatus = root.querySelector('[data-profile-statuses]')?.dataset.value || 'online';
-    if (cfg.avatarUrl) cfg.avatarMode = 'url';
+    cfg.avatarMode = cfg.chatAvatarMode === 'url' ? 'url' : 'game';
     saveCfg();
     try {
         Player.OnlineSharedSettings ??= {}; Player.OnlineSharedSettings.FCM ??= {};
@@ -906,8 +911,9 @@ function injectStyles() {
     style.textContent = `
 #fcm-chat-root,#fcm-chat-root *,#fcm-chat-balloon,#fcm-chat-balloon *,body>.fcm-chat-user-balloon,body>.fcm-chat-user-balloon *{box-sizing:border-box;user-select:none;-webkit-user-select:none;-webkit-user-drag:none}
 #fcm-chat-root{position:fixed;inset:0;z-index:99992;pointer-events:none;font-family:-apple-system,"Segoe UI",sans-serif}
-#fcm-chat-panel{--surface-alt:color-mix(in srgb,var(--s) 86%,#000);--surface-raised:color-mix(in srgb,var(--s) 82%,var(--ac));--dim:color-mix(in srgb,var(--tx) 62%,var(--s));--border:color-mix(in srgb,var(--ac) 38%,var(--s));position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(900px,94vw);height:min(590px,88vh);background:var(--s);color:var(--tx);border:1px solid var(--ac);border-radius:12px;box-shadow:0 14px 55px #000a;overflow:hidden;pointer-events:auto;transition:width .32s cubic-bezier(.4,0,.2,1),height .32s cubic-bezier(.4,0,.2,1)}
-#fcm-chat-panel.maximized{left:2vw!important;top:4vh!important;width:96vw;height:92vh;transform:none!important}
+#fcm-chat-panel{--surface-alt:color-mix(in srgb,var(--s) 86%,#000);--surface-raised:color-mix(in srgb,var(--s) 82%,var(--ac));--dim:color-mix(in srgb,var(--tx) 62%,var(--s));--border:color-mix(in srgb,var(--ac) 38%,var(--s));position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(900px,94vw);height:min(590px,88vh);min-width:520px;min-height:360px;max-width:98vw;max-height:96vh;background:var(--s);color:var(--tx);border:1px solid var(--ac);border-radius:12px;box-shadow:0 14px 55px #000a;overflow:hidden;resize:both;pointer-events:auto}
+#fcm-chat-panel.maximized{left:2vw!important;top:4vh!important;width:96vw!important;height:92vh!important;transform:none!important;resize:none}
+#fcm-chat-root *{scrollbar-color:var(--ac) var(--surface-alt)!important;scrollbar-width:auto}#fcm-chat-root *::-webkit-scrollbar{width:9px;height:9px}#fcm-chat-root *::-webkit-scrollbar-track{background:var(--surface-alt)!important;border-radius:8px}#fcm-chat-root *::-webkit-scrollbar-thumb{background:var(--ac)!important;border:2px solid var(--surface-alt)!important;border-radius:8px}#fcm-chat-root *::-webkit-scrollbar-thumb:hover{filter:brightness(1.18)!important}
 .fcm-chat-titlebar{height:44px;display:flex;align-items:center;gap:6px;padding:0 10px;background:var(--surface-alt);border-bottom:1px solid var(--ac);cursor:move;touch-action:none}.fcm-chat-titlebar b{color:var(--ac)}.fcm-chat-titlebar>span{flex:1}.fcm-chat-titlebar button{width:30px;height:30px;padding:0;background:transparent!important;color:var(--dim);border:1px solid var(--ac);border-radius:6px;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center}
 .fcm-chat-body{height:calc(100% - 44px);display:grid;grid-template-columns:54px 260px minmax(0,1fr);position:relative;overflow:hidden}.fcm-chat-rail{background:var(--surface-alt);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0;z-index:5}.fcm-chat-rail>span{flex:1}.fcm-chat-rail-button{width:36px!important;height:36px!important;min-width:36px;padding:0!important;background:transparent;border:1px solid transparent;border-radius:7px;color:var(--dim);font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;overflow:hidden}.fcm-chat-rail-button:hover,.fcm-chat-rail-button.active{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-chat-self .fcm-chat-avatar{width:34px!important;height:34px!important;border-radius:7px}
 .fcm-chat-list{min-width:0;display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}.fcm-chat-main{min-width:0;display:flex;flex-direction:column}.fcm-chat-list-title{padding:10px 12px 6px;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.08em}.fcm-chat-scroll{flex:1;overflow:auto;padding:2px 6px 6px;scrollbar-color:var(--ac) var(--surface-alt)}
@@ -968,7 +974,7 @@ function injectStyles() {
 #fcm-chat-balloon,.fcm-chat-user-balloon{z-index:100010}.fcm-balloon-preview{display:none!important;position:absolute!important;right:60px!important;left:auto!important;bottom:0!important;z-index:100011!important;width:260px!important;padding:9px!important;text-align:left!important;background:var(--s)!important;color:var(--tx)!important;border:1px solid var(--ac)!important;border-radius:9px!important;font-size:13px!important;pointer-events:none}.preview-right>.fcm-balloon-preview{right:auto!important;left:60px!important}.fcm-balloon-preview strong{display:block;color:var(--ac)}#fcm-chat-balloon:hover>.fcm-balloon-preview,.fcm-chat-user-balloon:hover>.fcm-balloon-preview{display:block!important}
 #fcm-chat-panel{font-family:var(--chat-font-family)}.fcm-chat-content,.fcm-chat-compose textarea{font-family:var(--chat-font-family);font-size:var(--chat-font-size)}
 .fcm-chat-profile{--profile-label-width:90px}.fcm-chat-profile :is(.fcm-chat-profile-line>span,.fcm-chat-profile-line>b,.fcm-chat-profile-field>span,.fcm-profile-statuses button){font-size:13px!important}.fcm-chat-profile-field,.fcm-chat-profile label.fcm-chat-profile-field{margin-left:132px;grid-template-columns:var(--profile-label-width) minmax(0,1fr);max-width:548px!important}.fcm-profile-nickname-display{display:flex;align-items:center;gap:7px;min-width:0}.fcm-profile-nickname-display>b{font-size:13px}.fcm-profile-edit{width:24px;height:24px;padding:3px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border-color:transparent}.fcm-profile-edit svg{width:16px;height:16px}.fcm-profile-edit:hover{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-profile-auto-replies{grid-template-columns:1fr;gap:10px}.fcm-chat-profile .fcm-profile-auto-replies>label{grid-template-columns:1fr auto}.fcm-profile-auto-replies label>b{font-size:13px!important}.fcm-layout-merge svg{transform:scaleX(-1)}.fcm-chat-room-join{display:block;margin-top:8px;padding:5px 12px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:7px}.fcm-chat-room-join:hover{background:color-mix(in srgb,var(--ac) 14%,transparent);box-shadow:0 0 9px color-mix(in srgb,var(--ac) 24%,transparent)}
-.fcm-chat-profile-line>b,.fcm-profile-nickname-display>b{font-size:16pt!important;color:var(--tx)!important}.fcm-chat-profile-field>span{padding-top:0!important;line-height:1.2}.fcm-profile-nickname-display{color:var(--tx)}
+#fcm-chat-panel .fcm-chat-profile{--profile-label-width:110px;font-family:inherit!important;font-size:12pt!important;line-height:1.35!important;font-stretch:normal!important;text-size-adjust:100%;-webkit-text-size-adjust:100%}#fcm-chat-panel .fcm-chat-profile :is(span,b,button,input,textarea,label){font-family:inherit!important;font-size:inherit!important;line-height:inherit!important;font-stretch:inherit!important}#fcm-chat-panel .fcm-chat-profile-line{grid-template-columns:110px minmax(0,1fr) auto!important;min-height:40px!important;overflow:visible!important}#fcm-chat-panel .fcm-chat-profile-line>b,#fcm-chat-panel .fcm-profile-nickname-display>b{color:var(--tx)!important}#fcm-chat-panel .fcm-profile-nickname-display{min-height:32px;color:var(--tx);overflow:visible}#fcm-chat-panel .fcm-chat-profile-field>span{padding-top:0!important}#fcm-chat-panel .fcm-profile-url-label{display:flex;align-items:center;gap:5px}#fcm-chat-panel .fcm-profile-help{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;border:1px solid var(--ac);border-radius:50%;background:transparent;color:var(--ac);line-height:1!important;cursor:help}
 #fcm-chat-panel[data-layout-mode="split"] [data-layout]>svg{transform:scaleX(-1)}
 @media(max-width:650px){#fcm-chat-panel{width:96vw}.fcm-chat-body{grid-template-columns:48px 210px minmax(0,1fr)}}
 `;
