@@ -22,6 +22,19 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
     // 手動刷新的 5 秒冷卻計時；_friendPoll：面板開著時的定期抓取（BC 在聊天室內不會自動輪詢 OnlineFriends）
     let _lastRefresh = 0, _friendPoll = null;
 
+    function enableDragScroll(scope) {
+        scope.querySelectorAll('.fcm-scroll,.fcm-settings-wrap').forEach(element => {
+            if (element.dataset.dragScroll) return; element.dataset.dragScroll = '1';
+            let startX=0,startY=0,left=0,top=0,dragging=false;
+            element.addEventListener('pointerdown', e => {
+                if (e.button !== 0 || e.target.closest('button,input,textarea,select,a')) return;
+                startX=e.clientX; startY=e.clientY; left=element.scrollLeft; top=element.scrollTop; dragging=true; element.setPointerCapture(e.pointerId); element.classList.add('drag-scrolling');
+            });
+            element.addEventListener('pointermove', e => { if (!dragging) return; const dx=e.clientX-startX,dy=e.clientY-startY; if(Math.abs(dx)+Math.abs(dy)>3)e.preventDefault(); element.scrollLeft=left-dx; element.scrollTop=top-dy; });
+            const stop=()=>{dragging=false;element.classList.remove('drag-scrolling')}; element.addEventListener('pointerup',stop); element.addEventListener('pointercancel',stop);
+        });
+    }
+
 
     // ═══════════════════════════════════════════════════════════
     //  PANEL BUILD
@@ -98,6 +111,7 @@ import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
         (p || Promise.resolve()).then(() => {
             if (_myToken !== _renderToken) return;
             if (savedScroll > 0) { const ns = content.querySelector('.fcm-scroll'); if (ns) ns.scrollTop = savedScroll; }
+            enableDragScroll(content);
         }).catch(e => console.warn('🐈‍⬛ [FCM] render:', e));
     }
 

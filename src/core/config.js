@@ -93,13 +93,6 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
         chatBalloonPosition: null,
         chatUserBalloonPositions: {},
         chatStatus: 'online',
-        // ── 聊天消息翻译（D2）──
-        translateEnabled: false,        // 总开关
-        translateAuto: false,           // 收到/发出消息后自动翻译
-        translateTarget: 'EN',          // 译文目标语言（设置可选，默认 EN）
-        translatorProvider: 'mymemory', // mymemory(免费/CORS/免key) | libretranslate | custom | deepl
-        translatorEndpoint: '',         // 自定义/自建后端 URL（留空用各 provider 默认公共端点）
-        translatorKey: '',              // 部分 provider 需要（如 deepl）；客户端暴露，建议走自建代理藏 key
     };
     function loadCfg() {
         try { const s = localStorage.getItem('LikoFCM'); if (s) Object.assign(cfg, JSON.parse(s)); } catch {}
@@ -111,7 +104,7 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
         if (!['round', 'square'].includes(cfg.avatarShape)) cfg.avatarShape = 'square';
         if (!['round', 'square'].includes(cfg.chatAvatarShape)) cfg.chatAvatarShape = 'square';
         cfg.chatFontSize = Math.max(10, Math.min(24, Number(cfg.chatFontSize) || 13));
-        if (!['system', 'serif', 'mono', 'rounded'].includes(cfg.chatFontFamily)) cfg.chatFontFamily = 'system';
+        if (!['system', 'heiti', 'ming', 'kai', 'mono'].includes(cfg.chatFontFamily)) cfg.chatFontFamily = 'system';
     }
     function saveCfg() {
         try { localStorage.setItem('LikoFCM', JSON.stringify(cfg)); } catch {}
