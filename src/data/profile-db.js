@@ -1,6 +1,7 @@
 import { cfg } from '../core/config.js';
 import { T } from '../i18n/i18n.js';
 import { inRoomFn } from './data.js';
+import { profileCache as _pc } from './profile-cache.js';
 // ════════════════════════════════════════
 //  FCM module: profile-db.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -67,7 +68,6 @@ import { inRoomFn } from './data.js';
         },
         async batchGet(mns) { for (const mn of mns) if (_pc[parseInt(mn)] === undefined) await this.get(mn); },
     };
-    const _pc = {};
     const Snapshot = {
         db: null,
         _cache: {},
@@ -288,15 +288,6 @@ import { inRoomFn } from './data.js';
         return false;
     }
 
-    function queueAvatarLoad(mn, profile, onDone) {
-        mn = parseInt(mn);
-        const cached = Snapshot._cache[mn];
-        if (cached) { onDone(cached); return; }
-        if (_avQueue.some(q => q.mn === mn)) return;
-        _avQueue.push({ mn, profile, onDone });
-        if (!_avBusy) _processAvQueue();
-    }
-
     async function _processAvQueue() {
         if (_avBusy || _avQueue.length === 0) return;
         _avBusy = true;
@@ -352,9 +343,9 @@ import { inRoomFn } from './data.js';
         if (!C || !C.MemberNumber || C.MemberNumber === parseInt(Player?.MemberNumber)) return;
         if (Snapshot._cache[C.MemberNumber]) return;
         const mn = C.MemberNumber;
-        let stable = 0, prev = '';
+        let stable = 0, attempts = 0, prev = '';
         const check = () => {
-            if (Snapshot._cache[mn]) return;
+            if (Snapshot._cache[mn] || attempts++ >= 40) return;
             const url = PDB._face(C, 100);
             if (url && url.length > 800) {
                 if (url === prev) {
@@ -368,4 +359,4 @@ import { inRoomFn } from './data.js';
     }
     function setAvStatusEl(v) { _avStatusEl = v; }
 
-export { PDB, _pc, Snapshot, detectWCESave, _avQueue, _avBusy, _avStatusEl, setAvStatusEl, _processAvQueue, loadAvatarFromBundle, queueAvatarLoad, _captureSnapshotDelayed, syncRoomAvatar, ensureOwnSharedProfile, ensureOwnAvatarSnapshot, updateOwnAvatarSnapshot, updateOwnAvatarProfile };
+export { PDB, _pc, Snapshot, detectWCESave, _avQueue, _avBusy, setAvStatusEl, _processAvQueue, loadAvatarFromBundle, _captureSnapshotDelayed, syncRoomAvatar, ensureOwnAvatarSnapshot, updateOwnAvatarSnapshot, updateOwnAvatarProfile };

@@ -125,7 +125,12 @@
     chatProvLibre: 'LibreTranslate',
     chatProvCustom: 'Personalizado',
     chatProvDeepl: 'DeepL',
-    chatProvGoogle: 'Google Translate'
+    chatProvGoogle: 'Google Translate',
+    off: 'Desactivado',
+    balloonSnap: 'Ajuste de globos',
+    balloonSnapNote: 'Ajusta automáticamente el globo arrastrado al borde de pantalla más cercano',
+    chatNotFriend: 'No es amigo',
+    chatRoomInviteIncoming: '{0} te invitó a unirte a una sala'
     };
     var T = {}; Object.keys(V).forEach(function (k) { T[k] = { ES: V[k] }; });
     I.register('FCM', T);

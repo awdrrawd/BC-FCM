@@ -13,6 +13,16 @@ import { openChat } from '../communication/chat.js';
 
 const _panel = () => document.getElementById('fcm-panel');
 
+function setAvatarImage(element, url, borderRadius = '') {
+    if (!element || !url) return;
+    element.replaceChildren();
+    const image = document.createElement('img');
+    image.src = url;
+    image.draggable = false;
+    if (borderRadius) image.style.borderRadius = borderRadius;
+    element.appendChild(image);
+}
+
 function makeAvEl(mn, snapshotUrl) {
     mn = parseInt(mn);
     const el = document.createElement('div'); el.className = 'fcm-av'; el.dataset.mn = mn;
@@ -27,21 +37,21 @@ function makeAvEl(mn, snapshotUrl) {
         if (sharedMode === 'none') { el.textContent = getDisplayName(mn).trim().slice(0, 2).toUpperCase() || '?'; return el; }
         const snap = snapshotUrl || Snapshot._cache[mn];
         if (snap) {
-            const img = document.createElement('img'); img.src = snap; img.style.borderRadius = cfg.avatarShape === 'round' ? '50%' : '7px'; el.appendChild(img); return el;
+            setAvatarImage(el, snap, cfg.avatarShape === 'round' ? '50%' : '7px'); return el;
         }
         (async () => {
             if (!el.isConnected) return;
             const saved = await Snapshot.get(mn);
             if (saved) {
                 const t = el.isConnected ? el : _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
-                if (t) { t.innerHTML = ''; const img = document.createElement('img'); img.src = saved; t.appendChild(img); }
+                setAvatarImage(t, saved);
                 return;
             }
             if (_pc[mn] === undefined) await PDB.get(mn);
             const profile = _pc[mn];
             _avQueue.push({ mn, profile, onDone: url => {
                 const t = _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
-                if (t) { t.innerHTML = ''; const img = document.createElement('img'); img.src = url; t.appendChild(img); }
+                setAvatarImage(t, url);
             }});
             if (!_avBusy) _processAvQueue();
         })();
@@ -73,7 +83,7 @@ async function _forceLoadAvatar(mn, el) {
     const url = await loadAvatarFromBundle(mn, profile);
     const target = el.isConnected ? el : _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
     if (url && target) {
-        target.innerHTML = ''; const img = document.createElement('img'); img.src = url; target.appendChild(img);
+        setAvatarImage(target, url);
     } else {
         if (target) target.textContent = getDisplayName(mn).trim().slice(0, 2).toUpperCase() || '?';
     }
@@ -220,7 +230,7 @@ async function _autoQueueVisible(mns) {
         _avQueue.push({ mn, profile, onDone: url => {
             if (!url) return;
             const el = _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
-            if (el) { el.innerHTML = ''; const img = document.createElement('img'); img.src = url; el.appendChild(img); }
+            setAvatarImage(el, url);
         }});
         queued++;
     }
@@ -231,24 +241,22 @@ async function refreshSnapshotsForList(mns) {
     const selfMn = parseInt(Player?.MemberNumber);
     const toProcess = mns.filter(mn => mn !== selfMn);
     await PDB.batchGet(toProcess);
-    let liveCount = 0, queueCount = 0, noBundle = 0;
     for (const mn of toProcess) {
         await Snapshot.delete(mn);
         const qi = _avQueue.findIndex(q => q.mn === mn);
         if (qi >= 0) _avQueue.splice(qi, 1);
         const C = ChatRoomCharacter && ChatRoomCharacter.find(c => c.MemberNumber === mn);
-        if (C) { _captureSnapshotDelayed(C); liveCount++; continue; }
+        if (C) { _captureSnapshotDelayed(C); continue; }
         const profile = _pc[mn];
-        if (!profile || !profile.characterBundle) { noBundle++; continue; }
+        if (!profile || !profile.characterBundle) continue;
         _avQueue.push({ mn, profile, onDone: url => {
             if (!url) return;
             const el = _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
-            if (el) { el.innerHTML = ''; const img = document.createElement('img'); img.src = url; el.appendChild(img); }
+            setAvatarImage(el, url);
         }});
-        queueCount++;
     }
     if (!_avBusy && _avQueue.length > 0) _processAvQueue();
 }
 
-export { makeAvEl, makeFavStar, _forceLoadAvatar, makeRelEl, makePermEl, mkBtn, mkToggle, makeSearchWrap,
+export { makeAvEl, makeFavStar, makeRelEl, makePermEl, mkBtn, mkToggle, makeSearchWrap,
          buildMgmtBtns, buildPersonOps, makeSortSel, makeCountBar, _autoQueueVisible, refreshSnapshotsForList };

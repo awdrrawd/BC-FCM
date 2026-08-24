@@ -1,7 +1,7 @@
 import { T } from '../i18n/i18n.js';
 import { PDB } from '../data/profile-db.js';
 import { amAdmin, inRoomFn, getDisplayName, isFriendOf } from '../data/data.js';
-import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
+import { renderCurrent, minimizePanel, closePanel } from '../panel/panel-controller.js';
 // ════════════════════════════════════════
 //  FCM module: actions.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -132,7 +132,7 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
     }
     function doRemoveFriend(mn) { mn = parseInt(mn); if (typeof ChatRoomListManipulation === 'function') { ChatRoomListManipulation(Player.FriendList, false, mn.toString()); setTimeout(renderCurrent, 400); } }
 
-    // 實際加入房間（無確認）。供簡易確認（navigateToRoom）與詳細資訊確認（showRoomJoinConfirm）共用。
+    // 實際加入房間（無確認），由詳細資訊確認流程共用。
     function _doJoinRoom(roomName) {
         // Blur all FCM search inputs to prevent their keydown handlers from
         // leaking Enter/Shift+Enter events into the new room context (Nami bug fix)
@@ -153,11 +153,6 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
                 if (typeof ServerSend === 'function') ServerSend('ChatRoomJoin', { Name: roomName });
             } catch (e) { console.warn('🐈‍⬛ [FCM] joinRoom:', e); }
         }, 150);
-    }
-
-    // 只知道房名時的簡易文字確認（例如好友列表的房間連結）。
-    function navigateToRoom(roomName) {
-        showConfirm(T('confirmRoom', roomName), () => _doJoinRoom(roomName), T('roomGo'));
     }
 
     // ── Bug fix: showConfirm — stopPropagation on Enter to prevent
@@ -211,7 +206,7 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
     // 這才是本功能的本意。AccountBeep 反而受伺服器好友限制（雙方皆非好友時被丟棄）。
     // Content 用自訂標記、且「絕不」攜帶任何房間欄位，避免被 BC 或其他 mod 的牽引處理器誤判成換房指令。
     // BC 對未知 Hidden Content 不做任何處理，故沒裝 FCM 的人完全不會看到。
-    const FRIENDREQ_MSG = 'FCMFriendReq';
+    const FRIENDREQ_MSG = 'FCM-InviteFriends';
 
     function showAddFriendConfirm(mn, dname, oneSided) {
         mn = parseInt(mn);
@@ -254,15 +249,10 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
 
     function sendFriendReqNotify(mn) {
         mn = parseInt(mn);
-        // leash 走同房投遞：對方不在本房則無法送達，明確提示而非假裝已送出。
-        if (!inRoomFn(mn)) { if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('friendReqNeedRoom'), 5000); return; }
         try {
-            // Hidden＋Target：只送給該成員，不帶任何房間資訊，故不會觸發真正的牽引/換房。
-            ServerSend('ChatRoomChat', {
-                Type: 'Hidden',
-                Content: FRIENDREQ_MSG,
-                Target: mn,
-            });
+            // 借用 Leash 通道送 FCM 標籤，但刻意不附 ChatRoomName / ChatRoomSpace。
+            // 接收端 FCM 會在 ServerAccountBeep hook 中攔截，不交給遊戲牽引流程。
+            ServerSend('AccountBeep', { MemberNumber: mn, BeepType: 'Leash', IsSecret: true, Message: FRIENDREQ_MSG });
             if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('friendReqSent', getDisplayName(mn)), 5000);
         } catch (e) { console.warn('🐈‍⬛ [FCM] sendFriendReqNotify:', e); }
     }
@@ -275,8 +265,16 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
         if (document.getElementById(uiId)) return;   // 已有一張，避免重複
         const dname = fromName || getDisplayName(fromNum);
 
-        const el = _appendChatCard(uiId);
+        const anchorId = `${uiId}-anchor`;
+        if (typeof ChatRoomSendLocal !== 'function') return;
+        ChatRoomSendLocal(`<span id="${anchorId}"></span>`);
+        const anchor = document.getElementById(anchorId);
+        const el = anchor?.closest('.ChatMessage') || anchor?.parentElement;
         if (!el) return;
+        el.id = uiId;
+        el.classList.add('fcm-chat-card');
+        el.style.cssText = 'background:rgba(40,15,55,.93);border:2px solid #9060d0;border-radius:8px;padding:10px 14px;margin:6px 4px;font-size:1em;line-height:1.5;color:#eee;';
+        el.replaceChildren();
         const title = document.createElement('div');
         title.style.cssText = 'font-weight:bold;font-size:1.02em;margin-bottom:8px;color:#ffd0e6;';
         title.textContent = T('friendReqIncoming', `${dname} (${fromNum})`);
@@ -516,6 +514,29 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
         } catch (e) { console.warn('🐈‍⬛ [FCM] handleIncomingRoomShare:', e); }
     }
 
+    function showIncomingRoomInvite(fromNum, fromName, info) {
+        if (!info?.room) return;
+        const uiId = `fcm-roominvite-${parseInt(fromNum)}-${String(info.room).replace(/[^a-z0-9_-]/gi, '').slice(0, 24)}`;
+        setTimeout(() => {
+            document.getElementById(uiId)?.remove();
+            const log = document.getElementById('TextAreaChatLog');
+            const rows = log?.querySelectorAll(`.ChatMessageBeep[data-sender="${parseInt(fromNum)}"]`) || [];
+            const el = rows.length ? rows[rows.length - 1] : _appendChatCard(uiId);
+            if (!el) return;
+            el.id = uiId;
+            el.classList.add('fcm-chat-card', 'fcm-room-share-message');
+            el.style.cssText = 'background:rgba(40,15,55,.93);border:2px solid #9060d0;border-radius:8px;padding:10px 14px;margin:6px 4px;font-size:1em;line-height:1.5;color:#eee;text-align:left;';
+            el.replaceChildren();
+            const intro = document.createElement('div');
+            intro.className = 'fcm-room-share-intro';
+            intro.style.cssText = 'color:#a890c8;font-size:.82em;margin-bottom:6px;';
+            intro.textContent = T('chatRoomInviteIncoming', fromName || getDisplayName(fromNum));
+            el.appendChild(intro);
+            el.appendChild(_buildRoomShareCard(info));
+            _scrollChatToEnd();
+        }, 0);
+    }
+
     // ── 聊天記錄卡片輔助（參考 AFC createProposalUI）─────────────────
     function _appendChatCard(uiId) {
         if (document.getElementById(uiId)) return null;
@@ -543,5 +564,5 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel.js';
         return td;
     }
 
-export { roomOp, doView, doBeep, doWhisper, doAddFriend, doToggleList, doRemoveFriend, navigateToRoom, showConfirm, makeIdCell,
-         showAddFriendConfirm, shareRoomToChat, showRoomJoinConfirm, roomInfoFromResult, handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSHARE_TAG };
+export { roomOp, doView, doBeep, doWhisper, doAddFriend, doToggleList, doRemoveFriend, showConfirm, makeIdCell,
+         showAddFriendConfirm, shareRoomToChat, showRoomJoinConfirm, roomInfoFromResult, handleIncomingFriendReq, handleIncomingRoomShare, showIncomingRoomInvite, FRIENDREQ_MSG, ROOMSHARE_TAG };

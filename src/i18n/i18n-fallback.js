@@ -7,6 +7,7 @@
 import './i18n-engine.js';   // 確保 window.Liko.__Sys_i18n__ 存在（引擎自帶防重載）
 
 const FCM_FALLBACK = {
+    "off": { TW: "關閉", EN: "Off" },
     "initHint": { TW: "🐈‍⬛ FCM v{0} 已初始化，點「SVG」圖示可進行好友與房間管理；初次使用可先到設定頁做簡單設定。\n⚠ 注意：新增好友時可能出現「單向好友」，可嘗試刪除後重新添加；此問題已回報社群。", EN: "🐈‍⬛ FCM v{0} initialized. Click the \"SVG\" icon to manage friends and rooms; first-time users may want a quick setup on the Settings page.\n⚠ Note: newly added friends may show as \"one-way\" — try removing and re-adding them. This issue has been reported to the community." },
     "panelTitle": { TW: "🎛 FCM ─ 好友與房間管理", EN: "🎛 FCM ─ Friends and ChatRoom Manager" },
     "tabFriends": { TW: "個人關係", EN: "Relations" },
@@ -267,6 +268,8 @@ const FCM_FALLBACK = {
     "takeoverChatButtonsNote": { TW: "使用 FCM 的悄悄話或私訊按鈕時，開啟 Chat 並切換至該玩家；不接管 BC 原生功能", EN: "FCM whisper/beep buttons open Chat for that player without replacing BC native behavior" },
     "individualBalloons": { TW: "用戶獨立氣球", EN: "Per-user balloons" },
     "individualBalloonsNote": { TW: "每位傳來新訊息的玩家建立獨立氣球；懸停顯示最新訊息", EN: "Creates a separate balloon per sender; hover shows the latest message" },
+    "balloonSnap": { TW: "氣球吸附", EN: "Balloon snapping" },
+    "balloonSnapNote": { TW: "拖移氣球後，自動吸附到距離最近的螢幕邊緣", EN: "Automatically snaps a dragged balloon to the nearest screen edge" },
     "notificationAnimation": { TW: "通知動畫", EN: "Notification animation" },
     "notificationAnimationNote": { TW: "收到新訊息時播放提示動畫（預設啟用）", EN: "Animate incoming notifications (on by default)" },
     "notificationAudio": { TW: "通知音訊", EN: "Notification audio" },
@@ -350,6 +353,8 @@ const FCM_FALLBACK = {
     "chatNotifyAudioNote": { TW: "收到新訊息時播放音效", EN: "Play a sound on new messages" },
     "chatOffline": { TW: "不在線", EN: "Offline" },
     "chatOnlineDiffRoom": { TW: "在線（不同房間）", EN: "Online (different room)" },
+    "chatNotFriend": { TW: "非好友", EN: "Not a friend" },
+    "chatRoomInviteIncoming": { TW: "{0} 邀請你加入房間", EN: "{0} invited you to join a room" },
     "chatPersistentBalloon": { TW: "顯示懸浮氣球", EN: "Show Floating Balloon" },
     "chatPersistentBalloonNote": { TW: "讓主氣球保持顯示", EN: "Keep the main balloon always visible" },
     "chatPlayerOffline": { TW: "玩家目前不在線", EN: "Player is currently offline" },
@@ -429,5 +434,3 @@ const FCM_FALLBACK = {
 
 try { window.Liko?.__Sys_i18n__?.register('FCM', FCM_FALLBACK); }
 catch (e) { console.warn('🐈‍⬛ [FCM] fallback register 失敗:', e && e.message); }
-
-export { FCM_FALLBACK };

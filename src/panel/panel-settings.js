@@ -6,8 +6,9 @@ import { buildFriendList } from '../data/data.js';
 import { mkBtn, mkToggle, refreshSnapshotsForList } from './panel-widgets.js';
 import { exportProfiles, importProfiles } from './panel-people.js';
 import { _applyWhisperStyle, _removeWhisperAvatar, _installOocProtect, _uninstallOocProtect } from '../chat/chat-fx.js';
-import { renderCurrent, reopenForLang } from './panel.js';
+import { renderCurrent, reopenForLang } from './panel-controller.js';
 import { refreshChatSettings, playNotificationSound, saveCustomNotificationSound } from '../communication/chat.js';
+import { THEME_PRESETS } from '../core/themes.js';
 import ALARM_MUTED_ICON from '../../assets/icons/alarm-muted.svg?raw';
 import ALARM_ACTIVE_ICON from '../../assets/icons/alarm-active.svg?raw';
 // ════════════════════════════════════════
@@ -118,13 +119,7 @@ function renderSettings(container) {
     themeReset.style.cssText = 'font-size:11px;padding:5px 10px;';
     pickers.appendChild(fPanel); pickers.appendChild(fFont); pickers.appendChild(fAccent); pickers.appendChild(themeReset);
     const presetRow = document.createElement('div'); presetRow.className = 'fcm-theme-presets';
-    const themePresets = {
-        violet: ['#1a1821', '#f1ecff', '#7648fe'], eu: ['#171d29', '#f2efe6', '#cda85a'],
-        electronic: ['#0b0f14', '#d9f8ff', '#35e0c9'], jp: ['#f7f3ea', '#2b2a28', '#b23b32'],
-        cn: ['#1a1210', '#f2e6d8', '#c23616'], silentblack: ['#0a0a0a', '#ededed', '#d8d8d8'],
-        minimalwhite: ['#fafafa', '#171717', '#171717'],
-    };
-    Object.entries(themePresets).forEach(([key, colors]) => {
+    Object.entries(THEME_PRESETS).forEach(([key, colors]) => {
         const b = document.createElement('button'); b.className = 'fcm-btn'; b.textContent = T(`themePreset_${key}`);
         b.classList.toggle('active', cfg.themePreset === key);
         b.addEventListener('click', () => {
@@ -342,11 +337,13 @@ function renderSettings(container) {
     sectionHeader(T('setSecCommunication'), 'communication');
     wrap.appendChild(settingRow(T('communicationEnabled'), T('communicationEnabledNote'), cfg.communicationEnabled, v => { cfg.communicationEnabled = v; saveCfg(); refreshChatSettings(); }));
     divider();
-    wrap.appendChild(balloonSelectRow(T('persistentBalloon'), T('persistentBalloonNote'), 'balloonPlacement', 'persistentBalloon'));
-    divider();
     wrap.appendChild(settingRow(T('takeoverChatButtons'), T('takeoverChatButtonsNote'), cfg.takeoverFcmChatButtons, v => { cfg.takeoverFcmChatButtons = v; saveCfg(); }));
     divider();
+    wrap.appendChild(balloonSelectRow(T('persistentBalloon'), T('persistentBalloonNote'), 'balloonPlacement', 'persistentBalloon'));
+    divider();
     wrap.appendChild(balloonSelectRow(T('individualBalloons'), T('individualBalloonsNote'), 'userBalloonPlacement', 'individualBalloons'));
+    divider();
+    wrap.appendChild(settingRow(T('balloonSnap'), T('balloonSnapNote'), cfg.balloonSnap, v => { cfg.balloonSnap = v; saveCfg(); }));
     divider();
     wrap.appendChild(settingRow(T('notificationAnimation'), T('notificationAnimationNote'), cfg.notificationAnimation, v => { cfg.notificationAnimation = v; saveCfg(); }));
     divider();

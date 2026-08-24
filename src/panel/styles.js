@@ -254,7 +254,7 @@ import { chatFontFamily } from '../communication/chat-font.js';
 .fcm-onesided-warn{padding:8px 14px;font-size:11px;color:#e8a040;background:#1e1205;border:1px solid #604010;border-radius:6px;margin:8px 14px;line-height:1.5;}
 .fcm-settings-wrap{padding:16px 24px;display:flex;flex-direction:column;gap:6px;overflow-y:auto;}
 .fcm-settings-wrap::-webkit-scrollbar{width:9px}.fcm-settings-wrap::-webkit-scrollbar-track{background:#111016;border-radius:0 0 10px 0}.fcm-settings-wrap::-webkit-scrollbar-thumb{background:#7648fe;border:2px solid #111016;border-radius:9px}
-.fcm-scroll,.fcm-settings-wrap{cursor:grab}.drag-scrolling{cursor:grabbing!important;scroll-behavior:auto!important;user-select:none!important}
+.fcm-scroll,.fcm-settings-wrap{cursor:default}.drag-scrolling{cursor:grabbing!important;scroll-behavior:auto!important;user-select:none!important}
 .fcm-settings-nav{position:sticky;top:-16px;z-index:5;display:flex;gap:8px;padding:10px 24px;background:#1a1821;border-bottom:1px solid #332b50;margin:-16px -24px 4px;width:calc(100% + 48px);}
 .fcm-settings-nav button{flex:1;padding:8px 12px;border-radius:8px;border:1px solid #40366c;background:transparent;color:#aaa1c4;font-weight:700;cursor:pointer;}
 .fcm-settings-section{scroll-margin-top:58px;}

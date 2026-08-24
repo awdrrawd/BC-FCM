@@ -125,7 +125,12 @@
     chatProvLibre: 'LibreTranslate',
     chatProvCustom: 'Tùy chỉnh',
     chatProvDeepl: 'DeepL',
-    chatProvGoogle: 'Google Dịch'
+    chatProvGoogle: 'Google Dịch',
+    off: 'Tắt',
+    balloonSnap: 'Hít bong bóng',
+    balloonSnapNote: 'Tự động hít bong bóng được kéo vào cạnh màn hình gần nhất',
+    chatNotFriend: 'Không phải bạn bè',
+    chatRoomInviteIncoming: '{0} đã mời bạn vào phòng'
     };
     var T = {}; Object.keys(V).forEach(function (k) { T[k] = { VI: V[k] }; });
     I.register('FCM', T);

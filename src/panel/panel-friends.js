@@ -5,7 +5,7 @@ import { onlineFriends, showNickname, setShowNickname, getDisplayName, matchesSe
 import { showRoomJoinConfirm, roomInfoFromResult, makeIdCell } from '../chat/actions.js';
 import { makeAvEl, makeFavStar, makeRelEl, mkBtn, makeSearchWrap, makeSortSel, makeCountBar, buildMgmtBtns, buildPersonOps, _autoQueueVisible, refreshSnapshotsForList } from './panel-widgets.js';
 import { queryRoomInfo, getCachedRoomInfo, fetchRoomFull } from './panel-rooms-data.js';
-import { renderCurrent, refreshPanel, getRenderToken } from './panel.js';
+import { renderCurrent, refreshPanel, getRenderToken } from './panel-controller.js';
 // ════════════════════════════════════════
 //  FCM module: panel-friends.js  (split from panel.js)
 //  好友（個人關係）頁。searchQ / sortMode / filters 為本頁狀態；

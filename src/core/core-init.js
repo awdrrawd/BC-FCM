@@ -11,9 +11,12 @@ import { initChat } from '../communication/chat.js';
 // ════════════════════════════════════════
 
 
+    let initStarted = false;
     async function init() {
         loadCfg();
         if (typeof ChatRoomCharacter === 'undefined' || typeof Player === 'undefined' || !Player?.MemberNumber) return setTimeout(init, 500);
+        if (initStarted) return;
+        initStarted = true;
         // Player settings become available only after login; merge them over the local fallback.
         loadCfg();
 

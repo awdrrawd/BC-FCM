@@ -129,7 +129,7 @@ import { T } from '../i18n/i18n.js';
             ctx.fillText(name.length > 10 ? name.slice(0, 9) + '…' : name, labelX, labelY);
 
             ctx.restore();
-        } catch (e) { /* silent */ }
+        } catch { /* silent */ }
     }
 
     function _roundRect(ctx, x, y, w, h, r) {

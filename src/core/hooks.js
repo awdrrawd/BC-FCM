@@ -20,6 +20,7 @@ import { handleIncomingBeep, handleIncomingWhisper, handleOutgoingServerSend } f
     let _introShown = false;   // 初始化提示只顯示一次
     let _relRegions = [];
     let _afcRegions = [];   // AFC 拓展戀人面板的可點區塊（透過 window.Liko.AFC 公開 API）
+    let _hooksRegistered = false;
 
     // 將 hex 顏色朝白色混合，用於 hover 時提亮底線（amt: 0~1）
     function _lightenHex(hex, amt) {
@@ -79,8 +80,17 @@ import { handleIncomingBeep, handleIncomingWhisper, handleOutgoingServerSend } f
     }
 
     function registerHooks() {
+    if (_hooksRegistered) return;
+    _hooksRegistered = true;
     modApi.hookFunction('ServerAccountBeep', 10, (args, next) => {
-        try { handleIncomingBeep(args[0]); } catch {}
+        const data = args[0];
+        // FCM 好友邀請借用 Leash 封包，但沒有任何房間資料；必須在此攔截，
+        // 不可繼續交給 ServerHandleLeashBeep。
+        if (data?.BeepType === 'Leash' && data?.Message === FRIENDREQ_MSG && !data?.ChatRoomName && !data?.ChatRoomSpace) {
+            try { handleIncomingFriendReq(data.MemberNumber, data.MemberName); } catch {}
+            return;
+        }
+        try { handleIncomingBeep(data); } catch {}
         return next(args);
     });
     modApi.hookFunction('ServerSend', 10, (args, next) => {
@@ -194,11 +204,6 @@ import { handleIncomingBeep, handleIncomingWhisper, handleOutgoingServerSend } f
     modApi.hookFunction('ChatRoomMessage', 0, (args, next) => {
         const data = args[0];
         try { handleIncomingWhisper(data); } catch {}
-        // 好友邀請通知：leash 式 Hidden 訊息（同房投遞）→ 顯示接收卡，抑制 BC 預設處理
-        if (data?.Type === 'Hidden' && data?.Content === FRIENDREQ_MSG) {
-            try { handleIncomingFriendReq(data.Sender); } catch {}
-            return;
-        }
         if (data?.Type === 'Hidden' && data?.Content?.startsWith(WPS_PREFIX)) {
             if (!window.LikoWPSInstance) { wpsHandleMessage(data); return; }
         }

@@ -44,4 +44,4 @@ function chatFontFamily() {
     return FONT_STACKS[cfg.chatFontFamily] || FONT_STACKS.system;
 }
 
-export { chatFontFamily, FONT_STACKS, availableFontChoices };
+export { chatFontFamily, availableFontChoices };

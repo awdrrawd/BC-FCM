@@ -4,7 +4,7 @@ import { inRoomFn, amAdmin, getAllRels, onlineFriends } from '../data/data.js';
 import { makeAvEl, makeRelEl, mkBtn, buildMgmtBtns, buildPersonOps } from './panel-widgets.js';
 import { makeIdCell } from '../chat/actions.js';
 import { wpsShareProfile } from '../chat/wps-share.js';
-import { getRenderToken } from './panel.js';
+import { getRenderToken } from './panel-controller.js';
 // ════════════════════════════════════════
 //  FCM module: panel-people.js  (split from panel.js)
 //  人員查詢頁（renderPeople）＋ Profile 匯出/匯入。

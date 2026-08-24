@@ -83,4 +83,4 @@ function T(key, ...args) {
     return key;
 }
 
-export { isZh, T, I18N_NS, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, fcmLang, ensureI18n, ensureLang, assetUrl };
+export { isZh, T, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, ensureI18n, ensureLang };

@@ -87,6 +87,7 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
         takeoverFcmChatButtons: false,
         individualBalloons: false,
         userBalloonPlacement: 'off',
+        balloonSnap: true,
         notificationAnimation: true,
         notificationAudio: true,
         notificationSound: 'Audio/BeepAlarm.mp3',

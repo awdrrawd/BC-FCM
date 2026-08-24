@@ -71,4 +71,4 @@ async function fetchRoomFull(roomName, space) {
     return null;
 }
 
-export { getRoomResults, setRoomResults, _cacheRooms, doRoomSearch, queryRoomInfo, getCachedRoomInfo, fetchRoomFull };
+export { getRoomResults, setRoomResults, doRoomSearch, queryRoomInfo, getCachedRoomInfo, fetchRoomFull };
