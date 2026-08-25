@@ -48,6 +48,7 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
     let cfg = {
         avatars: false, lang: 'auto', saveMode: 'off',
         favorites: [],                // 關注的成員編號（個人關係頁星號）
+        favoriteRooms: [],
         whisperIndicator: false, whisperColor: '#b070e8',
         ghostHide: false,
         whisperAvatar: false,
@@ -100,8 +101,11 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
         statusMessage: '',
     };
     function loadCfg() {
-        try { const s = localStorage.getItem('LikoFCM'); if (s) Object.assign(cfg, JSON.parse(s)); } catch {}
         try { const s = Player?.ExtensionSettings?.FCM?.settings; if (s && typeof s === 'object') Object.assign(cfg, s); } catch {}
+        // Settings belong to the BC account. The former localStorage mirror was
+        // shared by every account in the same browser and is intentionally not
+        // migrated because its owner cannot be identified safely.
+        if (Player?.MemberNumber) { try { localStorage.removeItem('LikoFCM'); } catch {} }
         // Migrate the former built-in purple defaults; intentional custom colors are untouched.
         if (cfg.panelColor === '#1e1635' && cfg.fontColor === '#f0e4ff' && cfg.accentColor === '#a078e8') {
             Object.assign(cfg, THEME_DEFAULTS, { themePreset: 'violet' });
@@ -120,7 +124,6 @@ import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
         if (cfg.notificationSound === 'Audio/BrushHair4.mp3') cfg.notificationSound = 'Audio/BeepAlarm.mp3';
     }
     function saveCfg() {
-        try { localStorage.setItem('LikoFCM', JSON.stringify(cfg)); } catch {}
         try {
             Player.ExtensionSettings ??= {};
             Player.ExtensionSettings.FCM ??= {};

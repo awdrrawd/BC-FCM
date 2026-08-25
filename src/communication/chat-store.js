@@ -1,5 +1,6 @@
 const DB_NAME = 'fcm-chat';
-const DB_VERSION = 1;
+const DB_VERSION = 1; // 共用資料庫，任意修改會導致其他插件的錯誤，修改前請先詢問必要性
+const accountNumber = () => Number(globalThis.Player?.MemberNumber) || 0;
 
 const ChatStore = {
     db: null,
@@ -22,22 +23,26 @@ const ChatStore = {
         });
     },
     async put(message) {
+        const ownerMemberNumber = accountNumber();
+        if (!ownerMemberNumber) return false;
         if (!this.db) await this.init();
         if (!this.db) return false;
         return new Promise(resolve => {
             try {
-                const req = this.db.transaction('messages', 'readwrite').objectStore('messages').put(message);
+                const req = this.db.transaction('messages', 'readwrite').objectStore('messages').put({ ...message, ownerMemberNumber });
                 req.onsuccess = () => resolve(true); req.onerror = () => resolve(false);
             } catch { resolve(false); }
         });
     },
     async all() {
+        const ownerMemberNumber = accountNumber();
+        if (!ownerMemberNumber) return [];
         if (!this.db) await this.init();
         if (!this.db) return [];
         return new Promise(resolve => {
             try {
                 const req = this.db.transaction('messages', 'readonly').objectStore('messages').getAll();
-                req.onsuccess = () => resolve((req.result || []).sort((a, b) => a.timestamp - b.timestamp));
+                req.onsuccess = () => resolve((req.result || []).filter(message => Number(message.ownerMemberNumber) === ownerMemberNumber).sort((a, b) => a.timestamp - b.timestamp));
                 req.onerror = () => resolve([]);
             } catch { resolve([]); }
         });
@@ -81,10 +86,13 @@ const ChatStore = {
     async clear() {
         if (!this.db) await this.init();
         if (!this.db) return false;
+        const records = await this.all();
         return new Promise(resolve => {
             try {
-                const req = this.db.transaction('messages', 'readwrite').objectStore('messages').clear();
-                req.onsuccess = () => resolve(true); req.onerror = () => resolve(false);
+                const tx = this.db.transaction('messages', 'readwrite');
+                const store = tx.objectStore('messages');
+                records.forEach(message => store.delete(message.id));
+                tx.oncomplete = () => resolve(true); tx.onerror = () => resolve(false);
             } catch { resolve(false); }
         });
     },

@@ -28,7 +28,7 @@ import { initChat } from '../communication/chat.js';
 
         Promise.all([PDB.init(), Snapshot.init()]).then(async ([pdbOk]) => {
             if (!pdbOk) console.warn('🐈‍⬛ [FCM] Profile DB: no profiles store');
-            const stored = JSON.parse(localStorage.getItem('LikoFCM') || '{}');
+            const stored = Player?.ExtensionSettings?.FCM?.settings || {};
             if (stored.saveMode === undefined) {
                 await detectWCESave();
             }

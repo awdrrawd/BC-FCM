@@ -3,6 +3,7 @@ import { onlineFriends } from '../data/data.js';
 import { showRoomJoinConfirm, roomInfoFromResult, shareRoomToChat } from '../chat/actions.js';
 import { mkBtn } from './panel-widgets.js';
 import { getRoomResults, setRoomResults, doRoomSearch } from './panel-rooms-data.js';
+import { cfg, saveCfg } from '../core/config.js';
 // ════════════════════════════════════════
 //  FCM module: panel-roomsearch.js  (split from panel.js)
 //  房間搜尋頁。_roomZoneFilter / _roomSearchQ2 / _roomSortMode / _favRooms 為本頁狀態；
@@ -11,13 +12,14 @@ import { getRoomResults, setRoomResults, doRoomSearch } from './panel-rooms-data
 
 let _roomZoneFilter = 'X';
 let _roomSearchQ2 = '';
-let _favRooms = new Set(JSON.parse(localStorage.getItem('fcmFavRooms') || '[]'));
+let _favRooms = null;
 let _roomSortMode = 'fav';
 
-function saveFavRooms() { try { localStorage.setItem('fcmFavRooms', JSON.stringify([..._favRooms])); } catch {} }
+function saveFavRooms() { cfg.favoriteRooms = [..._favRooms]; saveCfg(); }
 function resetRoomSearchQuery() { _roomSearchQ2 = ''; }
 
 async function renderRoomSearch(container) {
+    _favRooms ??= new Set(Array.isArray(cfg.favoriteRooms) ? cfg.favoriteRooms : []);
     container.innerHTML = '';
     const wrap = document.createElement('div'); wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;';
 
