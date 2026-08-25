@@ -19,7 +19,16 @@ function _cacheRooms(rooms) {
         const ml = r.MemberLimit ?? r.Limit ?? null;
         const existing = _roomCache.get(r.Name);
         if (!existing || mc !== null || ml !== null) {
-            _roomCache.set(r.Name, { MemberCount: mc, MemberLimit: ml, Space: r.Space ?? r.ChatRoomSpace ?? '', ts: now });
+            // CHAT 與主面板共用同一份快取；不能只留下人數，否則 CHAT 的房間框
+            // 會遺失主面板查詢結果中的描述、建立者與私密狀態。
+            _roomCache.set(r.Name, {
+                ...existing,
+                ...r,
+                MemberCount: mc,
+                MemberLimit: ml,
+                Space: r.Space ?? r.ChatRoomSpace ?? existing?.Space ?? '',
+                ts: now,
+            });
         }
     }
 }
@@ -52,7 +61,11 @@ async function queryRoomInfo(roomName, space, onUpdate) {
 function getCachedRoomInfo(roomName) {
     const cached = _roomCache.get(roomName); if (cached) return cached;
     const fromResults = _roomResults.find(r => r.Name === roomName);
-    if (fromResults) { const mc = fromResults.MemberCount ?? fromResults.NbMember ?? null; const ml = fromResults.MemberLimit ?? fromResults.Limit ?? null; return mc !== null || ml !== null ? { MemberCount: mc, MemberLimit: ml } : null; }
+    if (fromResults) {
+        const mc = fromResults.MemberCount ?? fromResults.NbMember ?? null;
+        const ml = fromResults.MemberLimit ?? fromResults.Limit ?? null;
+        return { ...fromResults, MemberCount: mc, MemberLimit: ml };
+    }
     return null;
 }
 

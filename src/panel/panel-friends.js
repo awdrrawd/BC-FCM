@@ -143,14 +143,14 @@ async function renderFriends(container, _myToken) {
             rl.title = (ri2.isPrivate ? T('roomPrivPrefix') : '') + rcStr + (roomFull ? ('\n' + T('roomFull')) : ('\n' + T('roomGoPrompt')));
             // 加入房間：立即以房名開框（其餘欄位顯示佔位），背景查詢完整房間資料後再補上；
             //  查不到（私人房不在搜尋結果等）則退回好友端已知的房名＋人數。
-            if (!roomFull) rl.addEventListener('click', () => {
+            rl.addEventListener('click', () => {
                 const fallback = { room: ri2.name, creator: '', count: mc, limit: ml, desc: '', priv: !!ri2.isPrivate, type: '' };
                 const space = onlineFriends.find(ff => ff.MemberNumber === f.mn)?.ChatRoomSpace;
                 const promise = fetchRoomFull(ri2.name, space)
                     .then(full => full ? roomInfoFromResult(full) : fallback)
                     .catch(() => fallback);
                 showRoomJoinConfirm({ room: ri2.name, priv: !!ri2.isPrivate }, promise);
-            }); else rl.style.color = '#808080';
+            });
             if (ri2.isPrivate) { const b2 = document.createElement('span'); b2.className = 'fcm-room-private'; b2.style.cssText = 'font-size:10px;color:#c090f0;margin-left:2px;'; b2.textContent = T('roomPrivShort'); rl.appendChild(b2); }
             return rl;
         }

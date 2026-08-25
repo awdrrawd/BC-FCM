@@ -56,6 +56,32 @@ function cleanMessage(value) {
     return text.replace(/[\r\n]+$/g, '').trim();
 }
 
+const CHAT_IMAGE_EXT = /\.(?:png|jpe?g|gif|webp|bmp|avif|apng|jfif|svg|ico)$/iu;
+
+function messageContentHtml(value) {
+    const text = cleanMessage(value);
+    const urlPattern = /https?:\/\/[^\s<>"']+/giu;
+    let html = '', cursor = 0;
+    for (const match of text.matchAll(urlPattern)) {
+        const raw = match[0];
+        const trailing = raw.match(/[),.!?\]]+$/u)?.[0] || '';
+        const candidate = trailing ? raw.slice(0, -trailing.length) : raw;
+        let url;
+        try { url = new URL(candidate); } catch { continue; }
+        if (!['http:', 'https:'].includes(url.protocol)) continue;
+        html += esc(text.slice(cursor, match.index));
+        const href = esc(url.href);
+        if (CHAT_IMAGE_EXT.test(url.pathname)) {
+            html += `<a class="fcm-chat-image-link" href="${href}" target="_blank" rel="noopener noreferrer" title="${href}"><img class="fcm-chat-image" src="${href}" alt="${href}" loading="lazy" referrerpolicy="no-referrer"></a>`;
+        } else {
+            html += `<a class="fcm-chat-link" href="${href}" target="_blank" rel="noopener noreferrer">${esc(candidate)}</a>`;
+        }
+        html += esc(trailing);
+        cursor = match.index + raw.length;
+    }
+    return html + esc(text.slice(cursor));
+}
+
 function parseRoomInvite(value) {
     const lines = String(value ?? '').replace(/\r\n?/g, '\n').split('\n');
     // 最小協議只需要 |房名|；由 FCM 按鈕發送時，後方再附房主與人數等完整資料。
@@ -317,9 +343,16 @@ function closeChat() {
     selectedMember = null;
     stackedDetail = false;
     if (root) root.style.display = 'none';
+    document.querySelectorAll('#fcm-chat-balloon,.fcm-chat-user-balloon').forEach(resetBalloonInteraction);
     document.querySelectorAll('.fcm-chat-user-balloon').forEach(balloon => balloon.remove());
-    if (cfg.persistentBalloon) ensureBalloon();
-    else document.getElementById('fcm-chat-balloon')?.remove();
+    const balloon = document.getElementById('fcm-chat-balloon');
+    if (!cfg.persistentBalloon) balloon?.remove();
+    else if (!balloon) ensureBalloon();
+    else {
+        // 關閉視窗只恢復外觀，不重新套用儲存座標或執行貼邊落位。
+        paintBalloon(balloon);
+        balloon.classList.toggle('persistent', !!cfg.communicationEnabled);
+    }
 }
 
 function filteredContacts() {
@@ -441,21 +474,35 @@ function conversationHtml() {
     return `<header class="fcm-chat-conversation-header">
         ${cfg.chatLayout === 'stacked' ? `<button class="fcm-chat-back fcm-chat-icon-action" data-back title="${T('chatBack')}">${EXIT_ICON}</button>` : ''}
         ${avatarHtml(selectedMember, 38, 'conversation')}
-        <span class="fcm-chat-conversation-meta"><b>${esc(getDisplayName(selectedMember))}${isFriendOf(selectedMember) ? '' : `<i class="fcm-chat-not-friend">${T('chatNotFriend')}</i>`}</b><small data-room-meta="${selectedMember}" ${roomInfo?.name ? `data-room-name="${esc(roomInfo.name)}" role="button" tabindex="0"` : ''}>${esc(roomText)}</small></span>
+        <span class="fcm-chat-conversation-meta"><b>${esc(getDisplayName(selectedMember))}${isFriendOf(selectedMember) ? '' : `<i class="fcm-chat-not-friend">${T('chatNotFriend')}</i>`}</b><small data-room-meta="${selectedMember}" title="${esc(roomText)}" ${roomInfo?.name ? `data-room-name="${esc(roomInfo.name)}" role="button" tabindex="0"` : ''}>${esc(roomText)}</small></span>
         <button class="fcm-chat-header-action fcm-chat-icon-action" data-summon ${!ChatRoomData || !online || inRoomFn(selectedMember) ? 'disabled' : ''} title="${T('beepSummon')}">${SUMMON_ICON}</button>
         <div class="fcm-chat-assign"><button class="fcm-chat-rail-button" data-toggle-assign title="${T('chatAssignGroup')}">${GROUP_ICON}</button><div class="fcm-chat-assign-menu" data-assign-menu>${Object.entries(cfg.chatGroups || {}).map(([id,label]) => `<button data-assign-group="${esc(id)}">${esc(label)}</button>`).join('')}<button class="create" data-create-group-from-chat>＋ ${T('chatNewGroup')}</button></div></div>
     </header>
     <div class="fcm-chat-messages">${rows.map(messageHtml).join('') || `<div class="fcm-chat-empty">${T('chatNoMessages')}</div>`}</div>
     <div class="fcm-chat-actions"><button class="fcm-chat-icon-action" data-invite ${available === 'none' || inRoomFn(selectedMember) ? 'disabled' : ''} title="${T('chatInviteRoom')}" aria-label="${T('chatInviteRoom')}">${INVITE_ICON}</button><span></span><div class="fcm-chat-tools"><div class="fcm-chat-tools-menu"><button class="fcm-chat-icon-action" data-export title="${T('chatSaveMessages')}">${DOWNLOAD_ICON}<span>${T('chatSaveMessages')}</span></button><button class="fcm-chat-icon-action" data-delete title="${T('chatDeleteAll')}">${TRASH_ICON}<span>${T('chatDeleteAll')}</span></button></div><button class="fcm-chat-icon-action" data-toggle-tools title="${T('chatMessageTools')}">${FOLDER_ICON}</button></div></div>
     <div class="fcm-chat-compose">
-        <div class="fcm-chat-channels ${online ? '' : 'offline'}"><button class="${online && channel === 'whisper' ? 'active' : ''}" data-channel="whisper" ${!inRoomFn(selectedMember) ? 'disabled' : ''}>Whisper</button><button class="${online && channel === 'beep' ? 'active' : ''}" data-channel="beep" ${!online ? 'disabled' : ''}>BEEP</button></div>
+        <div class="fcm-chat-channels ${online ? '' : 'offline'}"><button class="${online && channel === 'whisper' ? 'active' : ''}" data-channel="whisper" ${!inRoomFn(selectedMember) ? 'disabled' : ''}>${T('btnWhisper')}</button><button class="${online && channel === 'beep' ? 'active' : ''}" data-channel="beep" ${!online ? 'disabled' : ''}>${T('btnBeep')}</button></div>
         <textarea data-input rows="2" placeholder="${inputPlaceholder}"></textarea>
         <button data-send>${online ? T('chatSend') : T('chatQueueSend')}</button>
     </div>`;
 }
 
 function messageHtml(message) {
-    return `<div class="fcm-chat-message ${message.direction} ${message.queued ? 'queued' : ''}" data-msg-id="${esc(message.id)}"><span class="fcm-chat-content">${esc(cleanMessage(message.content))}</span>${message.roomName ? `<button class="fcm-chat-room-join" data-join-room="${esc(message.roomName)}">${T('roomJoinRoomBtn')}</button>` : ''}<time>${message.channel === 'whisper' ? T('chatChannelWhisper') : T('chatChannelPrivate')} · ${new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${message.queued ? ` · ${T('chatQueued')}` : ''}</time></div>`;
+    return `<div class="fcm-chat-message ${message.direction} ${message.queued ? 'queued' : ''}" data-msg-id="${esc(message.id)}"><span class="fcm-chat-content">${messageContentHtml(message.content)}</span>${message.roomName ? `<button class="fcm-chat-room-join" data-join-room="${esc(message.roomName)}">${T('roomJoinRoomBtn')}</button>` : ''}<time>${message.channel === 'whisper' ? T('chatChannelWhisper') : T('chatChannelPrivate')} · ${new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${message.queued ? ` · ${T('chatQueued')}` : ''}</time></div>`;
+}
+
+function bindMessageImages(scope, log) {
+    scope?.querySelectorAll?.('.fcm-chat-image').forEach(image => {
+        image.addEventListener('load', () => {
+            if (log) log.scrollTop = log.scrollHeight;
+        }, { once: true });
+        image.addEventListener('error', () => {
+            const link = image.closest('a');
+            if (!link) return;
+            link.className = 'fcm-chat-link';
+            link.textContent = link.href;
+        }, { once: true });
+    });
 }
 
 function appendConversationMessage(message) {
@@ -468,6 +515,7 @@ function appendConversationMessage(message) {
         const room = event.currentTarget.dataset.joinRoom;
         if (room) showRoomJoinConfirm({ room });
     });
+    bindMessageImages(inserted, log);
     requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
 }
 
@@ -481,12 +529,15 @@ function refreshConversationRoomMeta() {
         if (!meta || selectedMember !== Number(meta.dataset.roomMeta)) return;
         const count = data?.MemberCount;
         const limit = data?.MemberLimit;
-        meta.textContent = `${roomInfo.name}${count !== null && count !== undefined ? ` ＜${count}${limit !== null && limit !== undefined ? `/${limit}` : ''}＞` : ''}`;
+        const roomText = `${roomInfo.name}${count !== null && count !== undefined ? ` ＜${count}${limit !== null && limit !== undefined ? `/${limit}` : ''}＞` : ''}`;
+        meta.textContent = roomText;
+        meta.title = roomText;
     });
 }
 
 function renderChat() {
     if (!root) return;
+    const settingsScrollTop = activeView === 'settings' ? root.querySelector('.fcm-chat-list')?.scrollTop : null;
     const [chatPanel, chatText, chatAccent] = chatColors();
     const sessionSizeStyle = chatPanelSession.inlineSizeStyle();
     root.innerHTML = `<div id="fcm-chat-panel" class="${maximized ? 'maximized' : ''}" data-layout-mode="${esc(cfg.chatLayout || 'split')}" data-theme="${esc(cfg.chatThemeMode === 'preset' ? cfg.chatThemePreset : cfg.chatThemeMode === 'custom' ? 'custom' : cfg.themePreset || 'violet')}" style="${sessionSizeStyle}--s:${esc(chatPanel)};--tx:${esc(chatText)};--ac:${esc(chatAccent)};--chat-font-size:${Number(cfg.chatFontSize) || 13}px;--chat-font-family:${esc(chatFontFamily())}">
@@ -512,7 +563,14 @@ function renderChat() {
     refreshConversationRoomMeta();
     hydrateChatAvatars();
     const log = root.querySelector('.fcm-chat-messages');
-    if (log) log.scrollTop = log.scrollHeight;
+    if (log) {
+        bindMessageImages(log, log);
+        log.scrollTop = log.scrollHeight;
+    }
+    if (settingsScrollTop !== null && settingsScrollTop !== undefined) {
+        const settingsList = root.querySelector('.fcm-chat-list');
+        if (settingsList) settingsList.scrollTop = settingsScrollTop;
+    }
 }
 
 function animateLayoutChange(list, main, beforeList, beforeMain, stacked, showDetail) {
@@ -822,9 +880,11 @@ function makeDraggable(element, handle, configKey, memberNumber = null) {
             updateBalloonPreviewSide(element);
         };
         const up = next => {
-            handle.releasePointerCapture(next.pointerId);
             handle.removeEventListener('pointermove', move);
             handle.removeEventListener('pointerup', up);
+            handle.removeEventListener('pointercancel', cancel);
+            handle.removeEventListener('lostpointercapture', cancel);
+            try { if (handle.hasPointerCapture(next.pointerId)) handle.releasePointerCapture(next.pointerId); } catch {}
             if (isBalloon && moved) {
                 element.classList.remove('dragging');
                 element.classList.add('released');
@@ -850,9 +910,17 @@ function makeDraggable(element, handle, configKey, memberNumber = null) {
             else cfg[configKey] = position;
             saveCfg();
         };
+        const cancel = next => up(next);
         handle.addEventListener('pointermove', move);
         handle.addEventListener('pointerup', up);
+        handle.addEventListener('pointercancel', cancel);
+        handle.addEventListener('lostpointercapture', cancel);
     });
+}
+
+function resetBalloonInteraction(element) {
+    element?.classList.remove('dragging', 'released', 'release-water', 'stirred', 'notify');
+    ['--drag-angle', '--drag-stretch', '--drag-squash', '--stir-x', '--stir-y', '--stir-angle'].forEach(name => element?.style.removeProperty(name));
 }
 
 function stirNearbyBalloons(dragged, dx, dy) {
@@ -1099,6 +1167,14 @@ function placeBalloon(element, placement, index = 0) {
     delete element.dataset.snapEdge;
 }
 
+function placeSavedBalloon(element, saved) {
+    const maxX = Math.max(0, innerWidth - element.offsetWidth);
+    const maxY = Math.max(0, innerHeight - element.offsetHeight);
+    element.style.left = `${Math.max(0, Math.min(maxX, saved.x))}px`;
+    element.style.top = `${Math.max(0, Math.min(maxY, saved.y))}px`;
+    element.style.right = element.style.bottom = 'auto';
+}
+
 function ensureBalloon(force = false) {
     let created = false;
     let balloon = document.getElementById('fcm-chat-balloon');
@@ -1115,7 +1191,7 @@ function ensureBalloon(force = false) {
     paintBalloon(balloon);
     const saved = cfg.chatBalloonPosition;
     if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
-        balloon.style.left = `${saved.x}px`; balloon.style.top = `${saved.y}px`; balloon.style.right = balloon.style.bottom = 'auto';
+        placeSavedBalloon(balloon, saved);
     } else placeBalloon(balloon, cfg.balloonPlacement === 'off' ? 'bottom-right' : cfg.balloonPlacement);
     balloon.classList.toggle('persistent', !!cfg.communicationEnabled && (cfg.balloonPlacement !== 'off' || force));
     if (created) resolveBalloonCollision(balloon);
@@ -1136,7 +1212,7 @@ function showIncomingBalloon(message) {
         paintBalloon(balloon);
         const saved = cfg.chatUserBalloonPositions?.[message.memberNumber];
         if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
-            balloon.style.left = `${saved.x}px`; balloon.style.top = `${saved.y}px`; balloon.style.right = balloon.style.bottom = 'auto';
+            placeSavedBalloon(balloon, saved);
         } else placeBalloon(balloon, cfg.userBalloonPlacement, [...document.querySelectorAll('.fcm-chat-user-balloon')].indexOf(balloon));
         balloon.innerHTML = `${waterShapeHtml()}${avatarHtml(message.memberNumber, 50)}${unreadBadge(message.memberNumber)}<span class="fcm-balloon-preview"><strong>${esc(getDisplayName(message.memberNumber))}</strong>${esc(message.content)}</span>`;
         requestAnimationFrame(() => resolveBalloonCollision(balloon));
@@ -1217,7 +1293,8 @@ function injectStyles() {
 .fcm-chat-row{width:100%;display:flex;align-items:center;gap:8px;padding:7px 6px;background:transparent;color:var(--tx);border:1px solid transparent;border-radius:7px;text-align:left}.fcm-chat-row:hover{background:var(--surface-raised)}.fcm-chat-row.selected{background:color-mix(in srgb,var(--ac) 14%,transparent);border-color:var(--border)}.fcm-chat-row-meta{flex:1;min-width:0;display:flex;flex-direction:column}.fcm-chat-row-meta b,.fcm-chat-row-meta small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fcm-chat-row-meta small,.fcm-chat-row time{font-size:10.5px;color:var(--dim)}.fcm-chat-row em{background:var(--ac);color:var(--s);border-radius:9px;padding:2px 6px;font-style:normal}
 .fcm-chat-avatar{position:relative;display:inline-flex;flex:none;align-items:center;justify-content:center;border-radius:7px;overflow:visible;background:var(--surface-alt);color:var(--ac);border:1px solid var(--border);font-size:11px;font-weight:700}.fcm-chat-avatar img{width:100%;height:100%;border-radius:inherit;object-fit:cover;pointer-events:none}.fcm-chat-avatar i{position:absolute;right:-4px;bottom:-4px;width:15px;height:15px;border:2px solid var(--s);border-radius:50%;background:#58c878}.fcm-chat-avatar i.busy,.fcm-status-dot.busy,.fcm-chat-status-menu i.busy{background:#e85d68}.fcm-chat-avatar i.afk,.fcm-status-dot.afk,.fcm-chat-status-menu i.afk{background:#e9bd4b}.fcm-chat-avatar i.offline,.fcm-status-dot.offline,.fcm-chat-status-menu i.offline{background:#777}
 .fcm-chat-conversation-header{padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);animation:fcm-chat-rise .3s cubic-bezier(.2,.8,.2,1) both}.fcm-chat-conversation-header>span{display:flex;flex-direction:column}.fcm-chat-conversation-header small{color:var(--dim)}.fcm-chat-conversation-header small[data-room-name]{cursor:pointer}.fcm-chat-conversation-header small[data-room-name]:hover{color:var(--ac);text-decoration:underline}.fcm-chat-not-friend{margin-left:8px;color:var(--dim);font-size:.85em;font-style:normal;font-weight:400}.fcm-chat-conversation-header>.fcm-chat-avatar{cursor:pointer}.fcm-chat-messages{flex:1;min-height:0;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:8px;scrollbar-color:var(--ac) var(--surface-alt)}.fcm-chat-message{max-width:70%;padding:7px 10px;border-radius:7px;border:1px solid transparent;animation:fcm-chat-rise .32s cubic-bezier(.2,.8,.2,1) both}.fcm-chat-message.in{align-self:flex-start;background:var(--surface-alt)}.fcm-chat-message.out{align-self:flex-end;background:color-mix(in srgb,var(--ac) 14%,transparent);border-color:var(--ac)}.fcm-chat-message time{display:block;margin-top:3px;font-size:9px;color:var(--dim)}.fcm-chat-actions{display:flex;flex-shrink:0;gap:6px;padding:6px 12px 0;border-top:1px solid var(--border);animation:fcm-chat-rise .3s cubic-bezier(.2,.8,.2,1) .06s both}.fcm-chat-actions button{padding:4px 8px;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:7px}.fcm-chat-compose{display:flex;flex-shrink:0;gap:8px;padding:6px 12px 10px;animation:fcm-chat-rise .3s cubic-bezier(.2,.8,.2,1) .1s both}.fcm-chat-compose textarea{flex:1;resize:none;padding:8px;background:var(--surface-alt);color:var(--tx);border:1px solid var(--border);border-radius:7px;user-select:text!important;-webkit-user-select:text!important}.fcm-chat-compose>button{padding:0 16px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:7px}.fcm-chat-channels{display:flex;flex-direction:column;gap:3px}.fcm-chat-channels button{min-width:66px;flex:1;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:7px}.fcm-chat-channels button.active{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-chat-channels button:disabled{opacity:1;color:var(--dim);cursor:default}
-.fcm-chat-actions>span{flex:1}.fcm-chat-tools{position:relative}.fcm-chat-tools-menu{position:absolute;right:0;bottom:calc(100% + 7px);display:flex;flex-direction:column;align-items:stretch;gap:5px;padding:5px;opacity:0;visibility:hidden;transform:translateY(8px);background:var(--s);border:1px solid var(--ac);border-radius:8px;box-shadow:0 8px 24px #0009;transition:.18s ease}.fcm-chat-tools-menu button{justify-content:flex-start!important;gap:7px;white-space:nowrap}.fcm-chat-tools.open .fcm-chat-tools-menu{opacity:1;visibility:visible;transform:translateY(0)}.fcm-chat-tools.open>[data-toggle-tools]{color:var(--ac);border-color:var(--ac)}.fcm-chat-channels.offline button{color:#777!important;border-color:#555!important;background:#7771!important;box-shadow:none!important}.fcm-chat-message.queued{opacity:.68;border-style:dashed}.fcm-chat-message.queued time{color:#e9bd4b}.fcm-chat-header-action{width:38px;height:38px;padding:6px;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:7px}.fcm-chat-header-action:disabled{opacity:.35}.fcm-chat-header-action svg,.fcm-chat-rail-button svg,.fcm-chat-actions svg{width:18px;height:18px;fill:currentColor}
+.fcm-chat-content{white-space:pre-wrap;overflow-wrap:anywhere}.fcm-chat-link{color:var(--ac);text-decoration:underline;user-select:text!important}.fcm-chat-image-link{display:block;margin-top:5px}.fcm-chat-image{display:block;max-width:min(360px,100%);max-height:280px;border:1px solid var(--ac);border-radius:7px;object-fit:contain;background:#0004}
+.fcm-chat-actions>span{flex:1}.fcm-chat-tools{position:relative}.fcm-chat-tools-menu{position:absolute;right:0;bottom:calc(100% + 7px);display:flex;flex-direction:column;align-items:stretch;gap:5px;padding:5px;opacity:0;visibility:hidden;transform:translateY(8px);background:var(--s);border:1px solid var(--ac);border-radius:8px;box-shadow:0 8px 24px #0009;transition:.18s ease}.fcm-chat-tools-menu button{justify-content:flex-start!important;gap:7px;white-space:nowrap}.fcm-chat-tools.open .fcm-chat-tools-menu{opacity:1;visibility:visible;transform:translateY(0)}.fcm-chat-tools.open>[data-toggle-tools]{color:var(--ac);border-color:var(--ac)}.fcm-chat-channels.offline button{color:#777!important;border-color:#555!important;background:#7771!important;box-shadow:none!important}.fcm-chat-message.queued{opacity:.68;border-style:dashed}.fcm-chat-message.queued time{color:#e9bd4b}.fcm-chat-header-action{width:38px;height:38px;padding:6px;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:7px}.fcm-chat-header-action:disabled{opacity:.35}.fcm-chat-header-action svg{width:26px!important;height:26px!important;fill:currentColor}.fcm-chat-rail-button svg,.fcm-chat-actions svg{width:18px;height:18px;fill:currentColor}
 .fcm-chat-settings{padding:8px 10px;display:flex;flex-direction:column;gap:7px}.fcm-chat-setting-row{display:flex;align-items:center;gap:10px;padding:10px 8px;border:0}.fcm-chat-setting-row>span{flex:1;display:flex;flex-direction:column}.fcm-chat-setting-row small{color:var(--dim)}.fcm-chat-switch{width:34px;height:18px;padding:2px;background:var(--surface-alt);border:1px solid var(--ac);border-radius:10px}.fcm-chat-switch i{display:block;width:12px;height:12px;border-radius:50%;background:var(--dim);transition:transform .18s ease}.fcm-chat-switch.on{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 18%,transparent)}.fcm-chat-switch.on i{background:var(--ac);transform:translateX(14px)}.fcm-chat-main-settings{padding:7px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:7px}
 .fcm-chat-status-menu{display:none;position:absolute;left:58px;bottom:45px;z-index:10;padding:4px;background:var(--s);border:1px solid var(--ac);border-radius:7px;box-shadow:0 6px 20px #0008}.fcm-chat-status-menu.open{display:flex;flex-direction:column;animation:fcm-chat-pop .12s ease}.fcm-chat-status-menu button{display:flex;align-items:center;gap:8px;padding:6px 10px;background:transparent;color:var(--tx);border:1px solid transparent;border-radius:6px}.fcm-chat-status-menu button:hover{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-chat-status-menu i,.fcm-status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#58c878}.fcm-chat-empty{margin:auto;padding:20px;text-align:center;color:var(--dim)}
 .fcm-chat-titlebar button,.fcm-chat-rail-button,.fcm-chat-row,.fcm-chat-presence button,.fcm-chat-tags button,.fcm-chat-group-tabs button,.fcm-chat-subtabs button,.fcm-chat-actions button,.fcm-chat-channels button,.fcm-chat-compose>button,.fcm-chat-status-menu button,.fcm-chat-main-settings{cursor:pointer;transition:background-color .15s ease,border-color .15s ease,color .15s ease,transform .1s ease,box-shadow .15s ease}.fcm-chat-titlebar button:active,.fcm-chat-rail-button:active,.fcm-chat-row:active,.fcm-chat-tags button:active,.fcm-chat-group-tabs button:active,.fcm-chat-subtabs button:active,.fcm-chat-actions button:active,.fcm-chat-channels button:not(:disabled):active,.fcm-chat-compose>button:not(:disabled):active{transform:scale(.95)}
@@ -1269,6 +1346,7 @@ body>.fcm-chat-user-balloon{border:0!important;box-shadow:0 0 15px color-mix(in 
 .fcm-chat-profile-overview{display:grid;grid-template-columns:110px minmax(0,1fr);gap:22px;align-items:start;max-width:680px;margin-bottom:8px}.fcm-chat-profile-avatar-column{display:flex;flex-direction:column;align-items:center;gap:9px}.fcm-chat-profile-avatar-column .fcm-chat-avatar{width:88px!important;height:88px!important}.fcm-chat-profile-snapshot{width:88px;padding:6px 8px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:7px}.fcm-chat-profile-identity{display:flex;flex-direction:column;gap:8px}.fcm-chat-profile-line,.fcm-chat-profile label.fcm-chat-profile-line{display:grid!important;grid-template-columns:92px minmax(0,1fr) auto;align-items:center;gap:9px;max-width:none!important;min-height:32px;color:var(--dim)}.fcm-chat-profile-line>b{color:var(--tx);font-size:14px}.fcm-chat-profile-line>input{width:100%;max-width:none!important}.fcm-chat-profile-line>em{color:var(--ac);font-size:10px;font-style:normal;white-space:nowrap}.fcm-chat-profile-line .fcm-profile-statuses{max-width:none;gap:6px}.fcm-chat-profile-line .fcm-profile-statuses button{padding:5px 7px}.fcm-chat-profile>label:not(.fcm-chat-profile-line){max-width:680px}.fcm-chat-profile>[data-save-profile]{align-self:flex-end;margin-right:max(0px,calc(100% - 680px));min-width:110px}.fcm-chat-profile-snapshot:hover,.fcm-chat-profile>[data-save-profile]:hover{background:color-mix(in srgb,var(--ac) 14%,transparent);box-shadow:0 0 10px color-mix(in srgb,var(--ac) 22%,transparent)}
 .fcm-chat-profile{--profile-label-width:193px}.fcm-chat-profile :is(.fcm-chat-profile-line>span,.fcm-chat-profile-field>span,.fcm-profile-auto-replies label>b,.fcm-profile-edit){font-size:16px!important}.fcm-chat-profile-line>b{font-size:13px}.fcm-profile-edit{padding:5px 8px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:6px}.fcm-profile-nickname-editor[hidden]{display:none!important}.fcm-profile-nickname-editor{grid-column:2/4;display:flex;align-items:center;gap:6px}.fcm-profile-nickname-editor input{flex:1;min-width:0}.fcm-profile-nickname-editor button{width:30px;height:30px;padding:0;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:6px}.fcm-chat-profile-field,.fcm-chat-profile label.fcm-chat-profile-field{display:grid!important;grid-template-columns:var(--profile-label-width) minmax(0,1fr);align-items:start;gap:10px;max-width:680px!important;color:var(--dim)}.fcm-chat-profile-field>span{padding-top:8px}.fcm-chat-profile-field>input,.fcm-chat-profile-field>textarea{width:100%;max-width:none}.fcm-profile-auto-replies{display:grid;grid-template-columns:1fr 1fr;gap:12px}.fcm-chat-profile .fcm-profile-auto-replies>label{position:relative;display:grid!important;grid-template-columns:1fr auto;gap:6px;max-width:none}.fcm-profile-auto-replies label>b{align-self:center;color:var(--dim)}.fcm-profile-auto-replies textarea{grid-column:1/3;width:100%}.fcm-profile-auto-replies .fcm-chat-switch{grid-column:2;grid-row:1}.fcm-chat-avatar i,.fcm-status-dot,.fcm-chat-status-menu i,.fcm-profile-statuses button>i{box-shadow:0 0 7px 2px color-mix(in srgb,#58c878 70%,transparent)}.fcm-chat-avatar i.busy,.fcm-status-dot.busy,.fcm-chat-status-menu i.busy,.fcm-profile-statuses button>i.busy{box-shadow:0 0 7px 2px color-mix(in srgb,#e85d68 70%,transparent)}.fcm-chat-avatar i.afk,.fcm-status-dot.afk,.fcm-chat-status-menu i.afk,.fcm-profile-statuses button>i.afk{box-shadow:0 0 7px 2px color-mix(in srgb,#e9bd4b 70%,transparent)}.fcm-chat-avatar i.offline,.fcm-status-dot.offline{box-shadow:0 0 6px 1px #7778}
 .fcm-chat-icon-action{display:inline-flex!important;align-items:center;justify-content:center;min-width:30px;min-height:30px}.fcm-chat-icon-action svg{width:17px!important;height:17px!important;display:block;fill:currentColor}.fcm-chat-back{width:30px;height:30px}
+.fcm-chat-conversation-header .fcm-chat-header-action svg{width:26px!important;height:26px!important}
 .fcm-chat-conversation-header>.fcm-chat-back,.fcm-chat-conversation-header>.fcm-chat-header-action,.fcm-chat-conversation-header>.fcm-chat-assign>button{width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;flex:0 0 38px!important;padding:6px!important}.fcm-chat-conversation-header>.fcm-chat-avatar{width:38px!important;height:38px!important;flex:0 0 38px}.fcm-chat-rail .fcm-chat-unread{pointer-events:none;right:-7px;top:-7px}.fcm-chat-rail-button.has-unread{box-shadow:0 0 10px color-mix(in srgb,var(--ac) 38%,transparent)}.fcm-balloon-icon svg [id="Path 0"]{display:none}
 .fcm-chat-switch{transition:border-color .16s ease,background .16s ease,box-shadow .16s ease}.fcm-chat-switch i{transition:transform .18s ease,background .16s ease}.fcm-chat-switch:hover{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,var(--surface-alt));box-shadow:0 0 9px color-mix(in srgb,var(--ac) 22%,transparent)}.fcm-chat-switch:hover i{background:color-mix(in srgb,var(--ac) 70%,var(--tx))}
 #fcm-chat-balloon,.fcm-chat-user-balloon{z-index:100010}.fcm-balloon-preview{display:none!important;position:absolute!important;right:60px!important;left:auto!important;bottom:0!important;z-index:100011!important;width:260px!important;padding:9px!important;text-align:left!important;background:var(--s)!important;color:var(--tx)!important;border:1px solid var(--ac)!important;border-radius:9px!important;font-size:13px!important;pointer-events:none}.preview-right>.fcm-balloon-preview{right:auto!important;left:60px!important}.fcm-balloon-preview strong{display:block;color:var(--ac)}#fcm-chat-balloon:hover>.fcm-balloon-preview,.fcm-chat-user-balloon:hover>.fcm-balloon-preview{display:block!important}
