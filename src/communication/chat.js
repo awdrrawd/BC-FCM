@@ -43,7 +43,6 @@ let customAudioUrl = '';
 let justOpenedMember = null;
 const autoReplyTimes = new Map();
 const remoteProfiles = new Map();
-const balloonHideTimers = new WeakMap();
 let initialized = false;
 const esc = value => {
     const el = document.createElement('div');
@@ -187,7 +186,10 @@ async function recordMessage(data, { notify = true } = {}) {
     if (!message.content) return;
     await ChatStore.put(message);
     messages = await ChatStore.prune();
-    if (root?.isConnected && root.style.display !== 'none') renderChat();
+    if (root?.isConnected && root.style.display !== 'none') {
+        if (activeView === 'chat' && Number(message.memberNumber) === Number(selectedMember)) appendConversationMessage(message);
+        else renderChat();
+    }
     if (notify && message.direction === 'in') {
         showIncomingBalloon(message);
         playNotificationSound();
@@ -250,7 +252,7 @@ function conversations() {
     for (const message of messages) {
         if (Number(message.memberNumber) === self) continue;
         const row = map.get(message.memberNumber);
-        if (!row || row.timestamp < message.timestamp) map.set(message.memberNumber, { ...message, unread: 0 });
+        if (!row || row.timestamp < message.timestamp) map.set(message.memberNumber, { ...message, unread: row?.unread || 0 });
         if (message.direction === 'in' && !message.read) map.get(message.memberNumber).unread++;
     }
     for (const friend of buildFriendList()) {
@@ -442,13 +444,30 @@ function conversationHtml() {
         <span class="fcm-chat-conversation-meta"><b>${esc(getDisplayName(selectedMember))}${isFriendOf(selectedMember) ? '' : `<i class="fcm-chat-not-friend">${T('chatNotFriend')}</i>`}</b><small data-room-meta="${selectedMember}" ${roomInfo?.name ? `data-room-name="${esc(roomInfo.name)}" role="button" tabindex="0"` : ''}>${esc(roomText)}</small></span>
         <div class="fcm-chat-assign"><button data-toggle-assign title="${T('chatAssignGroup')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h7l2 2h9v11H3z"/><path d="M12 11v6M9 14h6"/></svg></button><div class="fcm-chat-assign-menu" data-assign-menu>${Object.entries(cfg.chatGroups || {}).map(([id,label]) => `<button data-assign-group="${esc(id)}">${esc(label)}</button>`).join('')}<button class="create" data-create-group-from-chat>＋ ${T('chatNewGroup')}</button></div></div>
     </header>
-    <div class="fcm-chat-messages">${rows.map(message => `<div class="fcm-chat-message ${message.direction}" data-msg-id="${esc(message.id)}"><span class="fcm-chat-content">${esc(cleanMessage(message.content))}</span>${message.roomName ? `<button class="fcm-chat-room-join" data-join-room="${esc(message.roomName)}">${T('roomJoinRoomBtn')}</button>` : ''}<time>${message.channel === 'whisper' ? T('chatChannelWhisper') : T('chatChannelPrivate')} · ${new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>`).join('') || `<div class="fcm-chat-empty">${T('chatNoMessages')}</div>`}</div>
+    <div class="fcm-chat-messages">${rows.map(messageHtml).join('') || `<div class="fcm-chat-empty">${T('chatNoMessages')}</div>`}</div>
     <div class="fcm-chat-actions"><button class="fcm-chat-icon-action" data-invite ${available === 'none' ? 'disabled' : ''} title="${T('chatInviteRoom')}" aria-label="${T('chatInviteRoom')}">${INVITE_ICON}</button><button class="fcm-chat-icon-action" data-delete title="${T('chatDeleteAll')}" aria-label="${T('chatDeleteAll')}">${TRASH_ICON}</button><button class="fcm-chat-icon-action" data-export title="${T('chatSaveMessages')}" aria-label="${T('chatSaveMessages')}">${DOWNLOAD_ICON}</button></div>
     <div class="fcm-chat-compose">
         <div class="fcm-chat-channels"><button class="${channel === 'whisper' ? 'active' : ''}" data-channel="whisper" ${!inRoomFn(selectedMember) ? 'disabled' : ''}>Whisper</button><button class="${channel === 'beep' ? 'active' : ''}" data-channel="beep" ${!isOnline(selectedMember) ? 'disabled' : ''}>BEEP</button></div>
         <textarea data-input rows="2" ${available === 'none' ? 'disabled' : ''} placeholder="${available === 'none' ? T('chatPlayerOffline') : T('chatInputPlaceholder')}"></textarea>
         <button data-send ${available === 'none' ? 'disabled' : ''}>${T('chatSend')}</button>
     </div>`;
+}
+
+function messageHtml(message) {
+    return `<div class="fcm-chat-message ${message.direction}" data-msg-id="${esc(message.id)}"><span class="fcm-chat-content">${esc(cleanMessage(message.content))}</span>${message.roomName ? `<button class="fcm-chat-room-join" data-join-room="${esc(message.roomName)}">${T('roomJoinRoomBtn')}</button>` : ''}<time>${message.channel === 'whisper' ? T('chatChannelWhisper') : T('chatChannelPrivate')} · ${new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</time></div>`;
+}
+
+function appendConversationMessage(message) {
+    const log = root?.querySelector('.fcm-chat-main .fcm-chat-messages');
+    if (!log || log.querySelector(`[data-msg-id="${CSS.escape(String(message.id))}"]`)) return;
+    log.querySelector(':scope > .fcm-chat-empty')?.remove();
+    log.insertAdjacentHTML('beforeend', messageHtml(message));
+    const inserted = log.lastElementChild;
+    inserted?.querySelector('[data-join-room]')?.addEventListener('click', event => {
+        const room = event.currentTarget.dataset.joinRoom;
+        if (room) showRoomJoinConfirm({ room });
+    });
+    requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
 }
 
 function refreshConversationRoomMeta() {
@@ -506,7 +525,24 @@ function bindEvents() {
         maximized = !maximized; panel.classList.toggle('maximized', maximized);
         event.currentTarget.classList.toggle('active', maximized); const label=event.currentTarget.querySelector('i'); if(label) label.textContent=maximized?T('chatRestore'):T('chatMaximize');
     });
-    root.querySelector('button[data-layout]')?.addEventListener('click', event => { event.stopPropagation(); cfg.chatLayout = cfg.chatLayout === 'stacked' ? 'split' : 'stacked'; saveCfg(); renderChat(); });
+    root.querySelector('button[data-layout]')?.addEventListener('click', event => {
+        event.stopPropagation();
+        cfg.chatLayout = cfg.chatLayout === 'stacked' ? 'split' : 'stacked';
+        stackedDetail = cfg.chatLayout === 'stacked' && !!selectedMember;
+        saveCfg();
+        const stacked = cfg.chatLayout === 'stacked';
+        const button = event.currentTarget;
+        const body = panel.querySelector('.fcm-chat-body');
+        const list = body?.querySelector('.fcm-chat-list');
+        const main = body?.querySelector('.fcm-chat-main');
+        panel.dataset.layoutMode = cfg.chatLayout;
+        button.classList.toggle('active', stacked);
+        button.innerHTML = `${stacked ? SPLIT_ICON : MERGE_ICON}<i>${stacked ? T('chatLayoutSplit') : T('chatLayoutMerged')}</i>`;
+        body?.classList.toggle('stacked', stacked);
+        list?.classList.toggle('slide-out', stackedDetail);
+        main?.classList.toggle('slide-in', stackedDetail);
+        syncConversationBackButton(main, stacked);
+    });
     root.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { activeView = button.dataset.view; stackedDetail = false; renderChat(); }));
     root.querySelectorAll('[data-notification-tab]').forEach(button => button.addEventListener('click', () => { notificationTab = button.dataset.notificationTab; renderChat(); }));
     root.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => { selectedGroup = button.dataset.group; renderChat(); }));
@@ -659,6 +695,25 @@ function bindEvents() {
     root.querySelectorAll('[data-profile-reply]').forEach(button => button.addEventListener('click', () => { const key=button.dataset.profileReply==='busy'?'busyAutoReply':'afkAutoReply'; cfg[key]=!cfg[key]; saveCfg(); button.classList.toggle('on',cfg[key]); }));
 }
 
+function syncConversationBackButton(main, stacked) {
+    const header = main?.querySelector('.fcm-chat-conversation-header');
+    if (!header) return;
+    const existing = header.querySelector('[data-back]');
+    if (!stacked) { existing?.remove(); return; }
+    if (existing) return;
+    const button = document.createElement('button');
+    button.className = 'fcm-chat-back fcm-chat-icon-action';
+    button.dataset.back = '';
+    button.title = T('chatBack');
+    button.innerHTML = EXIT_ICON;
+    button.addEventListener('click', () => {
+        stackedDetail = false;
+        root.querySelector('.fcm-chat-list')?.classList.remove('slide-out');
+        root.querySelector('.fcm-chat-main')?.classList.remove('slide-in');
+    });
+    header.prepend(button);
+}
+
 function positionPanel() {
     const panel = root.querySelector('#fcm-chat-panel');
     if (!maximized && cfg.chatPanelPosition) {
@@ -676,19 +731,45 @@ function makeDraggable(element, handle, configKey, memberNumber = null) {
         const offsetX = event.clientX - rect.left;
         const offsetY = event.clientY - rect.top;
         let moved = false;
+        const isBalloon = element.matches('#fcm-chat-balloon,.fcm-chat-user-balloon');
+        let lastX = event.clientX;
+        let lastY = event.clientY;
+        if (isBalloon) {
+            element.classList.remove('released');
+            element.classList.add('dragging');
+        }
         handle.setPointerCapture(event.pointerId);
         const move = next => {
             moved = true;
+            const dx = next.clientX - lastX;
+            const dy = next.clientY - lastY;
+            lastX = next.clientX;
+            lastY = next.clientY;
             element.style.left = `${Math.max(0, Math.min(innerWidth - element.offsetWidth, next.clientX - offsetX))}px`;
             element.style.top = `${Math.max(0, Math.min(innerHeight - element.offsetHeight, next.clientY - offsetY))}px`;
             element.style.right = element.style.bottom = 'auto';
-            element.style.transform = 'none';
+            if (isBalloon) {
+                const speed = Math.min(0.22, Math.hypot(dx, dy) / 90);
+                element.style.setProperty('--drag-angle', `${Math.max(-12, Math.min(12, dx * .55))}deg`);
+                element.style.setProperty('--drag-stretch', `${1 + speed}`);
+                element.style.setProperty('--drag-squash', `${1 - speed * .55}`);
+                stirNearbyBalloons(element, dx, dy);
+            } else element.style.transform = 'none';
             updateBalloonPreviewSide(element);
         };
         const up = next => {
             handle.releasePointerCapture(next.pointerId);
             handle.removeEventListener('pointermove', move);
             handle.removeEventListener('pointerup', up);
+            if (isBalloon) {
+                element.classList.remove('dragging');
+                element.classList.add('released');
+                element.style.removeProperty('--drag-angle');
+                element.style.removeProperty('--drag-stretch');
+                element.style.removeProperty('--drag-squash');
+                settleStirredBalloons();
+                setTimeout(() => element.classList.remove('released'), 520);
+            }
             if (!moved) return;
             element.dataset.dragMoved = '1';
             setTimeout(() => { delete element.dataset.dragMoved; }, 0);
@@ -701,6 +782,35 @@ function makeDraggable(element, handle, configKey, memberNumber = null) {
         };
         handle.addEventListener('pointermove', move);
         handle.addEventListener('pointerup', up);
+    });
+}
+
+function stirNearbyBalloons(dragged, dx, dy) {
+    const source = dragged.getBoundingClientRect();
+    const sx = source.left + source.width / 2;
+    const sy = source.top + source.height / 2;
+    document.querySelectorAll('#fcm-chat-balloon,.fcm-chat-user-balloon').forEach(other => {
+        if (other === dragged || getComputedStyle(other).display === 'none') return;
+        const rect = other.getBoundingClientRect();
+        const ox = rect.left + rect.width / 2;
+        const oy = rect.top + rect.height / 2;
+        const distance = Math.hypot(ox - sx, oy - sy);
+        if (distance > 150) return;
+        const force = (1 - distance / 150) * 13;
+        const length = Math.hypot(dx, dy) || 1;
+        other.style.setProperty('--stir-x', `${dx / length * force}px`);
+        other.style.setProperty('--stir-y', `${dy / length * force}px`);
+        other.style.setProperty('--stir-angle', `${Math.max(-9, Math.min(9, dx * .35))}deg`);
+        other.classList.add('stirred');
+    });
+}
+
+function settleStirredBalloons() {
+    document.querySelectorAll('.stirred').forEach(balloon => {
+        balloon.classList.remove('stirred');
+        balloon.style.removeProperty('--stir-x');
+        balloon.style.removeProperty('--stir-y');
+        balloon.style.removeProperty('--stir-angle');
     });
 }
 
@@ -907,9 +1017,9 @@ function showIncomingBalloon(message) {
         if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
             balloon.style.left = `${saved.x}px`; balloon.style.top = `${saved.y}px`; balloon.style.right = balloon.style.bottom = 'auto';
         } else placeBalloon(balloon, cfg.userBalloonPlacement, [...document.querySelectorAll('.fcm-chat-user-balloon')].indexOf(balloon));
-        balloon.innerHTML = `${avatarHtml(message.memberNumber, 42)}${unreadBadge(message.memberNumber)}<span class="fcm-balloon-preview"><strong>${esc(getDisplayName(message.memberNumber))}</strong>${esc(message.content)}</span>`;
+        balloon.innerHTML = `${avatarHtml(message.memberNumber, 50)}${unreadBadge(message.memberNumber)}<span class="fcm-balloon-preview"><strong>${esc(getDisplayName(message.memberNumber))}</strong>${esc(message.content)}</span>`;
         requestAnimationFrame(() => resolveBalloonCollision(balloon));
-        if (!avatarUrl(message.memberNumber)) Snapshot.get(message.memberNumber).then(url => { if (url && balloon.isConnected) balloon.innerHTML = `${avatarHtml(message.memberNumber, 42)}${unreadBadge(message.memberNumber)}<span class="fcm-balloon-preview"><strong>${esc(getDisplayName(message.memberNumber))}</strong>${esc(message.content)}</span>`; });
+        if (!avatarUrl(message.memberNumber)) Snapshot.get(message.memberNumber).then(url => { if (url && balloon.isConnected) balloon.innerHTML = `${avatarHtml(message.memberNumber, 50)}${unreadBadge(message.memberNumber)}<span class="fcm-balloon-preview"><strong>${esc(getDisplayName(message.memberNumber))}</strong>${esc(message.content)}</span>`; });
         showBalloon(balloon);
     } else if (cfg.balloonPlacement !== 'off') {
         ensureBalloon();
@@ -922,14 +1032,11 @@ function showIncomingBalloon(message) {
 
 function showBalloon(balloon) {
     balloon.classList.add('visible');
-    if (cfg.notificationAnimation) { balloon.classList.remove('notify'); requestAnimationFrame(() => balloon.classList.add('notify')); }
-    const previousTimer = balloonHideTimers.get(balloon);
-    if (previousTimer) clearTimeout(previousTimer);
-    if (balloon.classList.contains('fcm-chat-user-balloon')) {
-        balloonHideTimers.set(balloon, setTimeout(() => {
-            balloon.classList.remove('visible');
-            balloonHideTimers.delete(balloon);
-        }, 8000));
+    if (cfg.notificationAnimation) {
+        balloon.classList.remove('notify');
+        void balloon.offsetWidth;
+        balloon.classList.add('notify');
+        balloon.addEventListener('animationend', () => balloon.classList.remove('notify'), { once: true });
     }
 }
 
@@ -991,9 +1098,9 @@ function injectStyles() {
 .fcm-chat-settings{padding:8px 10px;display:flex;flex-direction:column;gap:7px}.fcm-chat-setting-row{display:flex;align-items:center;gap:10px;padding:10px 8px;border:0}.fcm-chat-setting-row>span{flex:1;display:flex;flex-direction:column}.fcm-chat-setting-row small{color:var(--dim)}.fcm-chat-switch{width:34px;height:18px;padding:2px;background:var(--surface-alt);border:1px solid var(--ac);border-radius:10px}.fcm-chat-switch i{display:block;width:12px;height:12px;border-radius:50%;background:var(--dim);transition:transform .18s ease}.fcm-chat-switch.on{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 18%,transparent)}.fcm-chat-switch.on i{background:var(--ac);transform:translateX(14px)}.fcm-chat-main-settings{padding:7px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:7px}
 .fcm-chat-status-menu{display:none;position:absolute;left:58px;bottom:45px;z-index:10;padding:4px;background:var(--s);border:1px solid var(--ac);border-radius:7px;box-shadow:0 6px 20px #0008}.fcm-chat-status-menu.open{display:flex;flex-direction:column;animation:fcm-chat-pop .12s ease}.fcm-chat-status-menu button{display:flex;align-items:center;gap:8px;padding:6px 10px;background:transparent;color:var(--tx);border:1px solid transparent;border-radius:6px}.fcm-chat-status-menu button:hover{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-chat-status-menu i,.fcm-status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#58c878}.fcm-chat-empty{margin:auto;padding:20px;text-align:center;color:var(--dim)}
 .fcm-chat-titlebar button,.fcm-chat-rail-button,.fcm-chat-row,.fcm-chat-presence button,.fcm-chat-tags button,.fcm-chat-group-tabs button,.fcm-chat-subtabs button,.fcm-chat-actions button,.fcm-chat-channels button,.fcm-chat-compose>button,.fcm-chat-status-menu button,.fcm-chat-main-settings{cursor:pointer;transition:background-color .15s ease,border-color .15s ease,color .15s ease,transform .1s ease,box-shadow .15s ease}.fcm-chat-titlebar button:active,.fcm-chat-rail-button:active,.fcm-chat-row:active,.fcm-chat-tags button:active,.fcm-chat-group-tabs button:active,.fcm-chat-subtabs button:active,.fcm-chat-actions button:active,.fcm-chat-channels button:not(:disabled):active,.fcm-chat-compose>button:not(:disabled):active{transform:scale(.95)}
-.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-list,.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-main{position:absolute;top:0;bottom:0;left:54px;width:calc(100% - 54px);transition:transform .32s cubic-bezier(.4,0,.2,1),visibility 0s linear 0s}.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-list{transform:translateX(0);z-index:2}.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-list.slide-out{transform:translateX(-100%);visibility:hidden;transition:transform .32s cubic-bezier(.4,0,.2,1),visibility 0s linear .32s}.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-main{transform:translateX(100%);visibility:hidden;z-index:3}.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-main.slide-in{transform:translateX(0);visibility:visible;transition:transform .32s cubic-bezier(.4,0,.2,1),visibility 0s linear 0s}
+.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-list,.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-main{position:absolute;top:0;bottom:0;left:54px;width:calc(100% - 54px);visibility:visible;pointer-events:auto;transition:transform .32s cubic-bezier(.4,0,.2,1),visibility 0s linear 0s,pointer-events 0s linear 0s}.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-list{transform:translateX(0);z-index:2}.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-list.slide-out{transform:translateX(-100%);visibility:hidden;pointer-events:none;transition:transform .32s cubic-bezier(.4,0,.2,1),visibility 0s linear .32s,pointer-events 0s linear .32s}.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-main{transform:translateX(100%);visibility:hidden;pointer-events:none;z-index:3;transition:transform .32s cubic-bezier(.4,0,.2,1),visibility 0s linear .32s,pointer-events 0s linear .32s}.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-main.slide-in{transform:translateX(0);visibility:visible;pointer-events:auto;transition:transform .32s cubic-bezier(.4,0,.2,1),visibility 0s linear 0s,pointer-events 0s linear 0s}
 #fcm-chat-balloon,.fcm-chat-user-balloon{--s:#1a1821;--tx:#f1ecff;--ac:#7648fe;display:none;position:fixed;right:22px;bottom:22px;z-index:99991;width:54px;height:54px;border-radius:50%;background:var(--s);color:var(--ac);border:2px solid var(--ac);font-size:22px;cursor:move;box-shadow:0 6px 24px #0008;touch-action:none}#fcm-chat-balloon.visible,#fcm-chat-balloon.persistent,.fcm-chat-user-balloon.visible{display:flex;align-items:center;justify-content:center}#fcm-chat-balloon>span,.fcm-chat-user-balloon>span{display:none;position:absolute;right:60px;bottom:0;width:260px;padding:9px;text-align:left;background:var(--s);color:var(--tx);border:1px solid var(--ac);border-radius:9px;font-size:13px}#fcm-chat-balloon>span strong,.fcm-chat-user-balloon>span strong{display:block;color:var(--ac)}#fcm-chat-balloon:hover>span,.fcm-chat-user-balloon:hover>span{display:block}.fcm-chat-user-balloon .fcm-chat-avatar i{display:none}
-@keyframes fcm-chat-rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}@keyframes fcm-chat-pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}@keyframes fcm-chat-notify{35%{transform:scale(1.18);box-shadow:0 0 0 8px color-mix(in srgb,var(--ac) 20%,transparent)}}.notify{animation:fcm-chat-notify .55s ease}
+@keyframes fcm-chat-rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}@keyframes fcm-chat-pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}@keyframes fcm-chat-notify{0%{transform:scale(1) rotate(0)}18%{transform:scale(.86,1.15) rotate(-7deg)}38%{transform:scale(1.24,.83) rotate(8deg);box-shadow:0 0 0 10px color-mix(in srgb,var(--ac) 20%,transparent)}58%{transform:scale(.94,1.08) rotate(-4deg)}76%{transform:scale(1.06,.96) rotate(2deg)}100%{transform:scale(1) rotate(0);box-shadow:0 6px 24px #0008}}.notify{animation:fcm-chat-notify .78s cubic-bezier(.2,.8,.2,1)}
 #fcm-chat-root textarea,#fcm-chat-root input{user-select:none!important;-webkit-user-select:none!important}
 .fcm-chat-titlebar button{position:relative}
 [data-group-name],[data-profile-avatar-url]{background:var(--surface-alt)!important;color:var(--tx)!important;border-color:var(--border)!important;caret-color:var(--ac)!important}[data-group-name]::placeholder,[data-profile-avatar-url]::placeholder{color:var(--dim)!important}[data-group-name]:-webkit-autofill,[data-profile-avatar-url]:-webkit-autofill{-webkit-text-fill-color:var(--tx)!important;box-shadow:0 0 0 1000px var(--surface-alt) inset!important}
@@ -1006,9 +1113,10 @@ function injectStyles() {
 .fcm-chat-modal-overlay{position:fixed;inset:0;z-index:100020;display:flex;align-items:center;justify-content:center;background:#0009;user-select:none}.fcm-chat-modal{width:min(400px,90vw);padding:24px;background:var(--s);color:var(--tx);border:2px solid var(--ac);border-radius:14px;box-shadow:0 8px 40px #000c;text-align:center}.fcm-chat-modal>div:last-child{display:flex;gap:10px;margin-top:18px}.fcm-chat-modal button{flex:1;padding:10px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:8px}.fcm-chat-modal [data-modal-ok]{background:color-mix(in srgb,var(--ac) 18%,transparent)}
 .fcm-chat-body.stacked.view-chat:not(.wide-view) .fcm-chat-list:not(.slide-out) .fcm-chat-scroll,.fcm-chat-body.stacked.view-groups:not(.wide-view) .fcm-chat-list:not(.slide-out) .fcm-chat-scroll{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));align-content:start;gap:4px;padding:6px 10px}.fcm-chat-body.stacked.view-chat .fcm-chat-row,.fcm-chat-body.stacked.view-groups .fcm-chat-row{min-width:0}
 .fcm-chat-back{width:22px;height:22px;padding:0;background:transparent;color:var(--dim);border:1px solid transparent;border-radius:7px;display:flex;align-items:center;justify-content:center}.fcm-chat-back:hover{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-chat-back svg{width:14px;height:14px}
-.fcm-balloon-icon{display:flex!important;position:relative!important;right:auto!important;bottom:auto!important;width:34px!important;height:34px!important;padding:0!important;background:transparent!important;border:0!important;align-items:center;justify-content:center;pointer-events:none}.fcm-balloon-icon svg{width:34px!important;height:34px!important;display:block}.fcm-chat-user-balloon>.fcm-chat-avatar{display:inline-flex!important;position:relative!important;right:auto!important;bottom:auto!important;width:42px!important;height:42px!important;padding:0!important;text-align:center!important;background:var(--surface-alt)!important;border:1px solid var(--ac)!important}.fcm-chat-user-balloon:hover>.fcm-chat-avatar{display:inline-flex!important}
+.fcm-balloon-icon{display:flex!important;position:relative!important;right:auto!important;bottom:auto!important;width:34px!important;height:34px!important;padding:0!important;background:transparent!important;border:0!important;align-items:center;justify-content:center;pointer-events:none}.fcm-balloon-icon svg{width:34px!important;height:34px!important;display:block}.fcm-chat-user-balloon>.fcm-chat-avatar{display:inline-flex!important;position:relative!important;right:auto!important;bottom:auto!important;width:50px!important;height:50px!important;padding:0!important;text-align:center!important;background:var(--surface-alt)!important;border:1px solid var(--ac)!important}.fcm-chat-user-balloon:hover>.fcm-chat-avatar{display:inline-flex!important}
 .fcm-chat-main.slide-in .fcm-chat-conversation-header,.fcm-chat-main.slide-in .fcm-chat-messages,.fcm-chat-main.slide-in .fcm-chat-actions,.fcm-chat-main.slide-in .fcm-chat-compose{animation:fcm-chat-enter-right .32s cubic-bezier(.2,.8,.2,1) both}.fcm-chat-list:not(.slide-out) .fcm-chat-scroll{animation:fcm-chat-enter-left .32s cubic-bezier(.2,.8,.2,1) both}@keyframes fcm-chat-enter-right{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:translateX(0)}}@keyframes fcm-chat-enter-left{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:translateX(0)}}
 .fcm-chat-user-balloon>.fcm-chat-avatar{background:color-mix(in srgb,var(--s) 82%,var(--ac))!important}
+body>.fcm-chat-user-balloon{border:0!important;box-shadow:0 0 15px color-mix(in srgb,var(--ac) 78%,transparent),0 6px 24px #0008}body>.fcm-chat-user-balloon:has(.fcm-chat-unread:not(.hidden)){box-shadow:0 0 18px color-mix(in srgb,#e34b62 88%,transparent),0 0 7px #e34b62,0 6px 24px #0008}.fcm-chat-user-balloon>.fcm-chat-avatar{border:0!important}
 .fcm-chat-rail-button svg{width:23px!important;height:23px!important;display:block}.fcm-chat-rail-button svg path,.fcm-chat-rail-button svg circle,.fcm-chat-rail-button svg rect{fill:currentColor!important;stroke:currentColor!important}.fcm-profile-statuses{display:flex;align-items:center;gap:12px;max-width:620px}.fcm-profile-statuses>span{width:110px;color:var(--dim)}.fcm-profile-statuses button{display:flex;align-items:center;gap:5px;background:transparent;color:var(--dim);border:1px solid transparent;border-radius:7px;padding:5px 8px}.fcm-profile-statuses button.active{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-profile-statuses button>i{width:15px;height:15px;border-radius:50%;background:#58c878}.fcm-profile-statuses button>i.busy{background:#e85d68}.fcm-profile-statuses button>i.afk{background:#e9bd4b}.fcm-profile-message{max-width:620px!important;display:grid!important;grid-template-columns:110px minmax(0,1fr) 34px;align-items:center;gap:10px}.fcm-profile-message textarea{grid-column:2}.fcm-profile-message .fcm-chat-switch{grid-column:3;grid-row:1/3}.fcm-chat-settings input[type="file"],.fcm-chat-settings input[type="text"],.fcm-chat-settings [data-chat-avatar-url]{max-width:240px;background:var(--surface-alt);color:var(--tx);border:1px solid var(--border);border-radius:7px;padding:6px}
 .fcm-chat-setting-row{border-radius:8px;transition:background-color .16s ease,border-color .16s ease,box-shadow .16s ease}.fcm-chat-setting-row:hover{background:color-mix(in srgb,var(--ac) 9%,transparent);border-color:color-mix(in srgb,var(--ac) 45%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,var(--ac) 20%,transparent) inset}.fcm-chat-sound-control{display:flex;align-items:center;gap:6px}.fcm-chat-sound-control>button{width:32px;height:32px;padding:5px;border-radius:8px;background:transparent;color:var(--ac);border:1px solid var(--border);display:flex;align-items:center;justify-content:center}.fcm-chat-sound-control>button:not(:disabled):hover{background:color-mix(in srgb,var(--ac) 14%,transparent);border-color:var(--ac)}.fcm-chat-sound-control>button:disabled{color:var(--dim);opacity:.65}.fcm-chat-sound-control svg{width:20px;height:20px}
 .fcm-chat-rail-button svg{width:25px!important;height:25px!important}.fcm-chat-rail-button svg *,.fcm-chat-sound-control svg *{fill:currentColor!important;stroke:currentColor!important}
@@ -1039,6 +1147,7 @@ function injectStyles() {
 .fcm-chat-icon-action{display:inline-flex!important;align-items:center;justify-content:center;min-width:30px;min-height:30px}.fcm-chat-icon-action svg{width:17px!important;height:17px!important;display:block;fill:currentColor}.fcm-chat-back{width:30px;height:30px}
 .fcm-chat-switch{transition:border-color .16s ease,background .16s ease,box-shadow .16s ease}.fcm-chat-switch i{transition:transform .18s ease,background .16s ease}.fcm-chat-switch:hover{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,var(--surface-alt));box-shadow:0 0 9px color-mix(in srgb,var(--ac) 22%,transparent)}.fcm-chat-switch:hover i{background:color-mix(in srgb,var(--ac) 70%,var(--tx))}
 #fcm-chat-balloon,.fcm-chat-user-balloon{z-index:100010}.fcm-balloon-preview{display:none!important;position:absolute!important;right:60px!important;left:auto!important;bottom:0!important;z-index:100011!important;width:260px!important;padding:9px!important;text-align:left!important;background:var(--s)!important;color:var(--tx)!important;border:1px solid var(--ac)!important;border-radius:9px!important;font-size:13px!important;pointer-events:none}.preview-right>.fcm-balloon-preview{right:auto!important;left:60px!important}.fcm-balloon-preview strong{display:block;color:var(--ac)}#fcm-chat-balloon:hover>.fcm-balloon-preview,.fcm-chat-user-balloon:hover>.fcm-balloon-preview{display:block!important}
+#fcm-chat-balloon,.fcm-chat-user-balloon{transform-origin:50% 65%;will-change:transform,left,top;transition:transform .34s cubic-bezier(.2,1.45,.35,1),left .14s ease-out,top .14s ease-out,border-radius .24s ease,box-shadow .24s ease}#fcm-chat-balloon.dragging,.fcm-chat-user-balloon.dragging{transform:rotate(var(--drag-angle,0deg)) scale(var(--drag-stretch,1),var(--drag-squash,1))!important;transform-origin:50% 20%;border-radius:46% 46% 58% 58% / 36% 36% 68% 68%;box-shadow:0 14px 28px #0009,0 0 16px color-mix(in srgb,var(--ac) 35%,transparent);transition:border-radius .16s ease,box-shadow .16s ease}#fcm-chat-balloon.released,.fcm-chat-user-balloon.released{animation:fcm-balloon-release .5s cubic-bezier(.2,.8,.2,1)}#fcm-chat-balloon.stirred,.fcm-chat-user-balloon.stirred{transform:translate(var(--stir-x,0),var(--stir-y,0)) rotate(var(--stir-angle,0deg)) scale(.96,1.04)!important;transition:transform .12s ease-out}@keyframes fcm-balloon-release{0%{transform:scale(1.16,.82)}28%{transform:scale(.9,1.13)}52%{transform:scale(1.07,.94)}74%{transform:scale(.97,1.04)}100%{transform:scale(1)}}
 #fcm-chat-panel{font-family:var(--chat-font-family)}.fcm-chat-content,.fcm-chat-compose textarea{font-family:var(--chat-font-family);font-size:var(--chat-font-size)}
 .fcm-chat-profile{--profile-label-width:90px}.fcm-chat-profile :is(.fcm-chat-profile-line>span,.fcm-chat-profile-line>b,.fcm-chat-profile-field>span,.fcm-profile-statuses button){font-size:13px!important}.fcm-chat-profile-field,.fcm-chat-profile label.fcm-chat-profile-field{margin-left:132px;grid-template-columns:var(--profile-label-width) minmax(0,1fr);max-width:548px!important}.fcm-profile-nickname-display{display:flex;align-items:center;gap:7px;min-width:0}.fcm-profile-nickname-display>b{font-size:13px}.fcm-profile-edit{width:24px;height:24px;padding:3px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border-color:transparent}.fcm-profile-edit svg{width:16px;height:16px}.fcm-profile-edit:hover{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-profile-auto-replies{grid-template-columns:1fr;gap:10px}.fcm-chat-profile .fcm-profile-auto-replies>label{grid-template-columns:1fr auto}.fcm-profile-auto-replies label>b{font-size:13px!important}.fcm-layout-merge svg{transform:scaleX(-1)}.fcm-chat-room-join{display:block;margin-top:8px;padding:5px 12px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:7px}.fcm-chat-room-join:hover{background:color-mix(in srgb,var(--ac) 14%,transparent);box-shadow:0 0 9px color-mix(in srgb,var(--ac) 24%,transparent)}
 #fcm-chat-panel .fcm-chat-profile{--profile-label-width:110px;font-family:inherit!important;font-size:12pt!important;line-height:1.35!important;font-stretch:normal!important;text-size-adjust:100%;-webkit-text-size-adjust:100%}#fcm-chat-panel .fcm-chat-profile :is(span,b,button,input,textarea,label){font-family:inherit!important;font-size:inherit!important;line-height:inherit!important;font-stretch:inherit!important}#fcm-chat-panel .fcm-chat-profile-line{grid-template-columns:110px minmax(0,1fr) auto!important;min-height:40px!important;overflow:visible!important}#fcm-chat-panel .fcm-chat-profile-line>b,#fcm-chat-panel .fcm-profile-nickname-display>b{color:var(--tx)!important}#fcm-chat-panel .fcm-profile-nickname-display{min-height:32px;color:var(--tx);overflow:visible}#fcm-chat-panel .fcm-chat-profile-field>span{padding-top:0!important}#fcm-chat-panel .fcm-profile-url-label{display:flex;align-items:center;gap:5px}#fcm-chat-panel .fcm-profile-help-wrap{position:relative;display:inline-flex}#fcm-chat-panel .fcm-profile-help{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;border:1px solid var(--ac);border-radius:50%;background:transparent;color:var(--ac);line-height:1!important;cursor:help}#fcm-chat-panel .fcm-profile-help-popup{position:absolute;left:30px;top:50%;z-index:1200;width:max-content;max-width:min(440px,55vw);padding:8px 10px;transform:translateY(-50%);visibility:hidden;opacity:0;pointer-events:none;background:var(--surface-alt);color:var(--tx);border:1px solid var(--ac);border-radius:8px;box-shadow:0 6px 20px #0009;font-size:inherit!important;line-height:1.35!important;transition:opacity .06s linear}#fcm-chat-panel .fcm-profile-help-wrap:hover .fcm-profile-help-popup,#fcm-chat-panel .fcm-profile-help:focus-visible+.fcm-profile-help-popup{visibility:visible;opacity:1}
