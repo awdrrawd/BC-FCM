@@ -6,7 +6,7 @@ import { renderCurrent, panelOpen, panelMini, uiTab, buildPanel, togglePanel, cl
 import { _applyWhisperStyle, _updateWhisperAvatar, _drawWavOnCanvas } from '../chat/chat-fx.js';
 import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from '../chat/wps-share.js';
 import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSHARE_TAG } from '../chat/actions.js';
-import { handleIncomingBeep, handleIncomingWhisper, handleOutgoingServerSend } from '../communication/chat.js';
+import { handleIncomingBeep, handleIncomingWhisper, handleOutgoingServerSend, handleOnlineFriendsUpdate } from '../communication/chat.js';
 // ════════════════════════════════════════
 //  FCM module: hooks.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -101,6 +101,7 @@ import { handleIncomingBeep, handleIncomingWhisper, handleOutgoingServerSend } f
         const data = args[0];
         if (data?.Query === 'OnlineFriends' && Array.isArray(data.Result)) {
             setOnlineFriends(data.Result);
+            handleOnlineFriendsUpdate(data.Result);
         }
         const r = next(args);
         // BC 背景輪詢 OnlineFriends 相當頻繁，直接跟著它重繪即為即時更新（不另設計時器）。
