@@ -1,5 +1,37 @@
 const DB_NAME = 'fcm-chat';
-const DB_VERSION = 1;
+const DB_VERSION = 1; // 共用資料庫，任意修改會導致其他插件的錯誤，修改前請先詢問必要性
+const accountNumber = () => Number(globalThis.Player?.MemberNumber) || 0;
+const OFFLINE_TTL = 48 * 60 * 60 * 1000;
+
+const OfflineQueue = {
+    key() { const owner = accountNumber(); return owner ? `FCM_chat_outbox_${owner}` : ''; },
+    all() {
+        try {
+            const key = this.key();
+            if (!key) return [];
+            const now = Date.now();
+            const rows = JSON.parse(localStorage.getItem(key) || '[]').filter(row => row && Number(row.memberNumber) && typeof row.content === 'string' && now - Number(row.queuedAt) < OFFLINE_TTL);
+            localStorage.setItem(key, JSON.stringify(rows));
+            return rows;
+        } catch { return []; }
+    },
+    add(memberNumber, content) {
+        const rows = this.all();
+        const row = { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`, memberNumber: Number(memberNumber), content: String(content), queuedAt: Date.now() };
+        rows.push(row);
+        try { localStorage.setItem(this.key(), JSON.stringify(rows)); } catch {}
+        return row;
+    },
+    remove(ids) {
+        const remove = new Set(ids);
+        const rows = this.all().filter(row => !remove.has(row.id));
+        try { localStorage.setItem(this.key(), JSON.stringify(rows)); } catch {}
+    },
+    removeMember(memberNumber) {
+        const rows = this.all().filter(row => Number(row.memberNumber) !== Number(memberNumber));
+        try { localStorage.setItem(this.key(), JSON.stringify(rows)); } catch {}
+    },
+};
 
 const ChatStore = {
     db: null,
@@ -22,22 +54,26 @@ const ChatStore = {
         });
     },
     async put(message) {
+        const ownerMemberNumber = accountNumber();
+        if (!ownerMemberNumber) return false;
         if (!this.db) await this.init();
         if (!this.db) return false;
         return new Promise(resolve => {
             try {
-                const req = this.db.transaction('messages', 'readwrite').objectStore('messages').put(message);
+                const req = this.db.transaction('messages', 'readwrite').objectStore('messages').put({ ...message, ownerMemberNumber });
                 req.onsuccess = () => resolve(true); req.onerror = () => resolve(false);
             } catch { resolve(false); }
         });
     },
     async all() {
+        const ownerMemberNumber = accountNumber();
+        if (!ownerMemberNumber) return [];
         if (!this.db) await this.init();
         if (!this.db) return [];
         return new Promise(resolve => {
             try {
                 const req = this.db.transaction('messages', 'readonly').objectStore('messages').getAll();
-                req.onsuccess = () => resolve((req.result || []).sort((a, b) => a.timestamp - b.timestamp));
+                req.onsuccess = () => resolve((req.result || []).filter(message => Number(message.ownerMemberNumber) === ownerMemberNumber).sort((a, b) => a.timestamp - b.timestamp));
                 req.onerror = () => resolve([]);
             } catch { resolve([]); }
         });
@@ -81,10 +117,13 @@ const ChatStore = {
     async clear() {
         if (!this.db) await this.init();
         if (!this.db) return false;
+        const records = await this.all();
         return new Promise(resolve => {
             try {
-                const req = this.db.transaction('messages', 'readwrite').objectStore('messages').clear();
-                req.onsuccess = () => resolve(true); req.onerror = () => resolve(false);
+                const tx = this.db.transaction('messages', 'readwrite');
+                const store = tx.objectStore('messages');
+                records.forEach(message => store.delete(message.id));
+                tx.oncomplete = () => resolve(true); tx.onerror = () => resolve(false);
             } catch { resolve(false); }
         });
     },
@@ -110,4 +149,4 @@ const AudioStore = {
     },
 };
 
-export { ChatStore, AudioStore };
+export { ChatStore, AudioStore, OfflineQueue };

@@ -50,7 +50,7 @@ import { chatFontFamily } from '../communication/chat-font.js';
         //  （私訊藍／好友綠／黑單紅／幽靈紫／管理橘…）排除在外，保留辨識色。
         const _plainBtn = ':not(.fcm-btn-red):not(.fcm-btn-green):not(.fcm-btn-purple):not(.fcm-btn-blue):not(.fcm-btn-orange)';
         el.textContent = `
-#fcm-panel{background:${p}!important;border-color:${a}!important;color:${t}!important;}
+#fcm-panel{--ac:${a};--surface-alt:${surfaceAlt};--tx:${t};--dim:${textDim};background:${p}!important;border-color:${a}!important;color:${t}!important;}
 #fcm-panel,#fcm-panel *{font-family:${chatFontFamily()}!important;}
 /* 語言下拉需要保留「Twemoji Country Flags」萬國旗字體，不能被上面這條全域字型覆蓋掉；
    #fcm-panel 底下加上 class 選擇器，特異度比「#fcm-panel *」的萬用選擇器更高，才能蓋過上面。 */
@@ -126,8 +126,8 @@ import { chatFontFamily } from '../communication/chat-font.js';
 .fcm-warn{background:color-mix(in srgb, ${a} 50%, transparent)!important;color:${t}!important;border-color:${border}!important;text-align:center!important;}
 #fcm-panel input[type="checkbox"]{accent-color:${a}!important;}
 /* 卷軸：底色與明暗處理比照 CHAT 面板（滑軌= 面板色與黑混合，滑塊 hover 用提高亮度而非整個換色）。 */
-#fcm-panel *{scrollbar-color:${a} ${surfaceAlt};scrollbar-width:auto;}
-#fcm-panel *::-webkit-scrollbar{width:9px;height:9px;}#fcm-panel *::-webkit-scrollbar-track{background:${surfaceAlt}!important;border-radius:8px;}#fcm-panel *::-webkit-scrollbar-thumb{background:${a}!important;border:2px solid ${surfaceAlt}!important;border-radius:8px;}#fcm-panel *::-webkit-scrollbar-thumb:hover{filter:brightness(1.18)!important;}
+#fcm-panel *{scrollbar-color:${a} rgba(0,0,0,.55);scrollbar-width:thin;}
+#fcm-panel *::-webkit-scrollbar{width:10px;height:10px;}#fcm-panel *::-webkit-scrollbar-track{background:rgba(0,0,0,.55)!important;}#fcm-panel *::-webkit-scrollbar-thumb{background:color-mix(in srgb,${a} 65%,transparent)!important;border:0!important;border-radius:4px;}#fcm-panel *::-webkit-scrollbar-thumb:hover{background:${a}!important;}
 .fcm-overlay{background:rgba(0,0,0,.55)!important;}
 .fcm-dialog{background:${p}!important;border-color:${a}!important;color:${t}!important;}
 .fcm-dialog div{color:${t}!important;}.fcm-dialog span{color:${textDim}!important;}
@@ -147,7 +147,7 @@ import { chatFontFamily } from '../communication/chat-font.js';
 .fcm-theme-options{background:${panel1}!important;border-color:${border}!important;}
 .fcm-theme-presets .fcm-btn.active{color:${a}!important;border-color:${a}!important;background:${panelSelected}!important;box-shadow:0 0 0 1px ${a} inset!important;}
 .fcm-settings-wrap::-webkit-scrollbar-track,.fcm-scroll::-webkit-scrollbar-track{background:${surfaceAlt}!important;}
-.fcm-settings-wrap::-webkit-scrollbar-thumb,.fcm-scroll::-webkit-scrollbar-thumb{background:${a}!important;border-color:${surfaceAlt}!important;}
+.fcm-settings-wrap::-webkit-scrollbar-thumb,.fcm-scroll::-webkit-scrollbar-thumb{background:color-mix(in srgb,${a} 65%,transparent)!important;border:0!important;}
 .fcm-settings-wrap::-webkit-scrollbar-thumb:hover,.fcm-scroll::-webkit-scrollbar-thumb:hover{filter:brightness(1.18)!important;}
 .fcm-tog.on{background:${mix(a, 38, p)}!important;border-color:${a}!important;}
 .fcm-tog.on .fcm-tog-dot{background:${accentB}!important;}
