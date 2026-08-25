@@ -9,8 +9,7 @@ import { _applyWhisperStyle, _removeWhisperAvatar, _installOocProtect, _uninstal
 import { renderCurrent, reopenForLang } from './panel-controller.js';
 import { refreshChatSettings, playNotificationSound, saveCustomNotificationSound } from '../communication/chat.js';
 import { THEME_PRESETS } from '../core/themes.js';
-import ALARM_MUTED_ICON from '../../assets/icons/alarm-muted.svg?raw';
-import ALARM_ACTIVE_ICON from '../../assets/icons/alarm-active.svg?raw';
+import { ALARM_MUTED_ICON, ALARM_ACTIVE_ICON } from '../ui/icons.js';
 // ════════════════════════════════════════
 //  FCM module: panel-settings.js  (split from panel.js)
 //  設定頁。與 index 唯一的耦合是「切換語言後重建面板」，已抽成 reopenForLang()。

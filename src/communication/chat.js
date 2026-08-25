@@ -1,4 +1,4 @@
-import { cfg, saveCfg, FCM_ICON_SVG } from '../core/config.js';
+import { cfg, saveCfg } from '../core/config.js';
 import { getDisplayName, getRoomInfo, inRoomFn, onlineFriends, buildFriendList, getAllRels, isFav, isFriendOf } from '../data/data.js';
 import { getCachedRoomInfo, queryRoomInfo } from '../panel/panel-rooms-data.js';
 import { Snapshot, syncRoomAvatar, updateOwnAvatarSnapshot, updateOwnAvatarProfile } from '../data/profile-db.js';
@@ -11,21 +11,12 @@ import { installDragScroll } from '../ui/drag-scroll.js';
 import { applyTheme } from '../panel/styles.js';
 import { THEME_KEYS, themeColors } from '../core/themes.js';
 import { showRoomJoinConfirm, showIncomingRoomInvite } from '../chat/actions.js';
-import CHAT_ICON from '../../assets/icons/chat.svg?raw';
-import NOTIFICATION_ICON from '../../assets/icons/notification.svg?raw';
-import GROUP_ICON from '../../assets/icons/group.svg?raw';
-import ALARM_MUTED_ICON from '../../assets/icons/alarm-muted.svg?raw';
-import ALARM_ACTIVE_ICON from '../../assets/icons/alarm-active.svg?raw';
-import EXIT_ICON from '../../assets/icons/exit.svg?raw';
-import DOWNLOAD_ICON from '../../assets/icons/download.svg?raw';
-import TRASH_ICON from '../../assets/icons/trash.svg?raw';
-import INVITE_ICON from '../../invite.svg?raw';
-import WATER_ICON from '../../icons8-water-100.svg?raw';
-import SPLIT_ICON from '../../assets/icons/split.svg?raw';
-import EDIT_ICON from '../../assets/icons/edit.svg?raw';
-const MERGE_ICON = SPLIT_ICON;
-const SETTINGS_ICON = '<svg class="fcm-outline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.96 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.03H3v-4h.08A1.7 1.7 0 0 0 4.6 8.96a1.7 1.7 0 0 0-.34-1.88l-.06-.06 2.83-2.83.06.06A1.7 1.7 0 0 0 8.96 4.6 1.7 1.7 0 0 0 10 3.08V3h4v.08a1.7 1.7 0 0 0 1.03 1.56 1.7 1.7 0 0 0 1.88-.34l.06-.06 2.83 2.83-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 20.92 10H21v4h-.08A1.7 1.7 0 0 0 19.4 15Z"/></svg>';
-const SUMMON_ICON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10v4h3l7 4V6l-7 4H4Z"/><path d="M7 14l1.5 5h3L10 16M17 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></svg>';
+import {
+    FCM_ICON_SVG, CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
+    ALARM_MUTED_ICON, ALARM_ACTIVE_ICON, EXIT_ICON, DOWNLOAD_ICON,
+    TRASH_ICON, SPLIT_ICON, MERGE_ICON, EDIT_ICON, SETTINGS_ICON,
+    SUMMON_ICON, INVITE_ICON, WATER_ICON, FOLDER_ICON, MAXIMIZE_ICON,
+} from '../ui/icons.js';
 
 let root = null;
 let selectedMember = null;
@@ -455,7 +446,7 @@ function conversationHtml() {
         <div class="fcm-chat-assign"><button class="fcm-chat-rail-button" data-toggle-assign title="${T('chatAssignGroup')}">${GROUP_ICON}</button><div class="fcm-chat-assign-menu" data-assign-menu>${Object.entries(cfg.chatGroups || {}).map(([id,label]) => `<button data-assign-group="${esc(id)}">${esc(label)}</button>`).join('')}<button class="create" data-create-group-from-chat>＋ ${T('chatNewGroup')}</button></div></div>
     </header>
     <div class="fcm-chat-messages">${rows.map(messageHtml).join('') || `<div class="fcm-chat-empty">${T('chatNoMessages')}</div>`}</div>
-    <div class="fcm-chat-actions"><button class="fcm-chat-icon-action" data-invite ${available === 'none' || inRoomFn(selectedMember) ? 'disabled' : ''} title="${T('chatInviteRoom')}" aria-label="${T('chatInviteRoom')}">${INVITE_ICON}</button><span></span><div class="fcm-chat-tools"><div class="fcm-chat-tools-menu"><button class="fcm-chat-icon-action" data-export title="${T('chatSaveMessages')}">${DOWNLOAD_ICON}<span>${T('chatSaveMessages')}</span></button><button class="fcm-chat-icon-action" data-delete title="${T('chatDeleteAll')}">${TRASH_ICON}<span>${T('chatDeleteAll')}</span></button></div><button class="fcm-chat-icon-action" data-toggle-tools title="${T('chatMessageTools')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 6h7l2 2h9v11H3z"/><path d="M12 11v6M9 14h6"/></svg></button></div></div>
+    <div class="fcm-chat-actions"><button class="fcm-chat-icon-action" data-invite ${available === 'none' || inRoomFn(selectedMember) ? 'disabled' : ''} title="${T('chatInviteRoom')}" aria-label="${T('chatInviteRoom')}">${INVITE_ICON}</button><span></span><div class="fcm-chat-tools"><div class="fcm-chat-tools-menu"><button class="fcm-chat-icon-action" data-export title="${T('chatSaveMessages')}">${DOWNLOAD_ICON}<span>${T('chatSaveMessages')}</span></button><button class="fcm-chat-icon-action" data-delete title="${T('chatDeleteAll')}">${TRASH_ICON}<span>${T('chatDeleteAll')}</span></button></div><button class="fcm-chat-icon-action" data-toggle-tools title="${T('chatMessageTools')}">${FOLDER_ICON}</button></div></div>
     <div class="fcm-chat-compose">
         <div class="fcm-chat-channels ${online ? '' : 'offline'}"><button class="${online && channel === 'whisper' ? 'active' : ''}" data-channel="whisper" ${!inRoomFn(selectedMember) ? 'disabled' : ''}>Whisper</button><button class="${online && channel === 'beep' ? 'active' : ''}" data-channel="beep" ${!online ? 'disabled' : ''}>BEEP</button></div>
         <textarea data-input rows="2" placeholder="${inputPlaceholder}"></textarea>
@@ -499,7 +490,7 @@ function renderChat() {
     const [chatPanel, chatText, chatAccent] = chatColors();
     const sessionSizeStyle = chatPanelSession.inlineSizeStyle();
     root.innerHTML = `<div id="fcm-chat-panel" class="${maximized ? 'maximized' : ''}" data-layout-mode="${esc(cfg.chatLayout || 'split')}" data-theme="${esc(cfg.chatThemeMode === 'preset' ? cfg.chatThemePreset : cfg.chatThemeMode === 'custom' ? 'custom' : cfg.themePreset || 'violet')}" style="${sessionSizeStyle}--s:${esc(chatPanel)};--tx:${esc(chatText)};--ac:${esc(chatAccent)};--chat-font-size:${Number(cfg.chatFontSize) || 13}px;--chat-font-family:${esc(chatFontFamily())}">
-        <div class="fcm-chat-titlebar"><b>FCM-Chat</b><span></span><button class="fcm-chat-icon-action ${cfg.chatLayout === 'stacked' ? 'active' : ''}" data-layout title="${T('chatToggleLayout')}">${cfg.chatLayout === 'stacked' ? SPLIT_ICON : MERGE_ICON}<i>${cfg.chatLayout === 'stacked' ? T('chatLayoutSplit') : T('chatLayoutMerged')}</i></button><button class="fcm-chat-icon-action ${maximized ? 'active' : ''}" data-max title="${T('chatToggleMax')}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><i>${maximized ? T('chatRestore') : T('chatMaximize')}</i></button><button class="fcm-chat-icon-action" data-min title="${T('chatMinimize')}">—</button><button class="fcm-chat-icon-action" data-close title="${T('chatClose')}">×</button></div>
+        <div class="fcm-chat-titlebar"><b>FCM-Chat</b><span></span><button class="fcm-chat-icon-action ${cfg.chatLayout === 'stacked' ? 'active' : ''}" data-layout title="${T('chatToggleLayout')}">${cfg.chatLayout === 'stacked' ? SPLIT_ICON : MERGE_ICON}<i>${cfg.chatLayout === 'stacked' ? T('chatLayoutSplit') : T('chatLayoutMerged')}</i></button><button class="fcm-chat-icon-action ${maximized ? 'active' : ''}" data-max title="${T('chatToggleMax')}">${MAXIMIZE_ICON}<i>${maximized ? T('chatRestore') : T('chatMaximize')}</i></button><button class="fcm-chat-icon-action" data-min title="${T('chatMinimize')}">—</button><button class="fcm-chat-icon-action" data-close title="${T('chatClose')}">×</button></div>
         <div class="fcm-chat-body view-${esc(activeView)} ${cfg.chatLayout === 'stacked' ? 'stacked' : ''} ${activeView === 'profile' || activeView === 'settings' ? 'wide-view' : ''}">
             <nav class="fcm-chat-rail">
                 <button class="fcm-chat-rail-button fcm-chat-self ${activeView === 'profile' ? 'active' : ''}" data-view="profile" title="${T('chatProfileTab')}">${avatarHtml(Player?.MemberNumber || 0, 34, 'toolbar')}</button>
@@ -804,7 +795,7 @@ function makeDraggable(element, handle, configKey, memberNumber = null) {
         const startY = event.clientY;
         let lastX = event.clientX;
         let lastY = event.clientY;
-        if (isBalloon) element.classList.remove('released');
+        if (isBalloon) element.classList.remove('released', 'release-water');
         handle.setPointerCapture(event.pointerId);
         const move = next => {
             if (isBalloon && !moved) {
@@ -835,17 +826,19 @@ function makeDraggable(element, handle, configKey, memberNumber = null) {
             handle.removeEventListener('pointermove', move);
             handle.removeEventListener('pointerup', up);
             if (isBalloon && moved) {
-                element.style.setProperty('--release-angle', element.style.getPropertyValue('--drag-angle') || '0deg');
                 element.classList.remove('dragging');
                 element.classList.add('released');
+                element.classList.add('release-water');
                 element.style.removeProperty('--drag-angle');
                 element.style.removeProperty('--drag-stretch');
                 element.style.removeProperty('--drag-squash');
                 settleStirredBalloons();
                 setTimeout(() => {
+                    element.classList.remove('release-water');
+                }, 150); // 落地前先由水滴恢復圓形，回彈動能仍繼續播放
+                setTimeout(() => {
                     element.classList.remove('released');
-                    element.style.removeProperty('--release-angle');
-                }, 150); //水滴動畫總時長，時間太短沒有抖動效果，太長復原又不流暢，先設定短時間
+                }, 540);
             }
             if (!moved) return;
             element.dataset.dragMoved = '1';
@@ -898,6 +891,9 @@ function snapBalloonToNearestEdge(element) {
     const edge = Object.entries(distances).sort((a, b) => a[1] - b[1])[0][0];
     const margin = 8;
     element.dataset.snapEdge = edge;
+    // 水滴尖端朝吸附邊緣的反方向；只轉外框，讓頭像仍受重力向下。
+    const waterAngles = { bottom: '0deg', top: '180deg', left: '90deg', right: '-90deg' };
+    element.style.setProperty('--water-angle', waterAngles[edge]);
     element.style.right = element.style.bottom = 'auto';
     if (edge === 'left') element.style.left = `${margin}px`;
     else if (edge === 'right') element.style.left = `${Math.max(margin, innerWidth - element.offsetWidth - margin)}px`;
@@ -1277,10 +1273,11 @@ body>.fcm-chat-user-balloon{border:0!important;box-shadow:0 0 15px color-mix(in 
 .fcm-chat-switch{transition:border-color .16s ease,background .16s ease,box-shadow .16s ease}.fcm-chat-switch i{transition:transform .18s ease,background .16s ease}.fcm-chat-switch:hover{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,var(--surface-alt));box-shadow:0 0 9px color-mix(in srgb,var(--ac) 22%,transparent)}.fcm-chat-switch:hover i{background:color-mix(in srgb,var(--ac) 70%,var(--tx))}
 #fcm-chat-balloon,.fcm-chat-user-balloon{z-index:100010}.fcm-balloon-preview{display:none!important;position:absolute!important;right:60px!important;left:auto!important;bottom:0!important;z-index:100011!important;width:260px!important;padding:9px!important;text-align:left!important;background:var(--s)!important;color:var(--tx)!important;border:1px solid var(--ac)!important;border-radius:9px!important;font-size:13px!important;pointer-events:none}.preview-right>.fcm-balloon-preview{right:auto!important;left:60px!important}.fcm-balloon-preview strong{display:block;color:var(--ac)}#fcm-chat-balloon:hover>.fcm-balloon-preview,.fcm-chat-user-balloon:hover>.fcm-balloon-preview{display:block!important}
 #fcm-chat-balloon,.fcm-chat-user-balloon{transform-origin:50% 65%;will-change:transform,left,top;transition:transform .34s cubic-bezier(.2,1.45,.35,1),left .14s ease-out,top .14s ease-out,border-radius .24s ease,box-shadow .24s ease}#fcm-chat-balloon.dragging,.fcm-chat-user-balloon.dragging{transform:rotate(var(--drag-angle,0deg)) scale(var(--drag-stretch,1),var(--drag-squash,1))!important;transform-origin:50% 20%;border-radius:46% 46% 58% 58% / 36% 36% 68% 68%;box-shadow:0 14px 28px #0009,0 0 16px color-mix(in srgb,var(--ac) 35%,transparent);transition:border-radius .16s ease,box-shadow .16s ease}#fcm-chat-balloon.released,.fcm-chat-user-balloon.released{animation:fcm-balloon-release .5s cubic-bezier(.2,.8,.2,1)}#fcm-chat-balloon.stirred,.fcm-chat-user-balloon.stirred{transform:translate(var(--stir-x,0),var(--stir-y,0)) rotate(var(--stir-angle,0deg)) scale(.96,1.04)!important;transition:transform .12s ease-out}@keyframes fcm-balloon-release{0%{transform:scale(1.16,.82)}28%{transform:scale(.9,1.13)}52%{transform:scale(1.07,.94)}74%{transform:scale(.97,1.04)}100%{transform:scale(1)}}
-.fcm-water-shape{display:none!important}.dragging>.fcm-water-shape,.released>.fcm-water-shape{display:block!important;position:absolute!important;z-index:0!important;left:-15px!important;top:-20px!important;right:auto!important;bottom:auto!important;width:84px!important;height:84px!important;padding:0!important;background:transparent!important;border:0!important;pointer-events:none}.fcm-water-shape svg{display:block;width:100%;height:100%}.fcm-water-shape svg *{fill:var(--ac)!important;stroke:var(--s)!important;stroke-width:3px;paint-order:stroke fill}.dragging::before,.released::before{content:none!important}#fcm-chat-balloon.dragging,.fcm-chat-user-balloon.dragging{transform:rotate(var(--drag-angle,0deg)) scale(var(--drag-squash,1),var(--drag-stretch,1))!important;transform-origin:50% 0;background:transparent;border-color:transparent;border-radius:50%;box-shadow:none}#fcm-chat-balloon.released,.fcm-chat-user-balloon.released{transform-origin:50% 0;background:transparent;border-color:transparent;border-radius:50%;box-shadow:none}#fcm-chat-balloon.dragging>.fcm-balloon-icon,.fcm-chat-user-balloon.dragging>.fcm-chat-avatar,#fcm-chat-balloon.released>.fcm-balloon-icon,.fcm-chat-user-balloon.released>.fcm-chat-avatar{z-index:1;transform:translateY(10px);transition:transform .08s linear}#fcm-chat-balloon:not(.dragging):not(.released)>.fcm-balloon-icon,.fcm-chat-user-balloon:not(.dragging):not(.released)>.fcm-chat-avatar{transition:transform .3s cubic-bezier(.2,1.4,.3,1)}
+.fcm-water-shape{display:none!important}.dragging>.fcm-water-shape,.release-water>.fcm-water-shape{display:block!important;position:absolute!important;z-index:0!important;left:-15px!important;top:-20px!important;right:auto!important;bottom:auto!important;width:84px!important;height:84px!important;padding:0!important;background:transparent!important;border:0!important;pointer-events:none;transform:rotate(var(--water-angle,0deg));transform-origin:50% 50%;transition:transform .14s ease-out}.fcm-water-shape svg{display:block;width:100%;height:100%}.fcm-water-shape svg *{fill:var(--ac)!important;stroke:var(--s)!important;stroke-width:3px;paint-order:stroke fill}.dragging::before,.release-water::before{content:none!important}#fcm-chat-balloon.dragging,.fcm-chat-user-balloon.dragging{transform:rotate(var(--drag-angle,0deg)) scale(var(--drag-squash,1),var(--drag-stretch,1))!important;transform-origin:50% 0;background:transparent;border-color:transparent;border-radius:50%;box-shadow:none}#fcm-chat-balloon.release-water,.fcm-chat-user-balloon.release-water{transform-origin:50% 0;background:transparent;border-color:transparent;border-radius:50%;box-shadow:none}#fcm-chat-balloon.dragging>.fcm-balloon-icon,.fcm-chat-user-balloon.dragging>.fcm-chat-avatar,#fcm-chat-balloon.release-water>.fcm-balloon-icon,.fcm-chat-user-balloon.release-water>.fcm-chat-avatar{z-index:1;transform:translateY(10px);transition:transform .08s linear}#fcm-chat-balloon:not(.dragging):not(.release-water)>.fcm-balloon-icon,.fcm-chat-user-balloon:not(.dragging):not(.release-water)>.fcm-chat-avatar{transition:transform .3s cubic-bezier(.2,1.4,.3,1)}
 .fcm-chat-header-action:not(:disabled){color:var(--ac);border-color:var(--ac)}.fcm-chat-header-action:not(:disabled):hover{color:var(--tx);background:color-mix(in srgb,var(--ac) 20%,transparent);border-color:var(--ac);box-shadow:0 0 11px color-mix(in srgb,var(--ac) 35%,transparent)}.fcm-chat-header-action:disabled,.fcm-chat-actions button:disabled{opacity:.35;cursor:not-allowed;box-shadow:none}
 .fcm-water-shape svg *{paint-order:fill stroke}
-@keyframes fcm-water-return{0%{opacity:1;transform:scale(1)}48%{opacity:.88;transform:scale(.94,1.08)}72%{opacity:.42;transform:scale(1.05,.93)}100%{opacity:0;transform:scale(.98)}}@keyframes fcm-shell-return{0%,45%{background-color:transparent;border-color:transparent;box-shadow:none}72%{background-color:color-mix(in srgb,var(--s) 72%,transparent);border-color:color-mix(in srgb,var(--ac) 55%,transparent);box-shadow:0 4px 14px #0005}100%{background-color:var(--s);border-color:var(--ac);border-radius:50%;box-shadow:0 6px 24px #0008}}@keyframes fcm-content-return{0%{transform:translateY(10px) rotate(var(--release-angle,0deg))}38%{transform:translateY(-3px) rotate(-3deg)}68%{transform:translateY(2px) rotate(1deg)}100%{transform:translateY(0) rotate(0)}}#fcm-chat-balloon.released,.fcm-chat-user-balloon.released{animation:fcm-balloon-release .52s cubic-bezier(.2,.8,.2,1) both,fcm-shell-return .52s ease-out both}.released>.fcm-water-shape{animation:fcm-water-return .52s ease-out both}#fcm-chat-balloon.released>.fcm-balloon-icon,.fcm-chat-user-balloon.released>.fcm-chat-avatar{animation:fcm-content-return .52s cubic-bezier(.2,.85,.25,1.25) both}
+#fcm-chat-balloon.dragging>.fcm-water-shape,.fcm-chat-user-balloon.dragging>.fcm-water-shape{transform:rotate(0deg)}
+#fcm-chat-balloon.released,.fcm-chat-user-balloon.released{animation:fcm-balloon-release .52s cubic-bezier(.2,.8,.2,1) both}.release-water>.fcm-water-shape{opacity:1;animation:none}#fcm-chat-balloon.release-water>.fcm-balloon-icon,.fcm-chat-user-balloon.release-water>.fcm-chat-avatar{transform:translateY(10px);animation:none}
 #fcm-chat-panel{font-family:var(--chat-font-family)}.fcm-chat-content,.fcm-chat-compose textarea{font-family:var(--chat-font-family);font-size:var(--chat-font-size)}
 .fcm-chat-profile{--profile-label-width:90px}.fcm-chat-profile :is(.fcm-chat-profile-line>span,.fcm-chat-profile-line>b,.fcm-chat-profile-field>span,.fcm-profile-statuses button){font-size:13px!important}.fcm-chat-profile-field,.fcm-chat-profile label.fcm-chat-profile-field{margin-left:132px;grid-template-columns:var(--profile-label-width) minmax(0,1fr);max-width:548px!important}.fcm-profile-nickname-display{display:flex;align-items:center;gap:7px;min-width:0}.fcm-profile-nickname-display>b{font-size:13px}.fcm-profile-edit{width:24px;height:24px;padding:3px;display:inline-flex;align-items:center;justify-content:center;flex:0 0 auto;border-color:transparent}.fcm-profile-edit svg{width:16px;height:16px}.fcm-profile-edit:hover{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-profile-auto-replies{grid-template-columns:1fr;gap:10px}.fcm-chat-profile .fcm-profile-auto-replies>label{grid-template-columns:1fr auto}.fcm-profile-auto-replies label>b{font-size:13px!important}.fcm-layout-merge svg{transform:scaleX(-1)}.fcm-chat-room-join{display:block;margin-top:8px;padding:5px 12px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:7px}.fcm-chat-room-join:hover{background:color-mix(in srgb,var(--ac) 14%,transparent);box-shadow:0 0 9px color-mix(in srgb,var(--ac) 24%,transparent)}
 #fcm-chat-panel .fcm-chat-profile{--profile-label-width:110px;font-family:inherit!important;font-size:12pt!important;line-height:1.35!important;font-stretch:normal!important;text-size-adjust:100%;-webkit-text-size-adjust:100%}#fcm-chat-panel .fcm-chat-profile :is(span,b,button,input,textarea,label){font-family:inherit!important;font-size:inherit!important;line-height:inherit!important;font-stretch:inherit!important}#fcm-chat-panel .fcm-chat-profile-line{grid-template-columns:110px minmax(0,1fr) auto!important;min-height:40px!important;overflow:visible!important}#fcm-chat-panel .fcm-chat-profile-line>b,#fcm-chat-panel .fcm-profile-nickname-display>b{color:var(--tx)!important}#fcm-chat-panel .fcm-profile-nickname-display{min-height:32px;color:var(--tx);overflow:visible}#fcm-chat-panel .fcm-chat-profile-field>span{padding-top:0!important}#fcm-chat-panel .fcm-profile-url-label{display:flex;align-items:center;gap:5px}#fcm-chat-panel .fcm-profile-help-wrap{position:relative;display:inline-flex}#fcm-chat-panel .fcm-profile-help{display:inline-flex;align-items:center;justify-content:center;width:24px;height:24px;padding:0;border:1px solid var(--ac);border-radius:50%;background:transparent;color:var(--ac);line-height:1!important;cursor:help}#fcm-chat-panel .fcm-profile-help-popup{position:absolute;left:30px;top:50%;z-index:1200;width:max-content;max-width:min(440px,55vw);padding:8px 10px;transform:translateY(-50%);visibility:hidden;opacity:0;pointer-events:none;background:var(--surface-alt);color:var(--tx);border:1px solid var(--ac);border-radius:8px;box-shadow:0 6px 20px #0009;font-size:inherit!important;line-height:1.35!important;transition:opacity .06s linear}#fcm-chat-panel .fcm-profile-help-wrap:hover .fcm-profile-help-popup,#fcm-chat-panel .fcm-profile-help:focus-visible+.fcm-profile-help-popup{visibility:visible;opacity:1}
