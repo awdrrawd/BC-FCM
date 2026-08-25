@@ -1,6 +1,6 @@
 import { cfg } from '../core/config.js';
 import { T, isZh } from '../i18n/i18n.js';
-import { PDB, _pc, Snapshot, _avQueue, _avBusy, _processAvQueue, loadAvatarFromBundle, _captureSnapshotDelayed } from '../data/profile-db.js';
+import { PDB, _pc, Snapshot, _avQueue, _avBusy, _processAvQueue, loadAvatarFromBundle, _captureSnapshotDelayed, syncRoomAvatar } from '../data/profile-db.js';
 import { getDisplayName, REL_ORDER, getRel, isFriendOf, canBeep, inRoomFn, isFav, toggleFav } from '../data/data.js';
 import { roomOp, doView, doBeep, doWhisper, doToggleList, doRemoveFriend, showConfirm, showAddFriendConfirm } from '../chat/actions.js';
 import { openChat } from '../communication/chat.js';
@@ -40,7 +40,6 @@ function makeAvEl(mn, snapshotUrl) {
             setAvatarImage(el, snap, cfg.avatarShape === 'round' ? '50%' : '7px'); return el;
         }
         (async () => {
-            if (!el.isConnected) return;
             const saved = await Snapshot.get(mn);
             if (saved) {
                 const t = el.isConnected ? el : _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
@@ -49,6 +48,7 @@ function makeAvEl(mn, snapshotUrl) {
             }
             if (_pc[mn] === undefined) await PDB.get(mn);
             const profile = _pc[mn];
+            if (_avQueue.some(item => item.mn === mn)) return;
             _avQueue.push({ mn, profile, onDone: url => {
                 const t = _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
                 setAvatarImage(t, url);
@@ -75,6 +75,17 @@ async function _forceLoadAvatar(mn, el) {
     mn = parseInt(mn);
     el.textContent = '…';
     const qi = _avQueue.findIndex(q => q.mn === mn); if (qi >= 0) _avQueue.splice(qi, 1);
+    const live = ChatRoomCharacter?.find(character => Number(character.MemberNumber) === mn);
+    if (live) {
+        await Snapshot.delete(mn);
+        let url = await syncRoomAvatar(live);
+        if (!url) {
+            const captured = PDB._face(live, 100);
+            if (captured?.length > 800) { await Snapshot.save(mn, captured, { source: 'manual-room-reload' }); url = await Snapshot.get(mn); }
+        }
+        const target = el.isConnected ? el : _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
+        if (url && target) { setAvatarImage(target, url); return; }
+    }
     if (_pc[mn] === undefined) await PDB.get(mn);
     const profile = _pc[mn];
     if (!profile) { el.textContent = '?'; return; }
