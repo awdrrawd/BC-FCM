@@ -402,6 +402,7 @@ function toggleChat(memberNumber = null) {
 
 function minimizeChat() {
     if (root) root.style.display = 'none';
+    syncMaximizedBalloonVisibility();
     ensureBalloon(true);
 }
 
@@ -411,6 +412,7 @@ function closeChat() {
     replyTarget = null;
     stackedDetail = false;
     if (root) root.style.display = 'none';
+    syncMaximizedBalloonVisibility();
     document.querySelectorAll('#fcm-chat-balloon,.fcm-chat-user-balloon').forEach(resetBalloonInteraction);
     if (memberToClose) document.getElementById(`fcm-chat-user-${memberToClose}`)?.remove();
     const balloon = document.getElementById('fcm-chat-balloon');
@@ -714,6 +716,7 @@ function renderChat() {
         <div class="fcm-chat-context-menu" hidden><button data-context-reply>${T('chatReply')}</button><button data-context-select>${T('chatSelectMessage')}</button><button data-context-copy>${T('chatCopy')}</button><button data-context-cancel>${T('chatCancel')}</button></div>
     </div>`;
     positionPanel();
+    syncMaximizedBalloonVisibility();
     bindEvents();
     installDragScroll(root, '.fcm-chat-scroll,.fcm-chat-messages,.fcm-chat-profile,.fcm-chat-body.view-settings .fcm-chat-list');
     refreshConversationRoomMeta();
@@ -808,6 +811,7 @@ function bindEvents() {
         panel.classList.add('fcm-size-animating');
         maximized = !maximized; panel.classList.toggle('maximized', maximized);
         event.currentTarget.classList.toggle('active', maximized); const label=event.currentTarget.querySelector('i'); if(label) label.textContent=maximized?T('chatRestore'):T('chatMaximize');
+        syncMaximizedBalloonVisibility();
         animatePanelSize(panel, before);
     });
     root.querySelector('button[data-layout]')?.addEventListener('click', event => {
@@ -1493,6 +1497,15 @@ function paintBalloon(element) {
     element.style.setProperty('--ac', accent);
 }
 
+function syncMaximizedBalloonVisibility() {
+    const chatVisible = !!root?.isConnected && root.style.display !== 'none';
+    const hidden = maximized && chatVisible;
+    document.querySelectorAll('#fcm-chat-balloon,.fcm-chat-user-balloon').forEach(balloon => {
+        balloon.classList.toggle('fcm-hidden-by-chat-maximized', hidden);
+        balloon.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+    });
+}
+
 function refreshBalloonBadges() {
     const railButton = root?.querySelector('.fcm-chat-rail [data-view="chat"]');
     const railBadge = railButton?.querySelector('.fcm-chat-unread');
@@ -1548,6 +1561,7 @@ function ensureBalloon(force = false) {
         placeSavedBalloon(balloon, saved);
     } else placeBalloon(balloon, cfg.balloonPlacement === 'off' ? 'bottom-right' : cfg.balloonPlacement);
     balloon.classList.toggle('persistent', !!cfg.communicationEnabled && (cfg.balloonPlacement !== 'off' || force));
+    syncMaximizedBalloonVisibility();
     if (created) resolveBalloonCollision(balloon);
 }
 
@@ -1583,6 +1597,7 @@ function showIncomingBalloon(message) {
 
 function showBalloon(balloon) {
     balloon.classList.add('visible');
+    syncMaximizedBalloonVisibility();
     if (cfg.notificationAnimation) {
         balloon.classList.remove('notify');
         void balloon.offsetWidth;
@@ -1655,6 +1670,7 @@ function injectStyles() {
 .fcm-chat-titlebar button,.fcm-chat-rail-button,.fcm-chat-row,.fcm-chat-presence button,.fcm-chat-tags button,.fcm-chat-group-tabs button,.fcm-chat-subtabs button,.fcm-chat-actions button,.fcm-chat-channels button,.fcm-chat-compose>button,.fcm-chat-status-menu button,.fcm-chat-main-settings{cursor:pointer;transition:background-color .15s ease,border-color .15s ease,color .15s ease,transform .1s ease,box-shadow .15s ease}.fcm-chat-titlebar button:active,.fcm-chat-rail-button:active,.fcm-chat-row:active,.fcm-chat-tags button:active,.fcm-chat-group-tabs button:active,.fcm-chat-subtabs button:active,.fcm-chat-actions button:active,.fcm-chat-channels button:not(:disabled):active,.fcm-chat-compose>button:not(:disabled):active{transform:scale(.95)}
 .fcm-chat-body.stacked:not(.wide-view) .fcm-chat-list,.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-main{position:absolute;top:0;bottom:0;left:54px;width:calc(100% - 54px);visibility:visible;pointer-events:auto;transition:transform .32s cubic-bezier(.4,0,.2,1),visibility 0s linear 0s,pointer-events 0s linear 0s}.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-list{transform:translateX(0);z-index:2}.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-list.slide-out{transform:translateX(-100%);visibility:hidden;pointer-events:none;transition:transform .32s cubic-bezier(.4,0,.2,1),visibility 0s linear .32s,pointer-events 0s linear .32s}.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-main{transform:translateX(100%);visibility:hidden;pointer-events:none;z-index:3;transition:transform .32s cubic-bezier(.4,0,.2,1),visibility 0s linear .32s,pointer-events 0s linear .32s}.fcm-chat-body.stacked:not(.wide-view) .fcm-chat-main.slide-in{transform:translateX(0);visibility:visible;pointer-events:auto;transition:transform .32s cubic-bezier(.4,0,.2,1),visibility 0s linear 0s,pointer-events 0s linear 0s}
 #fcm-chat-balloon,.fcm-chat-user-balloon{--s:#1a1821;--tx:#f1ecff;--ac:#7648fe;display:none;position:fixed;right:22px;bottom:22px;z-index:99991;width:54px;height:54px;border-radius:50%;background:var(--s);color:var(--ac);border:2px solid var(--ac);font-size:22px;cursor:move;box-shadow:0 6px 24px #0008;touch-action:none}#fcm-chat-balloon.visible,#fcm-chat-balloon.persistent,.fcm-chat-user-balloon.visible{display:flex;align-items:center;justify-content:center}#fcm-chat-balloon>span,.fcm-chat-user-balloon>span{display:none;position:absolute;right:60px;bottom:0;width:260px;padding:9px;text-align:left;background:var(--s);color:var(--tx);border:1px solid var(--ac);border-radius:9px;font-size:13px}#fcm-chat-balloon>span strong,.fcm-chat-user-balloon>span strong{display:block;color:var(--ac)}#fcm-chat-balloon:hover>span,.fcm-chat-user-balloon:hover>span{display:block}.fcm-chat-user-balloon .fcm-chat-avatar i{display:none}
+#fcm-chat-balloon.fcm-hidden-by-chat-maximized,.fcm-chat-user-balloon.fcm-hidden-by-chat-maximized{display:none!important}
 @keyframes fcm-chat-rise{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}@keyframes fcm-chat-pop{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:translateY(0)}}@keyframes fcm-chat-notify{0%{transform:scale(1) rotate(0)}18%{transform:scale(.86,1.15) rotate(-7deg)}38%{transform:scale(1.24,.83) rotate(8deg);box-shadow:0 0 0 10px color-mix(in srgb,var(--ac) 20%,transparent)}58%{transform:scale(.94,1.08) rotate(-4deg)}76%{transform:scale(1.06,.96) rotate(2deg)}100%{transform:scale(1) rotate(0);box-shadow:0 6px 24px #0008}}.notify{animation:fcm-chat-notify .78s cubic-bezier(.2,.8,.2,1)}
 #fcm-chat-root textarea,#fcm-chat-root input{user-select:none!important;-webkit-user-select:none!important}
 .fcm-chat-titlebar button{position:relative}
