@@ -298,7 +298,7 @@ import { profileCache as _pc } from './profile-cache.js';
             const alreadyCached = await Snapshot.get(mn);
             if (alreadyCached) { onDone(alreadyCached); continue; }
             const url = await loadAvatarFromBundle(mn, profile);
-            if (url) onDone(url);
+            onDone(url);
             await new Promise(r => setTimeout(r, 80));
         }
         _avBusy = false;

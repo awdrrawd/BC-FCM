@@ -23,6 +23,16 @@ function setAvatarImage(element, url, borderRadius = '') {
     element.appendChild(image);
 }
 
+function setAvatarLoading(mn, loading, element = null) {
+    const targets = new Set();
+    if (element) targets.add(element);
+    _panel()?.querySelectorAll(`.fcm-av[data-mn="${parseInt(mn)}"]`).forEach(target => targets.add(target));
+    targets.forEach(target => {
+        target.classList.toggle('fcm-avatar-loading', loading);
+        target.setAttribute('aria-busy', loading ? 'true' : 'false');
+    });
+}
+
 function makeAvEl(mn, snapshotUrl) {
     mn = parseInt(mn);
     const el = document.createElement('div'); el.className = 'fcm-av'; el.dataset.mn = mn;
@@ -49,9 +59,11 @@ function makeAvEl(mn, snapshotUrl) {
             if (_pc[mn] === undefined) await PDB.get(mn);
             const profile = _pc[mn];
             if (_avQueue.some(item => item.mn === mn)) return;
+            setAvatarLoading(mn, true, el);
             _avQueue.push({ mn, profile, onDone: url => {
                 const t = _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
-                setAvatarImage(t, url);
+                if (url) setAvatarImage(t, url);
+                setAvatarLoading(mn, false, t);
             }});
             if (!_avBusy) _processAvQueue();
         })();
@@ -73,7 +85,9 @@ function makeFavStar(mn, onToggle) {
 
 async function _forceLoadAvatar(mn, el) {
     mn = parseInt(mn);
-    el.textContent = '…';
+    if (el.getAttribute('aria-busy') === 'true') return;
+    setAvatarLoading(mn, true, el);
+    try {
     const qi = _avQueue.findIndex(q => q.mn === mn); if (qi >= 0) _avQueue.splice(qi, 1);
     const live = ChatRoomCharacter?.find(character => Number(character.MemberNumber) === mn);
     if (live) {
@@ -97,6 +111,9 @@ async function _forceLoadAvatar(mn, el) {
         setAvatarImage(target, url);
     } else {
         if (target) target.textContent = getDisplayName(mn).trim().slice(0, 2).toUpperCase() || '?';
+    }
+    } finally {
+        setAvatarLoading(mn, false, el);
     }
 }
 
@@ -238,10 +255,12 @@ async function _autoQueueVisible(mns) {
         const profile = _pc[mn];
         if (!profile || !profile.characterBundle) continue;
         if (_avQueue.some(q => q.mn === mn)) continue;
+        const current = _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
+        setAvatarLoading(mn, true, current);
         _avQueue.push({ mn, profile, onDone: url => {
-            if (!url) return;
             const el = _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
-            setAvatarImage(el, url);
+            if (url) setAvatarImage(el, url);
+            setAvatarLoading(mn, false, el);
         }});
         queued++;
     }

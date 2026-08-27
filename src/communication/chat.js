@@ -229,8 +229,8 @@ async function recordMessage(data, { notify = true } = {}) {
     await ChatStore.put(message);
     messages = await ChatStore.prune();
     if (root?.isConnected && root.style.display !== 'none') {
-        if (activeView === 'chat' && Number(message.memberNumber) === Number(selectedMember)) appendConversationMessage(message);
-        else renderChat();
+        if (Number(message.memberNumber) === Number(selectedMember)) appendConversationMessage(message);
+        refreshVisibleChatScroll();
     }
     if (notify && message.direction === 'in') {
         showIncomingBalloon(message);
@@ -438,7 +438,8 @@ function filteredContacts() {
 function contactRows(rows, { history = false } = {}) {
     return rows.map(row => {
         const memberNumber = Number(row.memberNumber);
-        const subtitle = history ? cleanMessage(row.content) : biography(memberNumber);
+        const direction = row.direction === 'out' ? T('chatSent') : T('chatReceived');
+        const subtitle = history ? `${direction}: ${cleanMessage(row.content)}` : biography(memberNumber);
         return `<button class="fcm-chat-row ${selectedMember === memberNumber ? 'selected' : ''} ${justOpenedMember === memberNumber ? 'just-opened' : ''}" data-member="${memberNumber}">
             ${avatarHtml(memberNumber)}
             <span class="fcm-chat-row-meta"><b>${esc(getDisplayName(memberNumber))}</b><small>${esc(subtitle)}</small></span>
@@ -527,17 +528,25 @@ function listHtml() {
     return chatListHtml();
 }
 
+function conversationRoomState(memberNumber) {
+    const roomInfo = getRoomInfo(memberNumber);
+    const privateRoom = !!roomInfo?.isPrivate && !roomInfo?.isCurrent;
+    return {
+        roomInfo,
+        roomText: privateRoom ? T('roomPrivateLabel') : roomInfo?.name || (isOnline(memberNumber) ? T('chatMainHall') : T('chatOffline')),
+        canOpenRoom: !!roomInfo?.name && !privateRoom,
+    };
+}
+
 function conversationHtml() {
     if (!selectedMember) return `<div class="fcm-chat-empty">${T('chatSelectPlayer')}</div>`;
     const available = capability(selectedMember);
-    const roomInfo = getRoomInfo(selectedMember);
+    const { roomInfo, roomText: baseRoomText, canOpenRoom } = conversationRoomState(selectedMember);
     const cachedRoom = roomInfo?.name ? getCachedRoomInfo(roomInfo.name) : null;
     const memberCount = roomInfo?.isCurrent ? (ChatRoomCharacter?.length ?? null) : (roomInfo?.memberCount ?? cachedRoom?.MemberCount ?? null);
     const memberLimit = roomInfo?.isCurrent ? (ChatRoomData?.MemberLimit ?? null) : (roomInfo?.memberLimit ?? cachedRoom?.MemberLimit ?? null);
     const roomCount = memberCount !== null && memberCount !== undefined ? ` ＜${memberCount}${memberLimit !== null && memberLimit !== undefined ? `/${memberLimit}` : ''}＞` : '';
-    const privateRoom = !!roomInfo?.isPrivate && !roomInfo?.isCurrent;
-    const roomText = privateRoom ? T('roomPrivateLabel') : roomInfo?.name ? `${roomInfo.name}${roomCount}` : (isOnline(selectedMember) ? T('chatOnlineDiffRoom') : T('chatOffline'));
-    const canOpenRoom = !!roomInfo?.name && !privateRoom;
+    const roomText = canOpenRoom ? `${roomInfo.name}${roomCount}` : baseRoomText;
     const rows = messages.filter(message => message.memberNumber === selectedMember);
     const online = isOnline(selectedMember);
     const inputPlaceholder = !online ? T('chatOfflineQueuePlaceholder') : channel === 'whisper' && inRoomFn(selectedMember) ? T('chatWhisperInputPlaceholder') : T('chatPrivateInputPlaceholder');
@@ -583,6 +592,26 @@ function expandProfileMentions(content) {
     return String(content).replace(/@(\d+)/gu, (all, id) => `@${getDisplayName(Number(id))} (${id})`);
 }
 
+function visibleChatScrollHtml() {
+    if (activeView === 'notifications') {
+        const rows = notificationTab === 'recent' ? recentConversations() : historyMessages();
+        return contactRows(rows, { history: true }) || `<div class="fcm-chat-empty">${T('chatNoRecord')}</div>`;
+    }
+    if (activeView === 'chat') return contactRows(filteredContacts()) || `<div class="fcm-chat-empty">${T('chatEmptyCategory')}</div>`;
+    return null;
+}
+
+function refreshVisibleChatScroll() {
+    const html = visibleChatScrollHtml();
+    const scroll = root?.querySelector('.fcm-chat-list .fcm-chat-scroll');
+    if (html === null || !scroll) return;
+    const scrollTop = scroll.scrollTop;
+    scroll.innerHTML = html;
+    scroll.scrollTop = scrollTop;
+    bindMemberRows(scroll);
+    hydrateChatAvatars();
+}
+
 function bindMessageImages(scope, log) {
     scope?.querySelectorAll?.('.fcm-chat-image').forEach(image => {
         image.addEventListener('load', () => {
@@ -625,6 +654,40 @@ function refreshConversationRoomMeta() {
         meta.textContent = roomText;
         meta.title = roomText;
     });
+}
+
+function refreshConversationPresence() {
+    if (!selectedMember) return;
+    const { roomInfo, roomText, canOpenRoom } = conversationRoomState(selectedMember);
+    const meta = root?.querySelector(`[data-room-meta="${selectedMember}"]`);
+    if (meta) {
+        meta.textContent = roomText;
+        meta.title = roomText;
+        if (canOpenRoom) {
+            meta.dataset.roomName = roomInfo.name;
+            meta.setAttribute('role', 'button');
+            meta.tabIndex = 0;
+        } else {
+            delete meta.dataset.roomName;
+            meta.removeAttribute('role');
+            meta.removeAttribute('tabindex');
+        }
+    }
+    const online = isOnline(selectedMember);
+    const status = online ? (sharedProfile(selectedMember).status || 'online') : 'offline';
+    const dot = root?.querySelector(`.fcm-chat-conversation-header [data-avatar-member="${selectedMember}"] i`);
+    if (dot) dot.className = status;
+    const summon = root?.querySelector('[data-summon]');
+    if (summon) summon.disabled = !ChatRoomData || !online || inRoomFn(selectedMember);
+    const whisper = root?.querySelector('[data-channel="whisper"]');
+    const beep = root?.querySelector('[data-channel="beep"]');
+    if (whisper) { whisper.disabled = !inRoomFn(selectedMember); whisper.classList.toggle('active', online && channel === 'whisper'); }
+    if (beep) { beep.disabled = !online; beep.classList.toggle('active', online && channel === 'beep'); }
+    const input = root?.querySelector('[data-input]');
+    if (input) input.placeholder = !online ? T('chatOfflineQueuePlaceholder') : channel === 'whisper' && inRoomFn(selectedMember) ? T('chatWhisperInputPlaceholder') : T('chatPrivateInputPlaceholder');
+    const send = root?.querySelector('[data-send]');
+    if (send) send.textContent = online ? T('chatSend') : T('chatQueueSend');
+    refreshConversationRoomMeta();
 }
 
 function renderChat() {
@@ -717,6 +780,22 @@ function animatePanelSize(panel, before) {
     animation.oncancel = finish;
 }
 
+function bindMemberRows(scope = root) {
+    scope?.querySelectorAll('[data-member]').forEach(button => button.addEventListener('click', async () => {
+        selectedMember = Number(button.dataset.member);
+        replyTarget = null;
+        contactCardOpen = false;
+        justOpenedMember = selectedMember;
+        channel = inRoomFn(selectedMember) ? 'whisper' : 'beep';
+        stackedDetail = true;
+        await ChatStore.markRead(selectedMember);
+        messages = await ChatStore.prune();
+        refreshBalloonBadges();
+        renderChat();
+        setTimeout(() => { justOpenedMember = null; }, 350);
+    }));
+}
+
 function bindEvents() {
     const panel = root.querySelector('#fcm-chat-panel');
     chatPanelSession.observe(panel, () => maximized);
@@ -767,19 +846,7 @@ function bindEvents() {
     });
     root.querySelectorAll('[data-presence]').forEach(button => button.addEventListener('click', () => { presenceFilter = button.dataset.presence; renderChat(); }));
     root.querySelectorAll('[data-rel]').forEach(button => button.addEventListener('click', () => { relationFilter = relationFilter === button.dataset.rel ? '' : button.dataset.rel; renderChat(); }));
-    root.querySelectorAll('[data-member]').forEach(button => button.addEventListener('click', async () => {
-        selectedMember = Number(button.dataset.member);
-        replyTarget = null;
-        contactCardOpen = false;
-        justOpenedMember = selectedMember;
-        channel = inRoomFn(selectedMember) ? 'whisper' : 'beep';
-        stackedDetail = true;
-        await ChatStore.markRead(selectedMember);
-        messages = await ChatStore.prune();
-        refreshBalloonBadges();
-        renderChat();
-        setTimeout(() => { justOpenedMember = null; }, 350);
-    }));
+    bindMemberRows();
     root.querySelector('[data-back]')?.addEventListener('click', () => { stackedDetail = false; renderChat(); });
     root.querySelectorAll('[data-channel]').forEach(button => button.addEventListener('click', () => { if (!button.disabled) { channel = button.dataset.channel; renderChat(); } }));
     root.querySelector('[data-send]')?.addEventListener('click', sendCurrentMessage);
@@ -800,8 +867,8 @@ function bindEvents() {
         const cached = getCachedRoomInfo(element.dataset.roomName);
         showRoomJoinConfirm({ room: element.dataset.roomName, creator: cached?.Creator || '', count: cached?.MemberCount ?? null, limit: cached?.MemberLimit ?? null, desc: cached?.Description || '', priv: !!cached?.Private });
     };
-    root.querySelector('[data-room-meta][data-room-name]')?.addEventListener('click', event => openHeaderRoom(event.currentTarget));
-    root.querySelector('[data-room-meta][data-room-name]')?.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openHeaderRoom(event.currentTarget); } });
+    root.querySelector('[data-room-meta]')?.addEventListener('click', event => openHeaderRoom(event.currentTarget));
+    root.querySelector('[data-room-meta]')?.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openHeaderRoom(event.currentTarget); } });
     root.querySelector('.fcm-chat-conversation-header > [data-avatar-member]')?.addEventListener('click', toggleContactCard);
     bindContactCardEvents();
     panel.addEventListener('click', event => {
@@ -1205,13 +1272,25 @@ function toggleContactCard() {
 }
 
 function bindContactCardEvents() {
-    root?.querySelector('[data-card-refresh]')?.addEventListener('click', async () => {
+    root?.querySelector('[data-card-refresh]')?.addEventListener('click', async event => {
+        const button = event.currentTarget;
+        if (button.disabled) return;
+        button.disabled = true;
+        const avatar = root?.querySelector('.fcm-chat-contact-card .fcm-chat-avatar');
+        avatar?.classList.add('fcm-avatar-loading');
+        avatar?.setAttribute('aria-busy', 'true');
         const live = character(selectedMember);
-        await Snapshot.delete(selectedMember);
-        if (live) await syncRoomAvatar(live);
-        else await loadAvatarFromBundle(selectedMember, await PDB.get(selectedMember));
-        const card = root?.querySelector('.fcm-chat-contact-card');
-        if (card) { card.outerHTML = contactCardHtml(); bindContactCardEvents(); hydrateChatAvatars(); }
+        try {
+            await Snapshot.delete(selectedMember);
+            if (live) await syncRoomAvatar(live);
+            else await loadAvatarFromBundle(selectedMember, await PDB.get(selectedMember));
+            const card = root?.querySelector('.fcm-chat-contact-card');
+            if (card) { card.outerHTML = contactCardHtml(); bindContactCardEvents(); hydrateChatAvatars(); }
+        } finally {
+            button.disabled = false;
+            avatar?.classList.remove('fcm-avatar-loading');
+            avatar?.removeAttribute('aria-busy');
+        }
     });
     root?.querySelector('[data-card-add-friend]')?.addEventListener('click', event => {
         event.stopPropagation();
@@ -1363,17 +1442,8 @@ async function handleOnlineFriendsUpdate(result) {
     if (signature !== onlinePresenceSignature) {
         onlinePresenceSignature = signature;
         if (root?.isConnected && root.style.display !== 'none') {
-            const input = root.querySelector('[data-input]');
-            const value = input?.value || '';
-            const caret = input?.selectionStart ?? value.length;
-            const hadFocus = document.activeElement === input;
-            renderChat();
-            const nextInput = root.querySelector('[data-input]');
-            if (nextInput) {
-                nextInput.value = value;
-                nextInput.setSelectionRange(caret, caret);
-                if (hadFocus) nextInput.focus();
-            }
+            refreshVisibleChatScroll();
+            refreshConversationPresence();
         }
     }
     const online = new Set(result.map(row => Number(row.MemberNumber)).filter(Boolean));
@@ -1391,7 +1461,11 @@ async function handleOnlineFriendsUpdate(result) {
             const stored = (await ChatStore.all()).find(message => message.queueId === row.id);
             if (stored) await ChatStore.put({ ...stored, queued: false, deliveredAt: Date.now() });
             messages = await ChatStore.prune();
-            if (root?.isConnected && root.style.display !== 'none') renderChat();
+            if (root?.isConnected && root.style.display !== 'none') {
+                const element = root.querySelector(`[data-msg-id="${CSS.escape(String(stored?.id || ''))}"]`);
+                element?.classList.remove('queued');
+                refreshVisibleChatScroll();
+            }
         }
         offlineQueueInFlight.delete(row.id);
     }, index * 350));
@@ -1572,6 +1646,7 @@ function injectStyles() {
 .fcm-chat-search{padding:8px 10px}.fcm-chat-search input{width:100%;padding:7px 8px;background:var(--surface-alt);color:var(--tx);border:1px solid var(--border);border-radius:7px}.fcm-chat-search input:focus{outline:0;border-color:var(--ac)}.fcm-chat-presence,.fcm-chat-tags,.fcm-chat-group-tabs,.fcm-chat-subtabs{display:flex;gap:5px;padding:0 10px 8px}.fcm-chat-presence button,.fcm-chat-tags button,.fcm-chat-group-tabs button,.fcm-chat-subtabs button{flex:1;padding:5px 4px;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:7px;font-size:11px}.fcm-chat-presence button.active,.fcm-chat-tags button.active,.fcm-chat-group-tabs button.active,.fcm-chat-subtabs button.active{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-chat-subtabs{padding-top:8px;border-bottom:1px solid var(--border)}
 .fcm-chat-row{width:100%;display:flex;align-items:center;gap:8px;padding:7px 6px;background:transparent;color:var(--tx);border:1px solid transparent;border-radius:7px;text-align:left}.fcm-chat-row:hover{background:var(--surface-raised)}.fcm-chat-row.selected{background:color-mix(in srgb,var(--ac) 14%,transparent);border-color:var(--border)}.fcm-chat-row-meta{flex:1;min-width:0;display:flex;flex-direction:column}.fcm-chat-row-meta b,.fcm-chat-row-meta small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fcm-chat-row-meta small,.fcm-chat-row time{font-size:10.5px;color:var(--dim)}.fcm-chat-row em{background:var(--ac);color:var(--s);border-radius:9px;padding:2px 6px;font-style:normal}
 .fcm-chat-avatar{position:relative;display:inline-flex;flex:none;align-items:center;justify-content:center;border-radius:7px;overflow:visible;background:var(--surface-alt);color:var(--ac);border:1px solid var(--border);font-size:11px;font-weight:700}.fcm-chat-avatar img{width:100%;height:100%;border-radius:inherit;object-fit:cover;pointer-events:none}.fcm-chat-avatar i{position:absolute;right:-4px;bottom:-4px;width:15px;height:15px;border:2px solid var(--s);border-radius:50%;background:#58c878}.fcm-chat-avatar i.busy,.fcm-status-dot.busy,.fcm-chat-status-menu i.busy{background:#e85d68}.fcm-chat-avatar i.afk,.fcm-status-dot.afk,.fcm-chat-status-menu i.afk{background:#e9bd4b}.fcm-chat-avatar i.offline,.fcm-status-dot.offline,.fcm-chat-status-menu i.offline{background:#777}
+.fcm-chat-avatar.fcm-avatar-loading img{opacity:.42;filter:saturate(.55)}.fcm-chat-avatar.fcm-avatar-loading::after{content:"";position:absolute;z-index:4;width:30%;height:30%;min-width:18px;min-height:18px;border:3px solid #ffffff55;border-top-color:var(--ac);border-radius:50%;animation:fcm-avatar-spin .75s linear infinite;box-sizing:border-box;pointer-events:none}@keyframes fcm-avatar-spin{to{transform:rotate(360deg)}}
 .fcm-chat-conversation-header{padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);animation:fcm-chat-rise .3s cubic-bezier(.2,.8,.2,1) both}.fcm-chat-conversation-header>span{display:flex;flex-direction:column}.fcm-chat-conversation-header small{color:var(--dim)}.fcm-chat-conversation-header small[data-room-name]{cursor:pointer}.fcm-chat-conversation-header small[data-room-name]:hover{color:var(--ac);text-decoration:underline}.fcm-chat-not-friend{margin-left:8px;color:var(--dim);font-size:.85em;font-style:normal;font-weight:400}.fcm-chat-conversation-header>.fcm-chat-avatar{cursor:pointer}.fcm-chat-messages{flex:1;min-height:0;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:8px;scrollbar-color:var(--ac) var(--surface-alt)}.fcm-chat-message{max-width:70%;padding:7px 10px;border-radius:7px;border:1px solid transparent;animation:fcm-chat-rise .32s cubic-bezier(.2,.8,.2,1) both}.fcm-chat-message.in{align-self:flex-start;background:var(--surface-alt)}.fcm-chat-message.out{align-self:flex-end;background:color-mix(in srgb,var(--ac) 14%,transparent);border-color:var(--ac)}.fcm-chat-message time{display:block;margin-top:3px;font-size:9px;color:var(--dim)}.fcm-chat-actions{display:flex;flex-shrink:0;gap:6px;padding:6px 12px 0;border-top:1px solid var(--border);animation:fcm-chat-rise .3s cubic-bezier(.2,.8,.2,1) .06s both}.fcm-chat-actions button{padding:4px 8px;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:7px}.fcm-chat-compose{display:flex;flex-shrink:0;gap:8px;padding:6px 12px 10px;animation:fcm-chat-rise .3s cubic-bezier(.2,.8,.2,1) .1s both}.fcm-chat-compose textarea{flex:1;resize:none;padding:8px;background:var(--surface-alt);color:var(--tx);border:1px solid var(--border);border-radius:7px;user-select:text!important;-webkit-user-select:text!important}.fcm-chat-compose>button{padding:0 16px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:7px}.fcm-chat-channels{display:flex;flex-direction:column;gap:3px}.fcm-chat-channels button{min-width:66px;flex:1;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:7px}.fcm-chat-channels button.active{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-chat-channels button:disabled{opacity:1;color:var(--dim);cursor:default}
 .fcm-chat-content{white-space:pre-wrap;overflow-wrap:anywhere}.fcm-chat-link{color:var(--ac);text-decoration:underline;user-select:text!important}.fcm-chat-image-link{display:block;margin-top:5px}.fcm-chat-image{display:block;max-width:min(360px,100%);max-height:280px;border:1px solid var(--ac);border-radius:7px;object-fit:contain;background:#0004}
 .fcm-chat-actions>span{flex:1}.fcm-chat-tools{position:relative}.fcm-chat-tools-menu{position:absolute;right:0;bottom:calc(100% + 7px);display:flex;flex-direction:column;align-items:stretch;gap:5px;padding:5px;opacity:0;visibility:hidden;transform:translateY(8px);background:var(--s);border:1px solid var(--ac);border-radius:8px;box-shadow:0 8px 24px #0009;transition:.18s ease}.fcm-chat-tools-menu button{justify-content:flex-start!important;gap:7px;white-space:nowrap}.fcm-chat-tools.open .fcm-chat-tools-menu{opacity:1;visibility:visible;transform:translateY(0)}.fcm-chat-tools.open>[data-toggle-tools]{color:var(--ac);border-color:var(--ac)}.fcm-chat-channels.offline button{color:#777!important;border-color:#555!important;background:#7771!important;box-shadow:none!important}.fcm-chat-message.queued{opacity:.68;border-style:dashed}.fcm-chat-message.queued time{color:#e9bd4b}.fcm-chat-header-action{width:38px;height:38px;padding:6px;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:7px}.fcm-chat-header-action:disabled{opacity:.35}.fcm-chat-header-action svg{width:26px!important;height:26px!important;fill:currentColor}.fcm-chat-rail-button svg,.fcm-chat-actions svg{width:18px;height:18px;fill:currentColor}

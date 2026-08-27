@@ -214,8 +214,9 @@ import { chatFontFamily } from '../communication/chat-font.js';
 .fcm-avwrap{display:flex;align-items:center;gap:5px;}
 .fcm-fav{cursor:pointer;font-size:15px;line-height:1;color:#5a4878;flex-shrink:0;transition:color .15s;}
 .fcm-fav.on{color:#f0c040;} .fcm-fav:hover{color:#ffd860;}
-.fcm-av{width:36px;height:36px;border-radius:8px;background:#201838;border:1px solid #4a3890;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:11px;color:#a080c8;flex-shrink:0;font-weight:700;}
+.fcm-av{position:relative;width:36px;height:36px;border-radius:8px;background:#201838;border:1px solid #4a3890;overflow:hidden;display:flex;align-items:center;justify-content:center;font-size:11px;color:#a080c8;flex-shrink:0;font-weight:700;}
 .fcm-av img{width:36px;height:36px;object-fit:cover;display:block;border-radius:7px;}
+.fcm-av.fcm-avatar-loading img{opacity:.42;filter:saturate(.55);}.fcm-av.fcm-avatar-loading::after{content:"";position:absolute;z-index:2;width:18px;height:18px;border:3px solid #ffffff55;border-top-color:currentColor;border-radius:50%;animation:fcm-avatar-spin .75s linear infinite;box-sizing:border-box;pointer-events:none;}@keyframes fcm-avatar-spin{to{transform:rotate(360deg)}}
 .fcm-name{color:#f0e4ff;font-size:12px;font-weight:600;max-width:130px;overflow:hidden;text-overflow:ellipsis;}
 .fcm-id{color:#7060a0;font-size:11px;}
 .fcm-id-copy{cursor:pointer;transition:color .15s;} .fcm-id-copy:hover{color:#c090ff;}
