@@ -6,7 +6,7 @@ import { renderCurrent, panelOpen, panelMini, uiTab, buildPanel, togglePanel, cl
 import { _applyWhisperStyle, _updateWhisperAvatar, _drawWavOnCanvas } from '../chat/chat-fx.js';
 import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from '../chat/wps-share.js';
 import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSHARE_TAG } from '../chat/actions.js';
-import { handleIncomingBeep, handleIncomingWhisper, handleOutgoingServerSend, handleOnlineFriendsUpdate } from '../communication/chat.js';
+import { handleIncomingBeep, handleIncomingChatMessageId, handleIncomingChatTag, handleIncomingFriendRequestNotice, handleIncomingWhisperDisplay, handleOutgoingServerSend, handleOnlineFriendsUpdate } from '../communication/chat.js';
 // ════════════════════════════════════════
 //  FCM module: hooks.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -88,6 +88,7 @@ import { handleIncomingBeep, handleIncomingWhisper, handleOutgoingServerSend, ha
         // 不可繼續交給 ServerHandleLeashBeep。
         if (data?.BeepType === 'Leash' && data?.Message === FRIENDREQ_MSG && !data?.ChatRoomName && !data?.ChatRoomSpace) {
             try { handleIncomingFriendReq(data.MemberNumber, data.MemberName); } catch {}
+            try { handleIncomingFriendRequestNotice(data); } catch {}
             return;
         }
         try { handleIncomingBeep(data); } catch {}
@@ -204,7 +205,8 @@ import { handleIncomingBeep, handleIncomingWhisper, handleOutgoingServerSend, ha
     // WPS hidden share messages
     modApi.hookFunction('ChatRoomMessage', 0, (args, next) => {
         const data = args[0];
-        try { handleIncomingWhisper(data); } catch {}
+        if (data?.Type === 'Hidden' && data?.Content === 'FCM::CHAT::TAG' && handleIncomingChatTag(data)) return;
+        if (data?.Type === 'Hidden' && data?.Content === 'FCM::CHAT::MESSAGE' && handleIncomingChatMessageId(data)) return;
         if (data?.Type === 'Hidden' && data?.Content?.startsWith(WPS_PREFIX)) {
             if (!window.LikoWPSInstance) { wpsHandleMessage(data); return; }
         }
@@ -215,6 +217,11 @@ import { handleIncomingBeep, handleIncomingWhisper, handleOutgoingServerSend, ha
             return r;
         }
         return next(args);
+    });
+    modApi.hookFunction('ChatRoomMessageDisplay', 99, (args, next) => {
+        const result = next(args);
+        try { handleIncomingWhisperDisplay(args[0], args[1], args[2]); } catch {}
+        return result;
     });
 
     setInterval(() => document.querySelectorAll('.ChatMessageLocalMessage').forEach(wpsProcessOpenTokens), 500);

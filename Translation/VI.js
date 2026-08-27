@@ -130,7 +130,14 @@
     balloonSnap: 'Hít bong bóng',
     balloonSnapNote: 'Tự động hít bong bóng được kéo vào cạnh màn hình gần nhất',
     chatNotFriend: 'Không phải bạn bè',
-    chatRoomInviteIncoming: '{0} đã mời bạn vào phòng'
+    chatRoomInviteIncoming: '{0} đã mời bạn vào phòng',
+    chatReply: 'Trả lời',
+    chatSelectMessage: 'Chọn tất cả',
+    chatCopy: 'Sao chép',
+    chatShareProfile: 'Chia sẻ hồ sơ',
+    chatProfileNotFound: 'Không tìm thấy hồ sơ đã lưu; sẽ gửi dưới dạng @ID thông thường',
+    chatNoBiography: 'Không có giới thiệu',
+    addFriend: 'Thêm bạn'
     };
     var T = {}; Object.keys(V).forEach(function (k) { T[k] = { VI: V[k] }; });
     I.register('FCM', T);

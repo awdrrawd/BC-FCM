@@ -19,3 +19,5 @@ export { default as INVITE_ICON } from '../../assets/icons/invite-action.svg?raw
 export { default as WATER_ICON } from '../../assets/icons/water.svg?raw';
 export { default as FOLDER_ICON } from '../../assets/icons/folder.svg?raw';
 export { default as MAXIMIZE_ICON } from '../../assets/icons/maximize.svg?raw';
+export { default as REPLY_ICON } from '../../assets/icons/reply.svg?raw';
+export { default as ADD_FRIEND_ICON } from '../../assets/icons/addFriends.svg?raw';
