@@ -309,17 +309,33 @@ import { profileCache as _pc } from './profile-cache.js';
         mn = parseInt(mn);
         if (!profile?.characterBundle) return null;
         if (inRoomFn(mn)) return null;
+        let C = null;
+        let existedBefore = false;
         try {
             const data = JSON.parse(profile.characterBundle);
             if (typeof CharacterLoadOnline !== 'function') return null;
-            const C = CharacterLoadOnline(data, mn);
+            existedBefore = Array.isArray(Character) && Character.some(character =>
+                String(character?.CharacterID) === String(data.ID) || Number(character?.MemberNumber) === mn);
+            C = CharacterLoadOnline(data, mn);
             if (!C) return null;
             if (typeof CharacterRefresh === 'function') CharacterRefresh(C, false, undefined);
+
+            // A newly reconstructed character needs time for BC's image/texture cache to finish.
+            // Loaded assets mark C.MustDraw; rebuild on that signal, then require several identical
+            // captures after the warm-up period. A timeout prevents a failed asset from blocking forever.
+            const startedAt = Date.now();
+            const minimumWarmup = existedBefore ? 500 : 5000;
+            const timeout = existedBefore ? 7000 : 12000;
             let prev = '', stable = 0, url = '';
-            for (let i = 0; i < 40; i++) {
-                await new Promise(r => requestAnimationFrame(r));
+            while (Date.now() - startedAt < timeout) {
+                await new Promise(r => setTimeout(r, 500));
+                if (C.MustDraw && typeof globalThis.CharacterLoadCanvas === 'function') {
+                    globalThis.CharacterLoadCanvas(C);
+                    stable = 0;
+                    prev = '';
+                }
                 const cur = PDB._face(C, 100);
-                if (cur && cur.length > 800) {
+                if (Date.now() - startedAt >= minimumWarmup && cur && cur.length > 800) {
                     if (cur === prev) {
                         stable++;
                         if (stable >= 3) { url = cur; break; }
@@ -328,16 +344,19 @@ import { profileCache as _pc } from './profile-cache.js';
                     }
                 }
             }
-            try {
-                if (Array.isArray(Character)) {
-                    const live = new Set((ChatRoomCharacter || []).map(c => c.MemberNumber));
-                    const idx = Character.findIndex(c => c.MemberNumber === mn && !live.has(mn));
-                    if (idx >= 0) Character.splice(idx, 1);
-                }
-            } catch {}
-            if (url && url.length > 800) Snapshot.save(mn, url, { source: 'manual' });
+            if (url && url.length > 800) await Snapshot.save(mn, url, { source: 'manual' });
             return url || null;
         } catch { return null; }
+        finally {
+            // CharacterLoadOnline registers reconstructed characters globally. Release temporary ones
+            // through BC's cleanup path so animations and character-owned resources are purged as well.
+            try {
+                const isLive = C && (C === Player || C === globalThis.CurrentCharacter
+                    || C === globalThis.CharacterAppearanceSelection
+                    || (ChatRoomCharacter || []).includes(C));
+                if (C && !isLive && typeof globalThis.CharacterDelete === 'function') globalThis.CharacterDelete(C, false);
+            } catch {}
+        }
     }
     function _captureSnapshotDelayed(C) {
         if (!C || !C.MemberNumber || C.MemberNumber === parseInt(Player?.MemberNumber)) return;
