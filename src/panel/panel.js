@@ -9,6 +9,7 @@ import { renderRoom, resetRoomAdminSearch } from './panel-room.js';
 import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
 import { installDragScroll } from '../ui/drag-scroll.js';
 import { setPanelController } from './panel-controller.js';
+import { requestOnlineFriends } from '../data/data.js';
 // ════════════════════════════════════════
 //  FCM module: panel.js  (orchestration core — split from Plugins/liko-FCM.user.js)
 //  面板骨架與生命週期：建立/開關/拖曳、頁籤切換、renderCurrent 分派。
@@ -21,8 +22,9 @@ import { setPanelController } from './panel-controller.js';
     function getRenderToken() { return _renderToken; }
     let panelEl = null, miniEl = null, panelOpen = false, panelMini = false;
     let uiTab = 'friends';
-    // 手動刷新的 5 秒冷卻計時；_friendPoll：面板開著時的定期抓取（BC 在聊天室內不會自動輪詢 OnlineFriends）
-    let _lastRefresh = 0, _friendPoll = null;
+    // 手動刷新的 5 秒冷卻計時。線上資料平時由 AccountQueryResult 事件推進，
+    // 面板開啟／還原時只主動查詢一次，不另設短週期輪詢。
+    let _lastRefresh = 0;
     let _commandRegistered = false;
 
     // ═══════════════════════════════════════════════════════════
@@ -104,29 +106,17 @@ import { setPanelController } from './panel-controller.js';
         }).catch(e => console.warn('🐈‍⬛ [FCM] render:', e));
     }
 
-    // 手動刷新：即刻請求最新線上好友資料，5 秒冷卻防連點狂發。回來的重繪由 hooks.js 的輪詢
-    //  重繪銜接；此處先以現有資料立即重繪一次。回傳 false = 冷卻中（供按鈕給視覺提示）。
+    // 手動刷新：即刻請求最新線上好友資料，5 秒冷卻防連點狂發。回來的重繪由
+    // hooks.js 的 AccountQueryResult hook 銜接；此處先以現有資料立即重繪一次。
+    // 回傳 false = 冷卻中（供按鈕給視覺提示）。
     function refreshPanel() {
         const now = Date.now();
         if (now - _lastRefresh < 5000) return false;
         _lastRefresh = now;
-        try { if (typeof ServerSend === 'function') ServerSend('AccountQuery', { Query: 'OnlineFriends' }); } catch {}
+        requestOnlineFriends();
         renderCurrent();
         return true;
     }
-    // 面板開著且在 friends/room 分頁時定期重查線上好友；結果回來由 hooks.js 的 result hook 重繪。
-    function _startFriendPoll() {
-        if (_friendPoll) return;
-        _friendPoll = setInterval(() => {
-            if (panelOpen && !panelMini && (uiTab === 'friends' || uiTab === 'room')
-                && typeof ServerSend === 'function') {
-                ServerSend('AccountQuery', { Query: 'OnlineFriends' });
-            }
-        }, 15000);  // ponytail: 固定 15s；要更即時就調短
-    }
-    function _stopFriendPoll() { if (_friendPoll) { clearInterval(_friendPoll); _friendPoll = null; } }
-
-
     // ═══════════════════════════════════════════════════════════
     //  PANEL STATE
     // ═══════════════════════════════════════════════════════════
@@ -136,8 +126,7 @@ import { setPanelController } from './panel-controller.js';
         if (miniEl) miniEl.classList.remove('visible');
         panelOpen = true; panelMini = false;
         // 開啟即查一次；不動 _lastRefresh，手動 ↻ 的冷卻與「開啟」脫鉤（開啟後仍可立即手動再查一次）
-        try { if (typeof ServerSend === 'function') ServerSend('AccountQuery', { Query: 'OnlineFriends' }); } catch {}
-        _startFriendPoll();
+        requestOnlineFriends();
         renderCurrent();
     }
 
@@ -165,13 +154,19 @@ import { setPanelController } from './panel-controller.js';
     // CHAT 端切換語言時會廣播同一事件；FCM 面板若已開啟，就地刷新即可，不需重建。
     window.addEventListener('fcm-language-change', refreshChrome);
 
-    function minimizePanel() { if (!panelEl) return; panelEl.classList.add('hidden'); if (miniEl) miniEl.classList.add('visible'); panelMini = true; _stopFriendPoll(); _removeWhisperAvatar(); }
-    function restorePanel() { if (!panelEl) buildPanel(); panelEl.classList.remove('hidden'); if (miniEl) miniEl.classList.remove('visible'); panelMini = false; _startFriendPoll(); renderCurrent(); }
+    function minimizePanel() { if (!panelEl) return; panelEl.classList.add('hidden'); if (miniEl) miniEl.classList.add('visible'); panelMini = true; _removeWhisperAvatar(); }
+    function restorePanel() {
+        if (!panelEl) buildPanel();
+        panelEl.classList.remove('hidden');
+        if (miniEl) miniEl.classList.remove('visible');
+        panelMini = false;
+        requestOnlineFriends();
+        renderCurrent();
+    }
     function closePanel() {
         if (panelEl) panelEl.classList.add('hidden');
         if (miniEl) miniEl.classList.remove('visible');
         panelOpen = false; panelMini = false;
-        _stopFriendPoll();
         // 關閉時一併清空所有搜尋欄位狀態
         resetPeopleSearch();
         resetFriendsSearch(); resetRoomAdminSearch(); resetRoomSearchQuery();

@@ -105,7 +105,7 @@ import { handleIncomingBeep, handleIncomingChatMessageId, handleIncomingChatTag,
             handleOnlineFriendsUpdate(data.Result);
         }
         const r = next(args);
-        // BC 背景輪詢 OnlineFriends 相當頻繁，直接跟著它重繪即為即時更新（不另設計時器）。
+        // 任何來源取得的 OnlineFriends 結果都直接更新已開啟的關係／房間頁，不另設計時器。
         if (data?.Query === 'OnlineFriends' && panelOpen && !panelMini && (uiTab === 'friends' || uiTab === 'room')) {
             renderCurrent();
         }

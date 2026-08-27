@@ -233,6 +233,15 @@ import { cfg, saveCfg } from '../core/config.js';
         return i < 0;   // true = 現在是最愛
     }
     function setOnlineFriends(v) { onlineFriends = v; }
+    function requestOnlineFriends() {
+        try {
+            if (typeof ServerSend !== 'function') return false;
+            ServerSend('AccountQuery', { Query: 'OnlineFriends' });
+            return true;
+        } catch {
+            return false;
+        }
+    }
     function setShowNickname(v) { showNickname = v; }
 
-export { onlineFriends, setOnlineFriends, showNickname, setShowNickname, getRel, getAllRels, REL_ORDER, getDisplayName, matchesSearch, buildFriendList, getZone, getRoomInfo, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep, _getWhisperTargetMN, isFav, toggleFav };
+export { onlineFriends, setOnlineFriends, requestOnlineFriends, showNickname, setShowNickname, getRel, getAllRels, REL_ORDER, getDisplayName, matchesSearch, buildFriendList, getZone, getRoomInfo, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep, _getWhisperTargetMN, isFav, toggleFav };

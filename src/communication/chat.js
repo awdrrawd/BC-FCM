@@ -1,5 +1,5 @@
 import { cfg, saveCfg } from '../core/config.js';
-import { getDisplayName, getRoomInfo, inRoomFn, onlineFriends, buildFriendList, getAllRels, isFav, isFriendOf } from '../data/data.js';
+import { getDisplayName as getSharedDisplayName, getRoomInfo, inRoomFn, onlineFriends, requestOnlineFriends, buildFriendList, getAllRels, isFav, isFriendOf } from '../data/data.js';
 import { getCachedRoomInfo, queryRoomInfo } from '../panel/panel-rooms-data.js';
 import { PDB, Snapshot, loadAvatarFromBundle, syncRoomAvatar, updateOwnAvatarSnapshot, updateOwnAvatarProfile } from '../data/profile-db.js';
 import { ChatStore, AudioStore, OfflineQueue } from './chat-store.js';
@@ -39,9 +39,13 @@ let replyTarget = null;
 let contactCardOpen = false;
 const pendingReplyTags = new Map();
 const pendingMessageIds = new Map();
+let onlinePresenceSignature = '';
 const autoReplyTimes = new Map();
 const offlineQueueInFlight = new Set();
 const remoteProfiles = new Map();
+
+// CHAT 固定使用「暱稱優先、沒有暱稱才用 BC 名稱」，不跟隨 FCM 主面板的名稱切換。
+const getDisplayName = memberNumber => getSharedDisplayName(memberNumber, true);
 let initialized = false;
 const esc = value => {
     const el = document.createElement('div');
@@ -205,7 +209,7 @@ function normalizeMessage(data) {
         channel: data.channel,
         content: cleanMessage(data.content),
         roomName: data.roomName || '',
-        name: data.name || getDisplayName(data.memberNumber),
+        name: getDisplayName(data.memberNumber),
         timestamp: Number(data.timestamp) || Date.now(),
         read: data.direction === 'out' || Number(data.memberNumber) === selectedMember,
         queued: !!data.queued,
@@ -262,7 +266,7 @@ function handleIncomingBeep(data) {
         const roomName = invite.roomName || data.ChatRoomName;
         const content = roomName;
         recordMessage({ memberNumber: data.MemberNumber, name: data.MemberName, direction: 'in', channel: 'beep', content, roomName });
-        showIncomingRoomInvite(data.MemberNumber, data.MemberName, { room: roomName, creator: invite.creator || '', count: invite.count ?? null, limit: invite.limit ?? null, desc: invite.desc || '', priv: !!invite.priv, type: invite.type || '' });
+        showIncomingRoomInvite(data.MemberNumber, getDisplayName(data.MemberNumber), { room: roomName, creator: invite.creator || '', count: invite.count ?? null, limit: invite.limit ?? null, desc: invite.desc || '', priv: !!invite.priv, type: invite.type || '' });
         return;
     }
     // Ordinary private messages can arrive as BeepType "Message".
@@ -318,7 +322,7 @@ function handleIncomingChatMessageId(data) {
 }
 
 function handleIncomingFriendRequestNotice(data) {
-    recordMessage({ memberNumber: data.MemberNumber, name: data.MemberName, direction: 'in', channel: 'beep', content: `📩 ${T('friendReqIncoming', `${data.MemberName || getDisplayName(data.MemberNumber)} (${data.MemberNumber})`)}` });
+    recordMessage({ memberNumber: data.MemberNumber, name: getDisplayName(data.MemberNumber), direction: 'in', channel: 'beep', content: `📩 ${T('friendReqIncoming', `${getDisplayName(data.MemberNumber)} (${data.MemberNumber})`)}` });
 }
 
 function handleOutgoingServerSend(type, data) {
@@ -379,6 +383,7 @@ async function openChat(memberNumber = null) {
         document.body.appendChild(root);
     }
     root.style.display = 'block';
+    requestOnlineFriends();
     if (selectedMember) await ChatStore.markRead(selectedMember);
     messages = await ChatStore.prune();
     refreshBalloonBadges();
@@ -530,14 +535,16 @@ function conversationHtml() {
     const memberCount = roomInfo?.isCurrent ? (ChatRoomCharacter?.length ?? null) : (roomInfo?.memberCount ?? cachedRoom?.MemberCount ?? null);
     const memberLimit = roomInfo?.isCurrent ? (ChatRoomData?.MemberLimit ?? null) : (roomInfo?.memberLimit ?? cachedRoom?.MemberLimit ?? null);
     const roomCount = memberCount !== null && memberCount !== undefined ? ` ＜${memberCount}${memberLimit !== null && memberLimit !== undefined ? `/${memberLimit}` : ''}＞` : '';
-    const roomText = roomInfo?.name ? `${roomInfo.name}${roomCount}` : (isOnline(selectedMember) ? T('chatOnlineDiffRoom') : T('chatOffline'));
+    const privateRoom = !!roomInfo?.isPrivate && !roomInfo?.isCurrent;
+    const roomText = privateRoom ? T('roomPrivateLabel') : roomInfo?.name ? `${roomInfo.name}${roomCount}` : (isOnline(selectedMember) ? T('chatOnlineDiffRoom') : T('chatOffline'));
+    const canOpenRoom = !!roomInfo?.name && !privateRoom;
     const rows = messages.filter(message => message.memberNumber === selectedMember);
     const online = isOnline(selectedMember);
     const inputPlaceholder = !online ? T('chatOfflineQueuePlaceholder') : channel === 'whisper' && inRoomFn(selectedMember) ? T('chatWhisperInputPlaceholder') : T('chatPrivateInputPlaceholder');
     return `<header class="fcm-chat-conversation-header">
         ${cfg.chatLayout === 'stacked' ? `<button class="fcm-chat-back fcm-chat-icon-action" data-back title="${T('chatBack')}">${EXIT_ICON}</button>` : ''}
         ${avatarHtml(selectedMember, 38, 'conversation')}
-        <span class="fcm-chat-conversation-meta"><span class="fcm-chat-name-line"><b>${esc(getDisplayName(selectedMember))} (${selectedMember})${isFriendOf(selectedMember) ? '' : `<i class="fcm-chat-not-friend">${T('chatNotFriend')}</i>`}</b><small data-room-meta="${selectedMember}" title="${esc(roomText)}" ${roomInfo?.name ? `data-room-name="${esc(roomInfo.name)}" role="button" tabindex="0"` : ''}>${esc(roomText)}</small></span><small class="fcm-chat-bio"><i>${esc(biography(selectedMember) || '-')}</i></small></span>
+        <span class="fcm-chat-conversation-meta"><span class="fcm-chat-name-line"><b>${esc(getDisplayName(selectedMember))} (${selectedMember})${isFriendOf(selectedMember) ? '' : `<i class="fcm-chat-not-friend">${T('chatNotFriend')}</i>`}</b><small data-room-meta="${selectedMember}" title="${esc(roomText)}" ${canOpenRoom ? `data-room-name="${esc(roomInfo.name)}" role="button" tabindex="0"` : ''}>${esc(roomText)}</small></span><small class="fcm-chat-bio"><i>${esc(biography(selectedMember) || '-')}</i></small></span>
         <button class="fcm-chat-header-action fcm-chat-icon-action" data-summon ${!ChatRoomData || !online || inRoomFn(selectedMember) ? 'disabled' : ''} title="${T('beepSummon')}">${SUMMON_ICON}</button>
         <div class="fcm-chat-assign"><button class="fcm-chat-rail-button" data-toggle-assign title="${T('chatAssignGroup')}">${GROUP_ICON}</button><div class="fcm-chat-assign-menu" data-assign-menu>${Object.entries(cfg.chatGroups || {}).map(([id,label]) => `<button data-assign-group="${esc(id)}">${esc(label)}</button>`).join('')}<button class="create" data-create-group-from-chat>＋ ${T('chatNewGroup')}</button></div></div>
     </header>
@@ -607,7 +614,7 @@ function appendConversationMessage(message) {
 function refreshConversationRoomMeta() {
     if (!selectedMember) return;
     const roomInfo = getRoomInfo(selectedMember);
-    if (!roomInfo?.name || roomInfo.isCurrent) return;
+    if (!roomInfo?.name || roomInfo.isCurrent || roomInfo.isPrivate) return;
     const friend = onlineFriends.find(item => Number(item.MemberNumber) === selectedMember);
     queryRoomInfo(roomInfo.name, friend?.ChatRoomSpace, data => {
         const meta = root?.querySelector(`[data-room-meta="${selectedMember}"]`);
@@ -1352,6 +1359,23 @@ async function summonCurrent() {
 
 async function handleOnlineFriendsUpdate(result) {
     if (!cfg.communicationEnabled || !Array.isArray(result)) return;
+    const signature = result.map(row => `${Number(row.MemberNumber)}:${row.ChatRoomName || ''}:${row.ChatRoomSpace || ''}:${row.Private ? 1 : 0}`).sort().join('|');
+    if (signature !== onlinePresenceSignature) {
+        onlinePresenceSignature = signature;
+        if (root?.isConnected && root.style.display !== 'none') {
+            const input = root.querySelector('[data-input]');
+            const value = input?.value || '';
+            const caret = input?.selectionStart ?? value.length;
+            const hadFocus = document.activeElement === input;
+            renderChat();
+            const nextInput = root.querySelector('[data-input]');
+            if (nextInput) {
+                nextInput.value = value;
+                nextInput.setSelectionRange(caret, caret);
+                if (hadFocus) nextInput.focus();
+            }
+        }
+    }
     const online = new Set(result.map(row => Number(row.MemberNumber)).filter(Boolean));
     const ready = OfflineQueue.all().filter(row => online.has(Number(row.memberNumber)) && !offlineQueueInFlight.has(row.id));
     if (!ready.length) return;
