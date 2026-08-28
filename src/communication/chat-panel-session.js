@@ -2,6 +2,7 @@ class ChatPanelSession {
     constructor() {
         this.size = null;
         this.observer = null;
+        this.frame = 0;
     }
 
     inlineSizeStyle() {
@@ -10,11 +11,21 @@ class ChatPanelSession {
 
     observe(panel, isMaximized) {
         this.observer?.disconnect();
+        if (this.frame) cancelAnimationFrame(this.frame);
+        this.frame = 0;
         if (!panel || typeof ResizeObserver !== 'function') return;
-        this.observer = new ResizeObserver(() => {
+        this.observer = new ResizeObserver(entries => {
             if (isMaximized()) return;
-            const rect = panel.getBoundingClientRect();
-            if (rect?.width && rect?.height) this.size = { width: Math.round(rect.width), height: Math.round(rect.height) };
+            const entry = entries[entries.length - 1];
+            const borderBox = entry?.borderBoxSize?.[0] || entry?.borderBoxSize;
+            const width = borderBox?.inlineSize || entry?.contentRect?.width;
+            const height = borderBox?.blockSize || entry?.contentRect?.height;
+            if (!width || !height) return;
+            if (this.frame) cancelAnimationFrame(this.frame);
+            this.frame = requestAnimationFrame(() => {
+                this.frame = 0;
+                this.size = { width: Math.round(width), height: Math.round(height) };
+            });
         });
         this.observer.observe(panel);
     }
