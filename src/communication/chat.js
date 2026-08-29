@@ -21,6 +21,11 @@ import {
 let root = null;
 let selectedMember = null;
 let messages = [];
+let conversationMessages = [];
+let conversationHasMore = false;
+let conversationLoading = false;
+let conversationUnread = 0;
+const CONVERSATION_PAGE_SIZE = 50;
 let search = '';
 let presenceFilter = 'online';
 let relationFilter = '';
@@ -229,7 +234,10 @@ async function recordMessage(data, { notify = true } = {}) {
     await ChatStore.put(message);
     messages = await ChatStore.prune();
     if (root?.isConnected && root.style.display !== 'none') {
-        if (Number(message.memberNumber) === Number(selectedMember)) appendConversationMessage(message);
+        if (Number(message.memberNumber) === Number(selectedMember)) {
+            if (!conversationMessages.some(row => row.id === message.id)) conversationMessages.push(message);
+            appendConversationMessage(message);
+        }
         refreshVisibleChatScroll();
     }
     if (notify && message.direction === 'in') {
@@ -386,6 +394,7 @@ async function openChat(memberNumber = null) {
     requestOnlineFriends();
     if (selectedMember) await ChatStore.markRead(selectedMember);
     messages = await ChatStore.prune();
+    if (selectedMember) await loadConversation(selectedMember);
     refreshBalloonBadges();
     renderChat();
     return true;
@@ -476,7 +485,7 @@ function groupDefinitions() {
 function groupsHtml() {
     const definitions = groupDefinitions();
     const group = groupMode === 'room' ? definitions.room : (definitions.groups.find(item => item.id === selectedGroup) || definitions.groups[0]);
-    const rows = group.members.filter(memberNumber => !groupSearch || `${getDisplayName(memberNumber)} ${biography(memberNumber)}`.toLowerCase().includes(groupSearch.toLowerCase())).map(memberNumber => ({ memberNumber, timestamp: 0, unread: 0 }));
+    const rows = filteredGroupRows(group);
     return `<div class="fcm-chat-list-title">${T('chatGroups')}</div>
         <div class="fcm-chat-group-create"><input data-group-search value="${esc(groupSearch)}" placeholder="${T('chatSearchPlayers')}"></div>
         <div class="fcm-chat-presence fcm-chat-group-mode"><button class="${groupMode === 'room' ? 'active' : ''}" data-group-mode="room">${T('chatRoom')}</button><button class="${groupMode === 'groups' ? 'active' : ''}" data-group-mode="groups">${T('chatGroupsTab')}</button></div>
@@ -549,7 +558,7 @@ function conversationHtml() {
     const memberLimit = roomInfo?.isCurrent ? (ChatRoomData?.MemberLimit ?? null) : (roomInfo?.memberLimit ?? cachedRoom?.MemberLimit ?? null);
     const roomCount = memberCount !== null && memberCount !== undefined ? ` ＜${memberCount}${memberLimit !== null && memberLimit !== undefined ? `/${memberLimit}` : ''}＞` : '';
     const roomText = canOpenRoom ? `${roomInfo.name}${roomCount}` : baseRoomText;
-    const rows = messages.filter(message => message.memberNumber === selectedMember);
+    const rows = conversationMessages;
     const online = isOnline(selectedMember);
     const inputPlaceholder = !online ? T('chatOfflineQueuePlaceholder') : channel === 'whisper' && inRoomFn(selectedMember) ? T('chatWhisperInputPlaceholder') : T('chatPrivateInputPlaceholder');
     return `<header class="fcm-chat-conversation-header">
@@ -561,7 +570,8 @@ function conversationHtml() {
     </header>
     ${contactCardOpen ? contactCardHtml() : ''}
     <div class="fcm-chat-messages">${rows.map(messageHtml).join('') || `<div class="fcm-chat-empty">${T('chatNoMessages')}</div>`}</div>
-    <div class="fcm-chat-actions"><button class="fcm-chat-icon-action" data-invite ${available === 'none' || inRoomFn(selectedMember) ? 'disabled' : ''} title="${T('chatInviteRoom')}" aria-label="${T('chatInviteRoom')}">${INVITE_ICON}</button><span></span><div class="fcm-chat-tools"><div class="fcm-chat-tools-menu"><button class="fcm-chat-icon-action" data-export title="${T('chatSaveMessages')}">${DOWNLOAD_ICON}<span>${T('chatSaveMessages')}</span></button><button class="fcm-chat-icon-action" data-delete title="${T('chatDeleteAll')}">${TRASH_ICON}<span>${T('chatDeleteAll')}</span></button></div><button class="fcm-chat-icon-action" data-toggle-tools title="${T('chatMessageTools')}">${FOLDER_ICON}</button></div></div>
+    <button class="fcm-chat-new-messages" data-new-messages ${conversationUnread ? '' : 'hidden'}>${T('chatNewUnread', conversationUnread)}</button>
+    <div class="fcm-chat-actions"><button class="fcm-chat-icon-action" data-invite ${available === 'none' || inRoomFn(selectedMember) ? 'disabled' : ''} title="${T('chatInviteRoom')}" aria-label="${T('chatInviteRoom')}">${INVITE_ICON}</button><span></span><div class="fcm-chat-tools"><div class="fcm-chat-tools-menu"><button class="fcm-chat-icon-action" data-export="html" title="${T('chatExportHtml')}">${DOWNLOAD_ICON}<span>${T('chatExportHtml')}</span></button><button class="fcm-chat-icon-action" data-export="json" title="${T('chatExportJson')}">${DOWNLOAD_ICON}<span>${T('chatExportJson')}</span></button><button class="fcm-chat-icon-action" data-delete title="${T('chatDeleteAll')}">${TRASH_ICON}<span>${T('chatDeleteAll')}</span></button></div><button class="fcm-chat-icon-action" data-toggle-tools title="${T('chatMessageTools')}">${FOLDER_ICON}</button></div></div>
     <div class="fcm-chat-compose">
         <div class="fcm-chat-channels ${online ? '' : 'offline'}"><button class="${online && channel === 'whisper' ? 'active' : ''}" data-channel="whisper" ${!inRoomFn(selectedMember) ? 'disabled' : ''}>${T('btnWhisper')}</button><button class="${online && channel === 'beep' ? 'active' : ''}" data-channel="beep" ${!online ? 'disabled' : ''}>${T('btnBeep')}</button></div>
         <div class="fcm-chat-input-wrap">${replyTarget ? `<div class="fcm-chat-reply-indicator"><span>${T('chatReply')}: ${esc(replyTarget.preview)}</span><button data-cancel-reply title="${T('chatCancel')}">×</button></div>` : ''}<div class="fcm-chat-profile-suggest" data-profile-suggest hidden></div><textarea data-input rows="2" placeholder="${inputPlaceholder}"></textarea></div>
@@ -600,7 +610,16 @@ function visibleChatScrollHtml() {
         return contactRows(rows, { history: true }) || `<div class="fcm-chat-empty">${T('chatNoRecord')}</div>`;
     }
     if (activeView === 'chat') return contactRows(filteredContacts()) || `<div class="fcm-chat-empty">${T('chatEmptyCategory')}</div>`;
+    if (activeView === 'groups') {
+        const definitions = groupDefinitions();
+        const group = groupMode === 'room' ? definitions.room : (definitions.groups.find(item => item.id === selectedGroup) || definitions.groups[0]);
+        return contactRows(filteredGroupRows(group)) || `<div class="fcm-chat-empty">${T('chatGroupEmpty')}</div>`;
+    }
     return null;
+}
+
+function filteredGroupRows(group) {
+    return (group?.members || []).filter(memberNumber => !groupSearch || `${getDisplayName(memberNumber)} ${biography(memberNumber)}`.toLowerCase().includes(groupSearch.toLowerCase())).map(memberNumber => ({ memberNumber, timestamp: 0, unread: 0 }));
 }
 
 function refreshVisibleChatScroll() {
@@ -617,7 +636,7 @@ function refreshVisibleChatScroll() {
 function bindMessageImages(scope, log) {
     scope?.querySelectorAll?.('.fcm-chat-image').forEach(image => {
         image.addEventListener('load', () => {
-            if (log) log.scrollTop = log.scrollHeight;
+            if (log && image.closest('.fcm-chat-message')?.classList.contains('out')) log.scrollTop = log.scrollHeight;
         }, { once: true });
         image.addEventListener('error', () => {
             const link = image.closest('a');
@@ -639,7 +658,53 @@ function appendConversationMessage(message) {
         if (room) showRoomJoinConfirm({ room });
     });
     bindMessageImages(inserted, log);
-    requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; });
+    if (message.direction === 'out') {
+        conversationUnread = 0;
+        requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; updateConversationUnreadNotice(); });
+    } else {
+        requestAnimationFrame(() => {
+            if (log.scrollHeight - log.scrollTop - log.clientHeight > 12) conversationUnread++;
+            updateConversationUnreadNotice();
+        });
+    }
+}
+
+async function loadConversation(memberNumber) {
+    const target = Number(memberNumber);
+    conversationLoading = true;
+    const page = await ChatStore.page(target, { limit: CONVERSATION_PAGE_SIZE });
+    if (Number(selectedMember) === target) {
+        conversationMessages = page.messages.map(message => ({ ...message, content: cleanMessage(message.content) }));
+        conversationHasMore = page.hasMore;
+        conversationUnread = 0;
+    }
+    conversationLoading = false;
+}
+
+async function loadOlderConversation(log) {
+    if (!selectedMember || conversationLoading || !conversationHasMore || !conversationMessages.length) return;
+    conversationLoading = true;
+    const target = Number(selectedMember);
+    const oldHeight = log.scrollHeight;
+    const oldTop = log.scrollTop;
+    const page = await ChatStore.page(target, { before: conversationMessages[0].timestamp, limit: CONVERSATION_PAGE_SIZE });
+    if (Number(selectedMember) === target && page.messages.length) {
+        const existing = new Set(conversationMessages.map(message => message.id));
+        const older = page.messages.filter(message => !existing.has(message.id));
+        conversationMessages = [...older, ...conversationMessages];
+        log.insertAdjacentHTML('afterbegin', older.map(messageHtml).join(''));
+        bindMessageImages(log, log);
+        log.scrollTop = oldTop + (log.scrollHeight - oldHeight);
+        conversationHasMore = page.hasMore;
+    } else if (Number(selectedMember) === target) conversationHasMore = false;
+    conversationLoading = false;
+}
+
+function updateConversationUnreadNotice() {
+    const button = root?.querySelector('[data-new-messages]');
+    if (!button) return;
+    button.hidden = !conversationUnread;
+    button.textContent = T('chatNewUnread', conversationUnread);
 }
 
 function refreshConversationRoomMeta() {
@@ -793,6 +858,7 @@ function bindMemberRows(scope = root) {
         stackedDetail = true;
         await ChatStore.markRead(selectedMember);
         messages = await ChatStore.prune();
+        await loadConversation(selectedMember);
         refreshBalloonBadges();
         renderChat();
         setTimeout(() => { justOpenedMember = null; }, 350);
@@ -843,10 +909,9 @@ function bindEvents() {
         const id = `group-${Date.now().toString(36)}`; cfg.chatGroups ||= {}; cfg.chatGroups[id] = label; selectedGroup = id; saveCfg(); renderChat();
     });
     root.querySelectorAll('[data-group-mode]').forEach(button => button.addEventListener('click', () => { groupMode = button.dataset.groupMode; renderChat(); }));
-    root.querySelector('[data-group-search]')?.addEventListener('input', event => { groupSearch = event.target.value; const caret=event.target.selectionStart??groupSearch.length; renderChat(); const input=root.querySelector('[data-group-search]'); input?.focus(); input?.setSelectionRange(caret,caret); });
+    root.querySelector('[data-group-search]')?.addEventListener('input', event => { groupSearch = event.target.value; refreshVisibleChatScroll(); });
     root.querySelector('[data-search]')?.addEventListener('input', event => {
-        search = event.target.value; const caret = event.target.selectionStart ?? search.length; renderChat();
-        const input = root.querySelector('[data-search]'); input?.focus(); input?.setSelectionRange(caret, caret);
+        search = event.target.value; refreshVisibleChatScroll();
     });
     root.querySelectorAll('[data-presence]').forEach(button => button.addEventListener('click', () => { presenceFilter = button.dataset.presence; renderChat(); }));
     root.querySelectorAll('[data-rel]').forEach(button => button.addEventListener('click', () => { relationFilter = relationFilter === button.dataset.rel ? '' : button.dataset.rel; renderChat(); }));
@@ -854,12 +919,25 @@ function bindEvents() {
     root.querySelector('[data-back]')?.addEventListener('click', () => { stackedDetail = false; renderChat(); });
     root.querySelectorAll('[data-channel]').forEach(button => button.addEventListener('click', () => { if (!button.disabled) { channel = button.dataset.channel; renderChat(); } }));
     root.querySelector('[data-send]')?.addEventListener('click', sendCurrentMessage);
+    const conversationLog = root.querySelector('.fcm-chat-messages');
+    conversationLog?.addEventListener('scroll', () => {
+        if (conversationLog.scrollTop < 80) loadOlderConversation(conversationLog);
+        if (conversationLog.scrollHeight - conversationLog.scrollTop - conversationLog.clientHeight <= 12 && conversationUnread) {
+            conversationUnread = 0;
+            updateConversationUnreadNotice();
+        }
+    });
+    root.querySelector('[data-new-messages]')?.addEventListener('click', () => {
+        if (conversationLog) conversationLog.scrollTop = conversationLog.scrollHeight;
+        conversationUnread = 0;
+        updateConversationUnreadNotice();
+    });
     bindMessageActions();
     root.querySelector('[data-cancel-reply]')?.addEventListener('click', clearReplyTarget);
     root.querySelector('[data-input]')?.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendCurrentMessage(); } });
     root.querySelector('[data-input]')?.addEventListener('input', updateProfileSuggestion);
     root.querySelector('[data-delete]')?.addEventListener('click', deleteConversation);
-    root.querySelector('[data-export]')?.addEventListener('click', exportConversation);
+    root.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => exportConversation(button.dataset.export)));
     root.querySelector('[data-invite]')?.addEventListener('click', inviteCurrent);
     root.querySelector('[data-summon]')?.addEventListener('click', summonCurrent);
     root.querySelector('[data-toggle-tools]')?.addEventListener('click', event => { event.stopPropagation(); event.currentTarget.closest('.fcm-chat-tools')?.classList.toggle('open'); });
@@ -1403,18 +1481,81 @@ async function deleteConversation() {
     await ChatStore.deleteMember(selectedMember);
     OfflineQueue.removeMember(selectedMember);
     messages = messages.filter(message => message.memberNumber !== selectedMember);
+    conversationMessages = [];
+    conversationHasMore = false;
+    conversationUnread = 0;
     renderChat();
 }
 
-function exportConversation() {
-    const text = messages.filter(message => message.memberNumber === selectedMember).map(message =>
-        `[${new Date(message.timestamp).toLocaleString()}] ${message.direction === 'out' ? 'Me' : getDisplayName(selectedMember)} (${message.channel}): ${message.content}`
-    ).join('\n');
+function downloadConversationFile(content, type, extension) {
     const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
-    link.download = `FCM-Chat-${selectedMember}-${Date.now()}.txt`;
+    link.href = URL.createObjectURL(new Blob([content], { type }));
+    link.download = `FCM-Chat-${selectedMember}-${new Date().toISOString().replace(/[:.]/g, '-')}.${extension}`;
     link.click();
     setTimeout(() => URL.revokeObjectURL(link.href), 1000);
+}
+
+function exportedMessageHtml(message, peerName, selfName) {
+    const sender = message.direction === 'out' ? selfName : peerName;
+    const reply = message.replyPreview ? `<div class="reply">↩ ${esc(message.replyPreview)}</div>` : '';
+    const translation = message.translatedContent ? `<div class="translation">[${esc(message.translatedContent)}]</div>` : '';
+    return `<article class="message ${message.direction}">${reply}<div class="sender">${esc(sender)}</div><div class="content">${messageContentHtml(message.content)}</div>${translation}<footer>${esc(message.channel === 'whisper' ? T('chatChannelWhisper') : T('chatChannelPrivate'))} · <time datetime="${new Date(message.timestamp).toISOString()}">${esc(new Date(message.timestamp).toLocaleString())}</time></footer></article>`;
+}
+
+function exportTimestamp(date = new Date()) {
+    const pad = value => String(value).padStart(2, '0');
+    return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+}
+
+function blobAsDataUrl(blob) {
+    return new Promise(resolve => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+        reader.onerror = () => resolve('');
+        reader.readAsDataURL(blob);
+    });
+}
+
+async function exportAvatarUrl(memberNumber) {
+    const direct = avatarUrl(memberNumber);
+    if (direct?.startsWith('data:image/')) return direct;
+    const record = await Snapshot.getRecord(memberNumber);
+    if (record?.blob instanceof Blob) return blobAsDataUrl(record.blob);
+    if (direct && !direct.startsWith('blob:')) {
+        try {
+            const response = await fetch(direct);
+            if (response.ok) return await blobAsDataUrl(await response.blob());
+        } catch {}
+        return direct;
+    }
+    return '';
+}
+
+function conversationExportHtml(storedMessages, peerAvatar = '') {
+    const peerName = `${getDisplayName(selectedMember)} (${selectedMember})`;
+    const selfDisplayName = String(Player?.Nickname || Player?.Name || getDisplayName(Player?.MemberNumber));
+    const selfName = `${selfDisplayName} (${Player?.MemberNumber})`;
+    const peerAvatarHtml = peerAvatar ? `<img class="avatar" src="${esc(peerAvatar)}" alt="" onerror="this.remove()">` : '';
+    const [panel, text, accent] = chatColors();
+    const title = `FCM Chat — ${peerName}`;
+    return `<!doctype html><html lang="${esc(document.documentElement.lang || cfg.lang || 'en')}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>
+:root{color-scheme:dark;--panel:${esc(panel)};--text:${esc(text)};--accent:${esc(accent)};--surface:color-mix(in srgb,var(--panel) 82%,#000);--incoming-border:color-mix(in srgb,var(--text) 65%,transparent)}*{box-sizing:border-box}body{margin:0;background:#111;color:var(--text);font:14px/1.45 system-ui,sans-serif}.app{width:min(860px,100%);min-height:100vh;margin:auto;background:var(--panel);box-shadow:0 0 40px #000}.header{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:11px;padding:14px 22px;background:color-mix(in srgb,var(--panel) 92%,transparent);border-bottom:1px solid color-mix(in srgb,var(--accent) 35%,transparent);backdrop-filter:blur(10px)}.avatar{width:42px;height:42px;flex:0 0 42px;object-fit:cover;border:1px solid var(--accent);border-radius:50%}h1{margin:0;color:var(--accent);font-size:18px}.messages{display:flex;flex-direction:column;gap:10px;padding:22px}.message{position:relative;width:fit-content;max-width:72%;padding:9px 12px;border:1px solid var(--incoming-border);border-radius:9px;background:var(--surface)}.message::before{content:"";position:absolute;top:16px;width:8px;height:8px;background:var(--surface);transform:rotate(45deg)}.message.in::before{left:-5px;border-left:1px solid var(--incoming-border);border-bottom:1px solid var(--incoming-border)}.message.out{align-self:flex-end;background:color-mix(in srgb,var(--accent) 14%,var(--panel));border-color:var(--accent)}.message.out::before{right:-5px;background:color-mix(in srgb,var(--accent) 14%,var(--panel));border-top:1px solid var(--accent);border-right:1px solid var(--accent)}.sender{margin-bottom:3px;color:var(--accent);font-size:12px;font-weight:700}.content{white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}.content a{color:var(--accent)}.content img{display:block;max-width:min(420px,100%);max-height:420px;margin-top:7px;border-radius:7px}.reply{margin-bottom:6px;padding:4px 7px;border-left:3px solid var(--accent);background:#0002;opacity:.82}.translation{margin-top:5px}.message footer{margin-top:5px;font-size:10px;opacity:.62}.empty{text-align:center;opacity:.65}</style></head><body><main class="app"><header class="header">${peerAvatarHtml}<h1>${esc(peerName)} - ${esc(exportTimestamp())} · ${storedMessages.length}</h1></header><section class="messages">${storedMessages.map(message => exportedMessageHtml(message, peerName, selfName)).join('') || `<div class="empty">${esc(T('chatNoMessages'))}</div>`}</section></main></body></html>`;
+}
+
+async function exportConversation(format = 'html') {
+    const storedMessages = await ChatStore.memberAll(selectedMember);
+    if (format === 'json') {
+        const payload = {
+            format: 'FCM_CHAT_EXPORT', version: 1, exportedAt: new Date().toISOString(),
+            owner: { memberNumber: Number(Player?.MemberNumber), name: String(Player?.Nickname || Player?.Name || getDisplayName(Player?.MemberNumber)) },
+            contact: { memberNumber: Number(selectedMember), name: getDisplayName(selectedMember), biography: biography(selectedMember) || '' },
+            messageCount: storedMessages.length,
+            messages: storedMessages.map(({ ownerMemberNumber: _owner, ...message }) => message),
+        };
+        downloadConversationFile(JSON.stringify(payload, null, 2), 'application/json;charset=utf-8', 'json');
+        return;
+    }
+    downloadConversationFile(conversationExportHtml(storedMessages, await exportAvatarUrl(selectedMember)), 'text/html;charset=utf-8', 'html');
 }
 
 function inviteCurrent() {
@@ -1718,7 +1859,7 @@ body>.fcm-chat-user-balloon{border:0!important;box-shadow:0 0 15px color-mix(in 
 .fcm-chat-profile{--profile-label-width:193px}.fcm-chat-profile :is(.fcm-chat-profile-line>span,.fcm-chat-profile-field>span,.fcm-profile-auto-replies label>b,.fcm-profile-edit){font-size:16px!important}.fcm-chat-profile-line>b{font-size:13px}.fcm-profile-edit{padding:5px 8px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:6px}.fcm-profile-nickname-editor[hidden]{display:none!important}.fcm-profile-nickname-editor{grid-column:2/4;display:flex;align-items:center;gap:6px}.fcm-profile-nickname-editor input{flex:1;min-width:0}.fcm-profile-nickname-editor button{width:30px;height:30px;padding:0;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:6px}.fcm-chat-profile-field,.fcm-chat-profile label.fcm-chat-profile-field{display:grid!important;grid-template-columns:var(--profile-label-width) minmax(0,1fr);align-items:start;gap:10px;max-width:680px!important;color:var(--dim)}.fcm-chat-profile-field>span{padding-top:8px}.fcm-chat-profile-field>input,.fcm-chat-profile-field>textarea{width:100%;max-width:none}.fcm-profile-auto-replies{display:grid;grid-template-columns:1fr 1fr;gap:12px}.fcm-chat-profile .fcm-profile-auto-replies>label{position:relative;display:grid!important;grid-template-columns:1fr auto;gap:6px;max-width:none}.fcm-profile-auto-replies label>b{align-self:center;color:var(--dim)}.fcm-profile-auto-replies textarea{grid-column:1/3;width:100%}.fcm-profile-auto-replies .fcm-chat-switch{grid-column:2;grid-row:1}.fcm-chat-avatar i,.fcm-status-dot,.fcm-chat-status-menu i,.fcm-profile-statuses button>i{box-shadow:0 0 7px 2px color-mix(in srgb,#58c878 70%,transparent)}.fcm-chat-avatar i.busy,.fcm-status-dot.busy,.fcm-chat-status-menu i.busy,.fcm-profile-statuses button>i.busy{box-shadow:0 0 7px 2px color-mix(in srgb,#e85d68 70%,transparent)}.fcm-chat-avatar i.afk,.fcm-status-dot.afk,.fcm-chat-status-menu i.afk,.fcm-profile-statuses button>i.afk{box-shadow:0 0 7px 2px color-mix(in srgb,#e9bd4b 70%,transparent)}.fcm-chat-avatar i.offline,.fcm-status-dot.offline{box-shadow:0 0 6px 1px #7778}
 .fcm-chat-icon-action{display:inline-flex!important;align-items:center;justify-content:center;min-width:30px;min-height:30px}.fcm-chat-icon-action svg{width:17px!important;height:17px!important;display:block;fill:currentColor}.fcm-chat-back{width:30px;height:30px}
 .fcm-chat-conversation-header .fcm-chat-header-action svg{width:26px!important;height:26px!important}
-.fcm-chat-conversation-header>.fcm-chat-back,.fcm-chat-conversation-header>.fcm-chat-header-action,.fcm-chat-conversation-header>.fcm-chat-assign>button{width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;flex:0 0 38px!important;padding:6px!important}.fcm-chat-conversation-header>.fcm-chat-avatar{width:38px!important;height:38px!important;flex:0 0 38px}.fcm-chat-rail .fcm-chat-unread{pointer-events:none;right:-7px;top:-7px}.fcm-chat-rail-button.has-unread{box-shadow:0 0 10px color-mix(in srgb,var(--ac) 38%,transparent)}.fcm-balloon-icon svg [id="Path 0"]{display:none}
+.fcm-chat-conversation-header>.fcm-chat-back,.fcm-chat-conversation-header>.fcm-chat-header-action,.fcm-chat-conversation-header>.fcm-chat-assign>button{width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;flex:0 0 38px!important;padding:6px!important}.fcm-chat-conversation-header>.fcm-chat-avatar{width:38px!important;height:38px!important;flex:0 0 38px}.fcm-chat-rail .fcm-chat-unread{pointer-events:none;right:0;top:0}.fcm-chat-rail-button.has-unread{box-shadow:0 0 10px color-mix(in srgb,var(--ac) 38%,transparent)}.fcm-balloon-icon svg [id="Path 0"]{display:none}
 .fcm-chat-switch{transition:border-color .16s ease,background .16s ease,box-shadow .16s ease}.fcm-chat-switch i{transition:transform .18s ease,background .16s ease}.fcm-chat-switch:hover{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,var(--surface-alt));box-shadow:0 0 9px color-mix(in srgb,var(--ac) 22%,transparent)}.fcm-chat-switch:hover i{background:color-mix(in srgb,var(--ac) 70%,var(--tx))}
 #fcm-chat-balloon,.fcm-chat-user-balloon{z-index:100010}.fcm-balloon-preview{display:none!important;position:absolute!important;right:60px!important;left:auto!important;bottom:0!important;z-index:100011!important;width:260px!important;padding:9px!important;text-align:left!important;background:var(--s)!important;color:var(--tx)!important;border:1px solid var(--ac)!important;border-radius:9px!important;font-size:13px!important;pointer-events:none}.preview-right>.fcm-balloon-preview{right:auto!important;left:60px!important}.fcm-balloon-preview strong{display:block;color:var(--ac)}#fcm-chat-balloon:hover>.fcm-balloon-preview,.fcm-chat-user-balloon:hover>.fcm-balloon-preview{display:block!important}
 #fcm-chat-balloon,.fcm-chat-user-balloon{transform-origin:50% 65%;will-change:transform,left,top;transition:transform .34s cubic-bezier(.2,1.45,.35,1),left .14s ease-out,top .14s ease-out,border-radius .24s ease,box-shadow .24s ease}#fcm-chat-balloon.dragging,.fcm-chat-user-balloon.dragging{transform:rotate(var(--drag-angle,0deg)) scale(var(--drag-stretch,1),var(--drag-squash,1))!important;transform-origin:50% 20%;border-radius:46% 46% 58% 58% / 36% 36% 68% 68%;box-shadow:0 14px 28px #0009,0 0 16px color-mix(in srgb,var(--ac) 35%,transparent);transition:border-radius .16s ease,box-shadow .16s ease}#fcm-chat-balloon.released,.fcm-chat-user-balloon.released{animation:fcm-balloon-release .5s cubic-bezier(.2,.8,.2,1)}#fcm-chat-balloon.stirred,.fcm-chat-user-balloon.stirred{transform:translate(var(--stir-x,0),var(--stir-y,0)) rotate(var(--stir-angle,0deg)) scale(.96,1.04)!important;transition:transform .12s ease-out}@keyframes fcm-balloon-release{0%{transform:scale(1.16,.82)}28%{transform:scale(.9,1.13)}52%{transform:scale(1.07,.94)}74%{transform:scale(.97,1.04)}100%{transform:scale(1)}}
@@ -1735,6 +1876,7 @@ body>.fcm-chat-user-balloon{border:0!important;box-shadow:0 0 15px color-mix(in 
 .fcm-chat-input-wrap{min-width:0;flex:1;display:flex;flex-direction:column;gap:4px}.fcm-chat-input-wrap textarea{width:100%}.fcm-chat-reply-indicator{display:flex;align-items:center;gap:6px;padding:5px 8px;color:var(--dim);border-left:3px solid var(--ac);background:color-mix(in srgb,var(--ac) 10%,transparent);border-radius:4px}.fcm-chat-reply-indicator span{min-width:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fcm-chat-reply-indicator button{width:22px;height:22px;padding:0;border:0;background:transparent;color:var(--dim)}.fcm-chat-message-original{display:block;margin-top:4px;color:var(--dim);font-size:.92em;white-space:pre-wrap;user-select:text!important;-webkit-user-select:text!important}
 .fcm-chat-message-original{color:var(--tx)}.fcm-chat-message-reply svg{width:18px;height:18px;display:block;margin:auto}.fcm-chat-message.in .fcm-chat-message-reply svg{transform:scaleX(-1)}.fcm-chat-tag-preview{display:flex;align-items:center;gap:5px;margin-bottom:5px;padding:4px 6px;border-left:3px solid var(--ac);background:color-mix(in srgb,var(--ac) 9%,transparent);border-radius:3px;color:var(--tx)}.fcm-chat-tag-preview svg{width:15px;height:15px;flex:none}.fcm-chat-tag-preview i{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fcm-chat-conversation-meta{min-width:0;flex:1}.fcm-chat-name-line{display:flex!important;flex-direction:row!important;align-items:baseline;gap:8px;min-width:0}.fcm-chat-name-line>small{white-space:nowrap}.fcm-chat-bio{display:block!important;max-width:100%;overflow:hidden;white-space:nowrap;color:var(--tx)!important}.fcm-chat-bio>i{display:inline-block;font-style:normal}.fcm-chat-bio.marquee>i{padding-left:100%;animation:fcm-chat-marquee 14s linear infinite}@keyframes fcm-chat-marquee{to{transform:translateX(-100%)}}.fcm-chat-main{position:relative}.fcm-chat-contact-card{position:absolute;z-index:50;left:12px;top:62px;width:min(330px,calc(100% - 24px));display:flex;gap:14px;padding:14px;background:var(--s);border:1px solid var(--ac);border-radius:12px;box-shadow:0 10px 30px #000b}.fcm-chat-contact-card>div{min-width:0;flex:1;display:flex;flex-direction:column;gap:8px}.fcm-chat-contact-card small{white-space:pre-wrap;color:var(--tx)}.fcm-chat-contact-card button{align-self:flex-start;padding:5px 9px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:6px}.fcm-chat-profile-suggest{position:absolute;left:0;right:0;bottom:100%;z-index:80;padding:6px;background:var(--s);border:1px solid var(--ac);border-radius:8px;box-shadow:0 8px 22px #000b}.fcm-chat-input-wrap{position:relative}.fcm-chat-profile-suggest[hidden]{display:none}.fcm-chat-profile-suggest>button{width:100%;display:flex;align-items:center;gap:8px;padding:5px;background:transparent;color:var(--tx);border:0;border-radius:5px;text-align:left}.fcm-chat-profile-suggest>button:hover{background:color-mix(in srgb,var(--ac) 15%,transparent)}.fcm-chat-profile-suggest>button span{display:flex;flex-direction:column}.fcm-chat-profile-suggest>span{display:block;padding:7px;color:var(--tx)}.fcm-chat-profile-mention{display:inline;padding:0 2px;background:transparent;color:var(--ac);border:0;text-decoration:underline;user-select:text}.fcm-chat-profile-mention:hover{filter:brightness(1.25)}
 .fcm-chat-message{cursor:pointer}.fcm-chat-message .fcm-chat-message-reply{opacity:0;visibility:hidden;pointer-events:none}.fcm-chat-message.selected{border-color:var(--ac);box-shadow:0 0 0 2px color-mix(in srgb,var(--ac) 35%,transparent),0 0 14px color-mix(in srgb,var(--ac) 25%,transparent)}.fcm-chat-message.selected .fcm-chat-message-reply{opacity:1;visibility:visible;pointer-events:auto}.fcm-chat-message.reply-highlight{animation:fcm-reply-highlight 1.6s ease}@keyframes fcm-reply-highlight{0%,100%{filter:none}30%,70%{filter:brightness(1.65);box-shadow:0 0 22px var(--ac)}}.fcm-chat-tag-preview{width:100%;border-top:0;border-right:0;border-bottom:0;text-align:left;cursor:pointer}.fcm-chat-contact-card .fcm-chat-avatar i{width:16px!important;height:16px!important;border-width:2px!important}.fcm-chat-card-actions{display:flex;gap:7px}.fcm-chat-card-actions button{display:inline-flex;align-items:center;gap:5px}.fcm-chat-card-actions svg{width:17px;height:17px}
+.fcm-chat-new-messages{position:absolute;z-index:20;left:50%;bottom:104px;transform:translateX(-50%);padding:6px 12px;background:var(--s);color:var(--ac);border:1px solid var(--ac);border-radius:16px;box-shadow:0 4px 14px #0008;cursor:pointer}.fcm-chat-new-messages[hidden]{display:none}
 @media(max-width:650px){#fcm-chat-panel{width:96vw}.fcm-chat-body{grid-template-columns:48px 210px minmax(0,1fr)}}
 .fcm-chat-message:not(.selected):hover .fcm-chat-message-reply{opacity:0;visibility:hidden;pointer-events:none}
 .fcm-chat-message.emote .fcm-chat-content{font-style:italic}.fcm-chat-message.ooc .fcm-chat-content{font-style:normal;opacity:.92}.fcm-chat-message.emote .fcm-chat-content,.fcm-chat-message.ooc .fcm-chat-content{white-space:pre-wrap}

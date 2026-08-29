@@ -78,22 +78,41 @@ const ChatStore = {
             } catch { resolve([]); }
         });
     },
-    async prune({ maxAge = 7 * 24 * 60 * 60 * 1000, maxCount = 100 } = {}) {
+    // Returns a lightweight recent-message index for the UI. Despite the legacy
+    // name this must never delete history; deletion is an explicit user action.
+    async prune({ maxCount = 100 } = {}) {
         const all = await this.all();
-        const cutoff = Date.now() - maxAge;
-        const keep = all.filter(m => Number(m.timestamp) >= cutoff).slice(-maxCount);
-        const keepIds = new Set(keep.map(m => m.id));
-        const remove = all.filter(m => !keepIds.has(m.id));
-        if (!remove.length) return keep;
-        await new Promise(resolve => {
+        return all.slice(-maxCount);
+    },
+    async page(memberNumber, { before = Infinity, limit = 50 } = {}) {
+        const ownerMemberNumber = accountNumber();
+        if (!ownerMemberNumber || !this.db) await this.init();
+        if (!ownerMemberNumber || !this.db) return { messages: [], hasMore: false };
+        const target = Number(memberNumber);
+        const rows = [];
+        return new Promise(resolve => {
             try {
-                const tx = this.db.transaction('messages', 'readwrite');
-                const store = tx.objectStore('messages');
-                remove.forEach(m => store.delete(m.id));
-                tx.oncomplete = () => resolve(); tx.onerror = () => resolve();
-            } catch { resolve(); }
+                const index = this.db.transaction('messages', 'readonly').objectStore('messages').index('timestamp');
+                const range = Number.isFinite(before) ? IDBKeyRange.upperBound(before, true) : null;
+                const req = index.openCursor(range, 'prev');
+                req.onsuccess = () => {
+                    const cursor = req.result;
+                    if (!cursor || rows.length > limit) {
+                        const hasMore = rows.length > limit;
+                        resolve({ messages: rows.slice(0, limit).reverse(), hasMore });
+                        return;
+                    }
+                    const message = cursor.value;
+                    if (Number(message.ownerMemberNumber) === ownerMemberNumber && Number(message.memberNumber) === target) rows.push(message);
+                    cursor.continue();
+                };
+                req.onerror = () => resolve({ messages: [], hasMore: false });
+            } catch { resolve({ messages: [], hasMore: false }); }
         });
-        return keep;
+    },
+    async memberAll(memberNumber) {
+        const target = Number(memberNumber);
+        return (await this.all()).filter(message => Number(message.memberNumber) === target);
     },
     async markRead(memberNumber) {
         const messages = (await this.all()).filter(m => m.memberNumber === Number(memberNumber) && !m.read);
