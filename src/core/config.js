@@ -3,25 +3,11 @@
 //  (split from Plugins/liko-FCM.user.js)
 // ════════════════════════════════════════
 
-import { FCM_ALREADY_LOADED, MOD_VER } from './version.js';
+import { MOD_VER } from './version.js';
 
-    // Match AEE's behavior: duplicate module evaluation receives a harmless
-    // API and never reaches registerMod, which would otherwise throw.
-    const modApi = FCM_ALREADY_LOADED
-        ? createNoopModApi()
-        : bcModSdk.registerMod({
+    const modApi = bcModSdk.registerMod({
             name: 'Liko - FCM', fullName: 'Friends and ChatRoom Manager', version: MOD_VER, repository: "https://github.com/awdrrawd/BC-FCM"
         }, { allowReplace: false });
-    function createNoopModApi() {
-        return {
-            unload: () => {},
-            hookFunction: () => () => {},
-            callOriginal: () => undefined,
-            patchFunction: () => {},
-            removePatches: () => {},
-            getOriginalHash: () => '',
-        };
-    }
     const BTN_X = 955, BTN_Y = 455, BTN_W = 45, BTN_H = 45;
     // ── FCM icon (SVG → preloaded Image for DrawImageResize) ──────
 

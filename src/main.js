@@ -1,23 +1,12 @@
-// FCM entry (bundled by Vite to assets/main.js).
-import { FCM_ALREADY_LOADED, MOD_VER } from './core/version.js';
-import './core/config.js';
-import { openPanel, closePanel, togglePanel } from './panel/panel.js';
-import { init } from './core/core-init.js';
-import { openChat, closeChat } from './communication/chat.js';
-import { installThemeSelects } from './ui/theme-select.js';
+// Keep this bootstrap free of static imports so duplicate detection runs first.
+window.Liko = window.Liko ?? {};
 
-if (FCM_ALREADY_LOADED) {
-    console.warn('[FCM] Already loaded, skipping duplicate initialization.');
+if (window.Liko.FCM) {
+    console.warn('🐈‍⬛ [FCM] Already loaded, skipping duplicate init.');
 } else {
-    Object.assign(window.Liko.FCM, {
-        version: MOD_VER,
-        open: () => openPanel(),
-        close: () => closePanel(),
-        toggle: () => togglePanel(),
-        openChat: memberNumber => openChat(memberNumber),
-        closeChat: () => closeChat(),
+    const namespace = window.Liko.FCM = {};
+    import('./app.js').catch(error => {
+        if (window.Liko.FCM === namespace && !namespace.version) delete window.Liko.FCM;
+        console.error('🐈‍⬛ [FCM] Failed to load:', error);
     });
-
-    installThemeSelects();
-    init();
 }
