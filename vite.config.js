@@ -3,8 +3,8 @@ import { readFileSync } from 'node:fs';
 
 const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url)));
 
-// Build FCM as a single ES-module bundle (assets/main.js) that the userscript
-// loader imports with a dynamic import(). Mirrors the BC-HSC build model.
+// Build a side-effect-free bootstrap (assets/main.js) plus the application
+// chunk (assets/app.js), preserving the duplicate-load guard as a real boundary.
 export default defineConfig({
   base: './',
   define: {
@@ -17,7 +17,6 @@ export default defineConfig({
     rollupOptions: {
       input: 'src/main.js',
       output: {
-        inlineDynamicImports: true,
         entryFileNames: 'assets/[name].js',
         chunkFileNames: 'assets/[name].js',
         assetFileNames: 'assets/[name].[ext]',

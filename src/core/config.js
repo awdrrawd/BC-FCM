@@ -5,6 +5,12 @@
 
 import { MOD_VER } from './version.js';
 
+    const existingFcmMod = bcModSdk.getModsInfo?.().find(mod => mod.name === 'Liko - FCM');
+    if (existingFcmMod) {
+        console.warn('🐈‍⬛ [FCM] Already registered with Mod SDK, aborting duplicate init.');
+        throw new Error('[FCM] Duplicate Mod SDK registration prevented.');
+    }
+
     const modApi = bcModSdk.registerMod({
             name: 'Liko - FCM', fullName: 'Friends and ChatRoom Manager', version: MOD_VER, repository: "https://github.com/awdrrawd/BC-FCM"
         }, { allowReplace: false });

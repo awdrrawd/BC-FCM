@@ -4,6 +4,7 @@ dist/*
 !dist/assets/
 dist/assets/*
 !dist/assets/main.js
+!dist/assets/app.js
 # public/ 由 scripts/copy-assets.mjs 於 build 前從 Translation/ 產生
 public/
 *.log
