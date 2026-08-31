@@ -5,7 +5,7 @@ import './i18n-fallback.js';   // 內建後備字庫（TW+EN）同步註冊，�
 //  FCM module: i18n.js  （薄轉接層，不含引擎、不含完整文本）
 //  結構參考 BC-AFC：i18n-engine.js（共用引擎）＋ i18n-fallback.js（TW+EN 後備）＋ 一國一檔的
 //    Translation/<LANG>.js（自註冊到 FCM 命名空間、{0} 位置佔位）。
-//  介面字串走共用引擎 window.Liko.__Sys_i18n__；完整文本改為「執行期 fetch」：
+//  介面字串走共用引擎 window.Liko.__Sys_i18n__；完整文本改為「執行期 fetch JSON」：
 //    翻譯者只需改 Translation/<LANG>.js，build 會複製到 public/ 部署，免動程式。
 //    載入前／離線時用內建後備（fallback）；fetch 到的完整字庫會覆蓋後備。
 // ════════════════════════════════════════
@@ -17,7 +17,7 @@ const FCM_LANG_NAMES = { auto: 'Auto', TW: '繁體中文', CN: '简体中文', E
 // 國旗 emoji（國家碼 regional indicator）；顯示需白嫖 BC country-flag polyfill 的
 // "Twemoji Country Flags" 字體（見 styles.js .fcm-sel）。auto 用地球代表「跟隨 BC 語系」。
 const FCM_LANG_FLAGS = { auto: '🌐', TW: '🇹🇼', CN: '🇨🇳', EN: '🇬🇧', JA: '🇯🇵', KO: '🇰🇷', DE: '🇩🇪', FR: '🇫🇷', ES: '🇪🇸', VI: '🇻🇳', RU: '🇷🇺', UA: '🇺🇦' };
-// 執行期 fetch 的語言檔（一國一檔）；引擎只會抓「目前語言 + EN 後備」（CN 再加 TW）
+// 執行期 fetch 的資料字庫（一國一檔）；引擎只會抓「目前語言 + EN 後備」（CN 再加 TW）
 const T_LANGS = ['TW', 'CN', 'EN', 'JA', 'KO', 'DE', 'FR', 'ES', 'VI', 'RU', 'UA'];
 
 // 依 bundle（assets/main.js）位置解析同層根目錄的素材網址；本地 vite preview 與 Pages 皆適用。
@@ -35,8 +35,8 @@ async function ensureI18n() {
         const eng = window.Liko?.__Sys_i18n__;
         if (!eng?.ensure) return;
         const urlMap = {};
-        for (const c of T_LANGS) urlMap[c] = assetUrl('Translation/' + c + '.js');
-        await eng.ensure(I18N_NS, urlMap, fcmLang());   // 依語言分檔（.js 自註冊）
+        for (const c of T_LANGS) urlMap[c] = assetUrl('Translation/' + c + '.json');
+        await eng.ensure(I18N_NS, urlMap, fcmLang());
     } catch (e) { console.warn('🐈‍⬛ [FCM] 翻譯載入失敗，改用內建後備:', e.message); }
 }
 
@@ -49,7 +49,7 @@ async function ensureLang(lang) {
         if (!eng?.ensure) return;
         const code = lang && lang !== 'auto' ? String(lang).toUpperCase() : fcmLang();
         const urlMap = {};
-        for (const c of T_LANGS) urlMap[c] = assetUrl('Translation/' + c + '.js');
+        for (const c of T_LANGS) urlMap[c] = assetUrl('Translation/' + c + '.json');
         await eng.ensure(I18N_NS, urlMap, code);
     } catch (e) { console.warn('🐈‍⬛ [FCM] 語系載入失敗:', e.message); }
 }
@@ -83,4 +83,12 @@ function T(key, ...args) {
     return key;
 }
 
-export { isZh, T, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, ensureI18n, ensureLang };
+// Translation for insertion into an HTML template. Keep T() raw for canvas,
+// textContent, alerts and network messages; use TH() only at HTML boundaries.
+function TH(key, ...args) {
+    return String(T(key, ...args)).replace(/[&<>"']/g, char => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]);
+}
+
+export { isZh, T, TH, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, ensureI18n, ensureLang };

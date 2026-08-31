@@ -1,4 +1,4 @@
-import { T } from '../i18n/i18n.js';
+import { T, TH } from '../i18n/i18n.js';
 import { injectStyles } from './styles.js';
 import { _removeWhisperAvatar } from '../chat/chat-fx.js';
 import { renderHelp } from './panel-help.js';
@@ -66,7 +66,7 @@ import { requestOnlineFriends } from '../data/data.js';
         });
         document.addEventListener('mouseup', () => { drag.on = false; });
         const mini = document.createElement('div'); mini.id = 'fcm-mini';
-        mini.innerHTML = `<span style="font-size:16px">🎛</span><div class="fcm-mini-pill"></div><span class="fcm-mini-lbl">${T('miniLabel')}</span>`;
+        mini.innerHTML = `<span style="font-size:16px">🎛</span><div class="fcm-mini-pill"></div><span class="fcm-mini-lbl">${TH('miniLabel')}</span>`;
         mini.addEventListener('click', restorePanel); document.body.appendChild(mini); miniEl = mini;
         let md = { on: false, ox: 0, oy: 0, moved: false };
         // 拖曳期間關閉 CSS transition（#fcm-mini 有 transition:all .15s，否則每次 mousemove 都會補間造成拖曳卡頓）

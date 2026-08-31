@@ -112,14 +112,11 @@
     const _loadedUrls = new Set();     // 去重：同一 URL 只抓一次
     function _bust(url) { return url + (url.includes('?') ? '&' : '?') + 't=' + Date.now(); }
 
-    // 抓一支 JS 並執行（合併字庫檔會自行呼叫 register 註冊）
+    // Remote JavaScript dictionaries are intentionally unsupported. Translation
+    // assets must be JSON so compromised hosting cannot execute code in BC.
     function loadScript(url) {
-        if (!url || _loadedUrls.has(url)) return Promise.resolve(false);
-        _loadedUrls.add(url);
-        return fetch(_bust(url))
-            .then(res => { if (!res.ok) throw new Error(`HTTP ${res.status}`); return res.text(); })
-            .then(code => { if (code && !code.trimStart().startsWith('<')) new Function(code)(); return true; })
-            .catch(e => { _loadedUrls.delete(url); console.warn(`🐈‍⬛ [Liko i18n] ⚠️ loadScript ${url}: ${e.message}`); return false; });
+        console.warn(`🐈‍⬛ [Liko i18n] blocked executable translation asset: ${url || '(empty URL)'}`);
+        return Promise.resolve(false);
     }
 
     // 抓一支 .json（純資料 { key: "字串" }）並註冊成單一語言

@@ -4,10 +4,11 @@ import { setOnlineFriends } from '../data/data.js';
 import { PDB, syncRoomAvatar } from '../data/profile-db.js';
 import { renderCurrent, panelOpen, panelMini, uiTab, buildPanel, togglePanel, closePanel, openPanel, openPeopleSearch } from '../panel/panel.js';
 import { _applyWhisperStyle, _updateWhisperAvatar, _drawWavOnCanvas } from '../chat/chat-fx.js';
-import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from '../chat/wps-share.js';
+import { WPS_PREFIX, wpsHandleMessage, observeWpsOpenTokens } from '../chat/wps-share.js';
 import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSHARE_TAG } from '../chat/actions.js';
 import { handleIncomingBeep, handleIncomingChatMessageId, handleIncomingChatTag, handleIncomingFriendRequestNotice, handleIncomingWhisper, handleIncomingWhisperDisplay, handleOutgoingServerSend, handleOnlineFriendsUpdate } from '../communication/chat.js';
 import { shouldBypassBcxReceiveRules } from '../communication/bcx-compat.js';
+import { warnLimited } from './logger.js';
 // ════════════════════════════════════════
 //  FCM module: hooks.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -89,12 +90,12 @@ import { shouldBypassBcxReceiveRules } from '../communication/bcx-compat.js';
         // FCM 好友邀請借用 Leash 封包，但沒有任何房間資料；必須在此攔截，
         // 不可繼續交給 ServerHandleLeashBeep。
         if (data?.BeepType === 'Leash' && data?.Message === FRIENDREQ_MSG && !data?.ChatRoomName && !data?.ChatRoomSpace) {
-            try { handleIncomingFriendReq(data.MemberNumber, data.MemberName); } catch {}
-            try { handleIncomingFriendRequestNotice(data); } catch {}
+            try { handleIncomingFriendReq(data.MemberNumber, data.MemberName); } catch (error) { warnLimited('friend request handling failed', error); }
+            try { handleIncomingFriendRequestNotice(data); } catch (error) { warnLimited('friend request notice failed', error); }
             return;
         }
         if (data && shouldBypassBcxReceiveRules()) {
-            try { handleIncomingBeep(data); bypassedBeeps.add(data); } catch {}
+            try { handleIncomingBeep(data); bypassedBeeps.add(data); } catch (error) { warnLimited('BCX bypass beep handling failed', error); }
         }
         return next(args);
     });
@@ -103,11 +104,11 @@ import { shouldBypassBcxReceiveRules } from '../communication/bcx-compat.js';
     // used when the explicit bypass setting is enabled.
     modApi.hookFunction('ServerAccountBeep', 0, (args, next) => {
         const data = args[0];
-        if (data && !bypassedBeeps.has(data)) { try { handleIncomingBeep(data); } catch {} }
+        if (data && !bypassedBeeps.has(data)) { try { handleIncomingBeep(data); } catch (error) { warnLimited('beep handling failed', error); } }
         return next(args);
     });
     modApi.hookFunction('ServerSend', 10, (args, next) => {
-        try { handleOutgoingServerSend(args[0], args[1]); } catch {}
+        try { handleOutgoingServerSend(args[0], args[1]); } catch (error) { warnLimited('outgoing chat capture failed', error); }
         return next(args);
     });
     modApi.hookFunction('ServerAccountQueryResult', 0, (args, next) => {
@@ -216,7 +217,7 @@ import { shouldBypassBcxReceiveRules } from '../communication/bcx-compat.js';
 
     // Explicit receive bypass: capture whispers before BCX's priority-5 rule.
     modApi.hookFunction('ChatRoomMessage', 10, (args, next) => {
-        if (shouldBypassBcxReceiveRules()) { try { handleIncomingWhisper(args[0]); } catch {} }
+        if (shouldBypassBcxReceiveRules()) { try { handleIncomingWhisper(args[0]); } catch (error) { warnLimited('BCX bypass whisper handling failed', error); } }
         return next(args);
     });
     // WPS hidden share messages
@@ -230,18 +231,18 @@ import { shouldBypassBcxReceiveRules } from '../communication/bcx-compat.js';
         // 房間分享（Action 對所有人可見）→ 先讓 BC 正常顯示，再疊上 FCM 專屬加入按鈕
         if (data?.Type === 'Action' && Array.isArray(data?.Dictionary) && data.Dictionary.some(e => e?.Tag === ROOMSHARE_TAG)) {
             const r = next(args);
-            try { handleIncomingRoomShare(data); } catch {}
+            try { handleIncomingRoomShare(data); } catch (error) { warnLimited('room share handling failed', error); }
             return r;
         }
         return next(args);
     });
     modApi.hookFunction('ChatRoomMessageDisplay', 99, (args, next) => {
         const result = next(args);
-        try { handleIncomingWhisperDisplay(args[0], args[1], args[2]); } catch {}
+        try { handleIncomingWhisperDisplay(args[0], args[1], args[2]); } catch (error) { warnLimited('whisper display handling failed', error); }
         return result;
     });
 
-    setInterval(() => document.querySelectorAll('.ChatMessageLocalMessage').forEach(wpsProcessOpenTokens), 500);
+    observeWpsOpenTokens();
     modApi.hookFunction('DrawCharacter', 5, (args, next) => {
         try {
             const C = args[0];

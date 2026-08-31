@@ -2,6 +2,7 @@ import { cfg } from '../core/config.js';
 import { T } from '../i18n/i18n.js';
 import { inRoomFn } from './data.js';
 import { profileCache as _pc } from './profile-cache.js';
+import { warnLimited } from '../core/logger.js';
 // ════════════════════════════════════════
 //  FCM module: profile-db.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -109,7 +110,7 @@ import { profileCache as _pc } from './profile-cache.js';
             };
             this._records[mn] = rec;
             this._cache[mn] = URL.createObjectURL(blob);
-            try { this.db.transaction('avatars', 'readwrite').objectStore('avatars').put(rec); } catch {}
+            try { this.db.transaction('avatars', 'readwrite').objectStore('avatars').put(rec); } catch (error) { warnLimited('avatar cache write failed', error); }
         },
         getRecord(mn) {
             mn = parseInt(mn);
@@ -126,7 +127,7 @@ import { profileCache as _pc } from './profile-cache.js';
                                 const blob = await (await fetch(r.avatarDataUrl)).blob();
                                 r = { memberNumber: mn, blob, savedAt: r.savedAt || Date.now(), source: 'legacy', sourceUpdatedAt: 0, sourceUrl: '' };
                                 this.db.transaction('avatars', 'readwrite').objectStore('avatars').put(r);
-                            } catch {}
+                            } catch (error) { warnLimited('legacy avatar migration failed', error); }
                         }
                         this._records[mn] = r;
                         res(r);
@@ -187,13 +188,22 @@ import { profileCache as _pc } from './profile-cache.js';
 
     async function _blobFromSharedProfile(shared) {
         if (typeof shared?.avatarUrl === 'string' && shared.avatarUrl) {
+            const controller = new AbortController();
+            const timeout = setTimeout(() => controller.abort(), 8000);
             try {
-                const response = await fetch(shared.avatarUrl, { cache: 'force-cache' });
-                if (response.ok) return { blob: await response.blob(), source: 'shared-url', sourceUrl: shared.avatarUrl };
-            } catch {}
+                const response = await fetch(shared.avatarUrl, { cache: 'force-cache', referrerPolicy: 'no-referrer', signal: controller.signal });
+                const declaredSize = Number(response.headers.get('content-length')) || 0;
+                const mime = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+                if (!response.ok || declaredSize > 2 * 1024 * 1024 || !mime.startsWith('image/')) throw new Error('invalid image response');
+                const blob = await response.blob();
+                if (blob.size > 2 * 1024 * 1024 || !String(blob.type).toLowerCase().startsWith('image/')) throw new Error('invalid image data');
+                return { blob, source: 'shared-url', sourceUrl: shared.avatarUrl };
+            } catch (error) {
+                if (error?.name !== 'AbortError') console.warn('🐈‍⬛ [FCM] shared avatar download failed:', error?.message || error);
+            } finally { clearTimeout(timeout); }
         }
         if (typeof shared?.avatarSnapshot === 'string' && shared.avatarSnapshot.startsWith('data:image/')) {
-            try { return { blob: await (await fetch(shared.avatarSnapshot)).blob(), source: 'shared-snapshot', sourceUrl: '' }; } catch {}
+            try { return { blob: await (await fetch(shared.avatarSnapshot)).blob(), source: 'shared-snapshot', sourceUrl: '' }; } catch (error) { warnLimited('shared avatar snapshot decode failed', error); }
         }
         return null;
     }
