@@ -6,7 +6,8 @@ import { renderCurrent, panelOpen, panelMini, uiTab, buildPanel, togglePanel, cl
 import { _applyWhisperStyle, _updateWhisperAvatar, _drawWavOnCanvas } from '../chat/chat-fx.js';
 import { WPS_PREFIX, wpsHandleMessage, wpsProcessOpenTokens } from '../chat/wps-share.js';
 import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSHARE_TAG } from '../chat/actions.js';
-import { handleIncomingBeep, handleIncomingChatMessageId, handleIncomingChatTag, handleIncomingFriendRequestNotice, handleIncomingWhisperDisplay, handleOutgoingServerSend, handleOnlineFriendsUpdate } from '../communication/chat.js';
+import { handleIncomingBeep, handleIncomingChatMessageId, handleIncomingChatTag, handleIncomingFriendRequestNotice, handleIncomingWhisper, handleIncomingWhisperDisplay, handleOutgoingServerSend, handleOnlineFriendsUpdate } from '../communication/chat.js';
+import { shouldBypassBcxReceiveRules } from '../communication/bcx-compat.js';
 // ════════════════════════════════════════
 //  FCM module: hooks.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -82,6 +83,7 @@ import { handleIncomingBeep, handleIncomingChatMessageId, handleIncomingChatTag,
     function registerHooks() {
     if (_hooksRegistered) return;
     _hooksRegistered = true;
+    const bypassedBeeps = new WeakSet();
     modApi.hookFunction('ServerAccountBeep', 10, (args, next) => {
         const data = args[0];
         // FCM 好友邀請借用 Leash 封包，但沒有任何房間資料；必須在此攔截，
@@ -91,7 +93,17 @@ import { handleIncomingBeep, handleIncomingChatMessageId, handleIncomingChatTag,
             try { handleIncomingFriendRequestNotice(data); } catch {}
             return;
         }
-        try { handleIncomingBeep(data); } catch {}
+        if (data && shouldBypassBcxReceiveRules()) {
+            try { handleIncomingBeep(data); bypassedBeeps.add(data); } catch {}
+        }
+        return next(args);
+    });
+    // BCX uses priority 5 for its receive rule. Running the normal FCM capture
+    // below it means blocked beeps never reach FCM; priority 10 above is only
+    // used when the explicit bypass setting is enabled.
+    modApi.hookFunction('ServerAccountBeep', 0, (args, next) => {
+        const data = args[0];
+        if (data && !bypassedBeeps.has(data)) { try { handleIncomingBeep(data); } catch {} }
         return next(args);
     });
     modApi.hookFunction('ServerSend', 10, (args, next) => {
@@ -202,6 +214,11 @@ import { handleIncomingBeep, handleIncomingChatMessageId, handleIncomingChatTag,
         return next(args);
     });
 
+    // Explicit receive bypass: capture whispers before BCX's priority-5 rule.
+    modApi.hookFunction('ChatRoomMessage', 10, (args, next) => {
+        if (shouldBypassBcxReceiveRules()) { try { handleIncomingWhisper(args[0]); } catch {} }
+        return next(args);
+    });
     // WPS hidden share messages
     modApi.hookFunction('ChatRoomMessage', 0, (args, next) => {
         const data = args[0];

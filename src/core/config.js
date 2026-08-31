@@ -29,7 +29,8 @@ import { MOD_VER } from './version.js';
         const blob = new Blob([FCM_ICON_SVG], { type: 'image/svg+xml' });
         const url = URL.createObjectURL(blob);
         const img = new Image();
-        img.onload = () => { _fcmIconImg = img; };
+        img.onload = () => { _fcmIconImg = img; URL.revokeObjectURL(url); };
+        img.onerror = () => { URL.revokeObjectURL(url); };
         img.src = url;
     })();
     // ═══════════════════════════════════════════════════════════
@@ -75,6 +76,7 @@ import { MOD_VER } from './version.js';
         chatFontSize: 13,
         chatFontFamily: 'system',
         communicationEnabled: false,
+        bypassBcxCommunication: false,
         persistentBalloon: false,
         balloonPlacement: 'off',
         takeoverFcmChatButtons: false,

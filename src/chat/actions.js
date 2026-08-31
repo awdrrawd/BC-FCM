@@ -2,6 +2,7 @@ import { T } from '../i18n/i18n.js';
 import { PDB } from '../data/profile-db.js';
 import { amAdmin, inRoomFn, getDisplayName, isFriendOf } from '../data/data.js';
 import { renderCurrent, minimizePanel, closePanel } from '../panel/panel-controller.js';
+import { sendBcxAwareBeep } from '../communication/bcx-compat.js';
 // ════════════════════════════════════════
 //  FCM module: actions.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -72,8 +73,7 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel-control
             const msg = ta.value.trim();
             overlay.remove();
             sendAfterPaint(() => {
-                ServerSend('AccountBeep', { MemberNumber: mn, BeepType: '', Message: msg || undefined });
-                if (typeof FriendListBeepLog !== 'undefined') FriendListBeepLog.push({ MemberNumber: mn, MemberName: name, Sent: true, Time: new Date(), Message: msg });
+                if (sendBcxAwareBeep({ MemberNumber: mn, BeepType: '', Message: msg || undefined }) && typeof FriendListBeepLog !== 'undefined') FriendListBeepLog.push({ MemberNumber: mn, MemberName: name, Sent: true, Time: new Date(), Message: msg });
             });
         });
         ta.addEventListener('keydown', e => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); sendBtn.click(); } if (e.key === 'Escape') overlay.remove(); e.stopPropagation(); });
@@ -86,12 +86,13 @@ import { renderCurrent, minimizePanel, closePanel } from '../panel/panel-control
                 overlay.remove();
                 sendAfterPaint(() => {
                     try {
-                        ServerSend('AccountBeep', {
+                        const sent = sendBcxAwareBeep({
                             MemberNumber: mn, BeepType: '',
                             Message: 'summon',
                             ChatRoomName: (typeof ChatRoomData !== 'undefined' && ChatRoomData) ? ChatRoomData.Name : undefined,
                             ChatRoomSpace: (typeof ChatRoomData !== 'undefined' && ChatRoomData) ? ChatRoomData.Space : undefined,
                         });
+                        if (!sent) return;
                     } catch(e) { console.warn('🐈‍⬛ [FCM] summon error:', e); }
                     if (typeof FriendListBeepLog !== 'undefined') FriendListBeepLog.push({ MemberNumber: mn, MemberName: name, Sent: true, Time: new Date(), Message: '[summon]' });
                 });

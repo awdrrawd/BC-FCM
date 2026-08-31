@@ -11,6 +11,7 @@ import { installDragScroll } from '../ui/drag-scroll.js';
 import { applyTheme } from '../panel/styles.js';
 import { THEME_KEYS, themeColors } from '../core/themes.js';
 import { showAddFriendConfirm, showRoomJoinConfirm, showIncomingRoomInvite } from '../chat/actions.js';
+import { canSendBcxWhisper, sendBcxAwareBeep, sendBcxAwareWhisper } from './bcx-compat.js';
 import {
     FCM_ICON_SVG, CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     ALARM_MUTED_ICON, ALARM_ACTIVE_ICON, EXIT_ICON, DOWNLOAD_ICON,
@@ -42,12 +43,14 @@ let customAudioUrl = '';
 let justOpenedMember = null;
 let replyTarget = null;
 let contactCardOpen = false;
+let bcxNoticeTimer = 0;
 const pendingReplyTags = new Map();
 const pendingMessageIds = new Map();
 let onlinePresenceSignature = '';
 const autoReplyTimes = new Map();
 const offlineQueueInFlight = new Set();
 const remoteProfiles = new Map();
+const bypassedIncomingWhispers = new WeakSet();
 
 // CHAT 固定使用「暱稱優先、沒有暱稱才用 BC 名稱」，不跟隨 FCM 主面板的名稱切換。
 const getDisplayName = memberNumber => getSharedDisplayName(memberNumber, true);
@@ -70,8 +73,27 @@ function cleanMessage(value) {
 }
 
 const CHAT_IMAGE_EXT = /\.(?:png|jpe?g|gif|webp|bmp|avif|apng|jfif|svg|ico)$/iu;
+const trustedImageOrigins = new Set();
 
-function messageContentHtml(value) {
+function normalizedImageOrigin(value) {
+    try {
+        const url = new URL(value);
+        return ['http:', 'https:'].includes(url.protocol) ? url.origin : null;
+    } catch { return null; }
+}
+
+function lceAlwaysTrusts(origin) {
+    try {
+        const api = window.Liko?.LCE?.TrustedImageOrigins;
+        return typeof api?.isPermanentlyTrusted === 'function' && !!api.isPermanentlyTrusted(origin);
+    } catch { return false; }
+}
+
+function imageOriginTrusted(url) {
+    return trustedImageOrigins.has(url.origin) || lceAlwaysTrusts(url.origin);
+}
+
+function messageContentHtml(value, interactive = true) {
     const text = cleanMessage(value);
     const urlPattern = /https?:\/\/[^\s<>"']+/giu;
     let html = '', cursor = 0;
@@ -85,7 +107,9 @@ function messageContentHtml(value) {
         html += esc(text.slice(cursor, match.index));
         const href = esc(url.href);
         if (CHAT_IMAGE_EXT.test(url.pathname)) {
-            html += `<a class="fcm-chat-image-link" href="${href}" target="_blank" rel="noopener noreferrer" title="${href}"><img class="fcm-chat-image" src="${href}" alt="${href}" loading="lazy" referrerpolicy="no-referrer"></a>`;
+            html += imageOriginTrusted(url)
+                ? `<a class="fcm-chat-image-link" href="${href}" target="_blank" rel="noopener noreferrer" title="${href}"><img class="fcm-chat-image" src="${href}" alt="${href}" loading="lazy" referrerpolicy="no-referrer"></a>`
+                : `<a class="fcm-chat-link" href="${href}" target="_blank" rel="noopener noreferrer">${esc(candidate)}</a>${interactive ? ` <button class="fcm-chat-image-trust" data-trust-image-origin="${esc(url.origin)}" type="button">${T('chatTrustImage')}</button>` : ''}`;
         } else {
             html += `<a class="fcm-chat-link" href="${href}" target="_blank" rel="noopener noreferrer">${esc(candidate)}</a>`;
         }
@@ -199,6 +223,14 @@ async function initChat() {
     // 不必（也不應該）整個重建 — 分別掛勾兩個共用事件，各自只重繪自己負責的畫面。
     window.addEventListener('fcm-theme-change', refreshChatSettings);
     window.addEventListener('fcm-language-change', () => { if (root?.isConnected && root.style.display !== 'none') renderChat(); ensureBalloon(); });
+    window.addEventListener('fcm:bcx-send-blocked', event => {
+        const notice = root?.querySelector('[data-bcx-compose-notice]');
+        if (!notice) return;
+        notice.textContent = T(event.detail?.channel === 'whisper' ? 'bcxWhisperBlocked' : 'bcxBeepBlocked');
+        notice.hidden = false;
+        clearTimeout(bcxNoticeTimer);
+        bcxNoticeTimer = window.setTimeout(() => { if (notice.isConnected) notice.hidden = true; }, 4000);
+    });
     document.addEventListener('pointerdown', event => {
         if (!contactCardOpen || event.target.closest('.fcm-chat-contact-card') || event.target.closest('.fcm-chat-conversation-header > [data-avatar-member]')) return;
         contactCardOpen = false;
@@ -253,11 +285,12 @@ function sendStatusAutoReply(message) {
     if (!content || Date.now() - (autoReplyTimes.get(message.memberNumber) || 0) < 60000) return;
     autoReplyTimes.set(message.memberNumber, Date.now());
     suppressOutgoing++;
+    let sent = false;
     try {
-        if (message.channel === 'whisper' && inRoomFn(message.memberNumber)) ServerSend('ChatRoomChat', { Type: 'Whisper', Target: message.memberNumber, Content: content });
-        else if (isOnline(message.memberNumber)) ServerSend('AccountBeep', { MemberNumber: message.memberNumber, BeepType: '', Message: content });
+        if (message.channel === 'whisper' && inRoomFn(message.memberNumber)) sent = sendBcxAwareWhisper({ Type: 'Whisper', Target: message.memberNumber, Content: content });
+        else if (isOnline(message.memberNumber)) sent = sendBcxAwareBeep({ MemberNumber: message.memberNumber, BeepType: '', Message: content });
     } finally { suppressOutgoing--; }
-    recordMessage({ memberNumber: message.memberNumber, direction: 'out', channel: message.channel, content }, { notify: false });
+    if (sent) recordMessage({ memberNumber: message.memberNumber, direction: 'out', channel: message.channel, content }, { notify: false });
 }
 
 function handleIncomingBeep(data) {
@@ -285,10 +318,12 @@ function handleIncomingBeep(data) {
 function handleIncomingWhisper(data) {
     if (!data || data.Type !== 'Whisper' || !data.Content || Number(data.Sender) === Number(Player?.MemberNumber)) return;
     recordMessage({ memberNumber: data.Sender, direction: 'in', channel: 'whisper', content: data.Content, timestamp: data.Time });
+    bypassedIncomingWhispers.add(data);
 }
 
 function handleIncomingWhisperDisplay(data, displayedMessage, senderCharacter) {
     if (!data || data.Type !== 'Whisper') return;
+    if (bypassedIncomingWhispers.delete(data)) return;
     const idEntry = Array.isArray(data.Dictionary) ? data.Dictionary.find(entry => entry?.Tag === 'MsgId' && entry.MsgId) : null;
     if (Number(data.Sender) === Number(Player?.MemberNumber)) {
         const target = Number(data.Target);
@@ -365,6 +400,10 @@ function unreadCount(memberNumber = null) {
 function unreadBadge(memberNumber = null) {
     const count = unreadCount(memberNumber);
     return `<b class="fcm-chat-unread ${count ? '' : 'hidden'}">${Math.min(count, 99)}</b>`;
+}
+
+function activeRailBadge(view) {
+    return activeView === view ? unreadBadge() : '';
 }
 
 function recentConversations() {
@@ -509,6 +548,7 @@ function settingsHtml() {
             <div class="fcm-chat-theme-options" data-chat-theme-options hidden><div class="fcm-chat-theme-presets"><button class="${cfg.chatThemeMode === 'follow' ? 'active' : ''}" data-chat-theme-follow>${T('chatThemeFollow')}</button>${themeKeys.map(value => `<button class="${cfg.chatThemeMode === 'preset' && cfg.chatThemePreset === value ? 'active' : ''}" data-chat-theme-preset="${value}">${T(`themePreset_${value}`)}</button>`).join('')}</div><div class="fcm-chat-theme-colors"><label>${T('themePanelColor')}<input type="color" data-chat-theme-color="chatPanelColor" value="${esc(cfg.chatPanelColor)}"></label><label>${T('themeFontColor')}<input type="color" data-chat-theme-color="chatFontColor" value="${esc(cfg.chatFontColor)}"></label><label>${T('themeAccentColor')}<input type="color" data-chat-theme-color="chatAccentColor" value="${esc(cfg.chatAccentColor)}"></label></div></div>
             <div class="fcm-chat-setting-row"><span><b>${T('chatFontFamily')}</b><small>${T('chatFontFamilyNote')}</small></span><div class="fcm-chat-font-controls"><input data-chat-font-size type="number" min="10" max="24" step="1" value="${Number(cfg.chatFontSize) || 13}" title="${T('chatFontSize')}"><select data-chat-font-family>${fontFamilies.map(([value,label]) => `<option value="${value}" ${cfg.chatFontFamily === value ? 'selected' : ''}>${label}</option>`).join('')}</select></div></div>
             <div class="fcm-chat-setting-row"><span><b>${T('chatTakeover')}</b><small>${T('chatTakeoverNote')}</small></span><button class="fcm-chat-switch ${cfg.takeoverFcmChatButtons ? 'on' : ''}" data-setting="takeover"><i></i></button></div>
+            <div class="fcm-chat-setting-row"><span><b>${T('bypassBcxCommunication')}</b><small>${T('bypassBcxCommunicationNote')}</small></span><button class="fcm-chat-switch ${cfg.bypassBcxCommunication ? 'on' : ''}" data-setting="bcxBypass"><i></i></button></div>
             <div class="fcm-chat-setting-row"><span><b>${T('chatPersistentBalloon')}</b><small>${T('chatPersistentBalloonNote')}</small></span><select data-balloon-placement>${placementOptions(cfg.balloonPlacement)}</select></div>
             <div class="fcm-chat-setting-row"><span><b>${T('chatIndividualBalloons')}</b><small>${T('chatIndividualBalloonsNote')}</small></span><select data-user-balloon-placement>${placementOptions(cfg.userBalloonPlacement)}</select></div>
             <div class="fcm-chat-setting-row"><span><b>${T('balloonSnap')}</b><small>${T('balloonSnapNote')}</small></span><button class="fcm-chat-switch ${cfg.balloonSnap ? 'on' : ''}" data-setting="balloonSnap"><i></i></button></div>
@@ -573,6 +613,7 @@ function conversationHtml() {
     <button class="fcm-chat-new-messages" data-new-messages ${conversationUnread ? '' : 'hidden'}>${T('chatNewUnread', conversationUnread)}</button>
     <div class="fcm-chat-actions"><button class="fcm-chat-icon-action" data-invite ${available === 'none' || inRoomFn(selectedMember) ? 'disabled' : ''} title="${T('chatInviteRoom')}" aria-label="${T('chatInviteRoom')}">${INVITE_ICON}</button><span></span><div class="fcm-chat-tools"><div class="fcm-chat-tools-menu"><button class="fcm-chat-icon-action" data-export="html" title="${T('chatExportHtml')}">${DOWNLOAD_ICON}<span>${T('chatExportHtml')}</span></button><button class="fcm-chat-icon-action" data-export="json" title="${T('chatExportJson')}">${DOWNLOAD_ICON}<span>${T('chatExportJson')}</span></button><button class="fcm-chat-icon-action" data-delete title="${T('chatDeleteAll')}">${TRASH_ICON}<span>${T('chatDeleteAll')}</span></button></div><button class="fcm-chat-icon-action" data-toggle-tools title="${T('chatMessageTools')}">${FOLDER_ICON}</button></div></div>
     <div class="fcm-chat-compose">
+        <div class="fcm-chat-compose-notice" data-bcx-compose-notice hidden></div>
         <div class="fcm-chat-channels ${online ? '' : 'offline'}"><button class="${online && channel === 'whisper' ? 'active' : ''}" data-channel="whisper" ${!inRoomFn(selectedMember) ? 'disabled' : ''}>${T('btnWhisper')}</button><button class="${online && channel === 'beep' ? 'active' : ''}" data-channel="beep" ${!online ? 'disabled' : ''}>${T('btnBeep')}</button></div>
         <div class="fcm-chat-input-wrap">${replyTarget ? `<div class="fcm-chat-reply-indicator"><span>${T('chatReply')}: ${esc(replyTarget.preview)}</span><button data-cancel-reply title="${T('chatCancel')}">×</button></div>` : ''}<div class="fcm-chat-profile-suggest" data-profile-suggest hidden></div><textarea data-input rows="2" placeholder="${inputPlaceholder}"></textarea></div>
         <button data-send>${online ? T('chatSend') : T('chatQueueSend')}</button>
@@ -644,6 +685,14 @@ function bindMessageImages(scope, log) {
             link.className = 'fcm-chat-link';
             link.textContent = link.href;
         }, { once: true });
+    });
+    scope?.querySelectorAll?.('[data-trust-image-origin]').forEach(button => {
+        button.addEventListener('click', async () => {
+            const origin = normalizedImageOrigin(button.dataset.trustImageOrigin);
+            if (!origin || !await showFcmConfirm(T('chatTrustImagePrompt', origin), T('chatTrustImage'))) return;
+            trustedImageOrigins.add(origin);
+            renderChat();
+        });
     });
 }
 
@@ -766,13 +815,13 @@ function renderChat() {
         <div class="fcm-chat-titlebar"><b>FCM-Chat</b><span></span><button class="fcm-chat-icon-action ${cfg.chatLayout === 'stacked' ? 'active' : ''}" data-layout title="${T('chatToggleLayout')}">${cfg.chatLayout === 'stacked' ? SPLIT_ICON : MERGE_ICON}<i>${cfg.chatLayout === 'stacked' ? T('chatLayoutSplit') : T('chatLayoutMerged')}</i></button><button class="fcm-chat-icon-action ${maximized ? 'active' : ''}" data-max title="${T('chatToggleMax')}">${MAXIMIZE_ICON}<i>${maximized ? T('chatRestore') : T('chatMaximize')}</i></button><button class="fcm-chat-icon-action" data-min title="${T('chatMinimize')}">—</button><button class="fcm-chat-icon-action" data-close title="${T('chatClose')}">×</button></div>
         <div class="fcm-chat-body view-${esc(activeView)} ${cfg.chatLayout === 'stacked' ? 'stacked' : ''} ${activeView === 'profile' || activeView === 'settings' ? 'wide-view' : ''}">
             <nav class="fcm-chat-rail">
-                <button class="fcm-chat-rail-button fcm-chat-self ${activeView === 'profile' ? 'active' : ''}" data-view="profile" title="${T('chatProfileTab')}">${avatarHtml(Player?.MemberNumber || 0, 34, 'toolbar')}</button>
-                <button class="fcm-chat-rail-button ${activeView === 'notifications' ? 'active' : ''}" data-view="notifications" title="${T('chatNotificationsTab')}">${NOTIFICATION_ICON}</button>
-                <button class="fcm-chat-rail-button ${activeView === 'chat' ? 'active' : ''} ${unreadCount() ? 'has-unread' : ''}" data-view="chat" title="${T('chatChatTab')}">${CHAT_ICON}${unreadBadge()}</button>
-                <button class="fcm-chat-rail-button ${activeView === 'groups' ? 'active' : ''}" data-view="groups" title="${T('chatGroupsTab')}">${GROUP_ICON}</button>
+                <button class="fcm-chat-rail-button fcm-chat-self ${activeView === 'profile' ? 'active' : ''}" data-view="profile" title="${T('chatProfileTab')}">${avatarHtml(Player?.MemberNumber || 0, 34, 'toolbar')}${activeRailBadge('profile')}</button>
+                <button class="fcm-chat-rail-button ${activeView === 'notifications' ? 'active' : ''}" data-view="notifications" title="${T('chatNotificationsTab')}">${NOTIFICATION_ICON}${activeRailBadge('notifications')}</button>
+                <button class="fcm-chat-rail-button ${activeView === 'chat' ? 'active' : ''}" data-view="chat" title="${T('chatChatTab')}">${CHAT_ICON}${activeRailBadge('chat')}</button>
+                <button class="fcm-chat-rail-button ${activeView === 'groups' ? 'active' : ''}" data-view="groups" title="${T('chatGroupsTab')}">${GROUP_ICON}${activeRailBadge('groups')}</button>
                 <span></span>
                 <button class="fcm-chat-rail-button" data-status title="${T('chatStatusTab')}"><i class="fcm-status-dot ${esc(cfg.chatStatus || 'online')}"></i></button>
-                <button class="fcm-chat-rail-button ${activeView === 'settings' ? 'active' : ''}" data-view="settings" title="${T('chatSettingsTab')}">${SETTINGS_ICON}</button>
+                <button class="fcm-chat-rail-button ${activeView === 'settings' ? 'active' : ''}" data-view="settings" title="${T('chatSettingsTab')}">${SETTINGS_ICON}${activeRailBadge('settings')}</button>
             </nav>
             <aside class="fcm-chat-list ${stackedDetail ? 'slide-out' : ''}">${listHtml()}</aside>
             <main class="fcm-chat-main ${stackedDetail ? 'slide-in' : ''}">${conversationHtml()}</main>
@@ -978,6 +1027,7 @@ function bindEvents() {
     root.querySelectorAll('[data-status-value]').forEach(button => button.addEventListener('click', () => setStatus(button.dataset.statusValue)));
     root.querySelectorAll('[data-setting]').forEach(button => button.addEventListener('click', () => {
         if (button.dataset.setting === 'takeover') cfg.takeoverFcmChatButtons = !cfg.takeoverFcmChatButtons;
+        if (button.dataset.setting === 'bcxBypass') cfg.bypassBcxCommunication = !cfg.bypassBcxCommunication;
         if (button.dataset.setting === 'animation') cfg.notificationAnimation = !cfg.notificationAnimation;
         if (button.dataset.setting === 'balloonSnap') cfg.balloonSnap = !cfg.balloonSnap;
         saveCfg(); refreshChatSettings(); if (root?.style.display !== 'none') renderChat();
@@ -1300,6 +1350,7 @@ function sendCurrentMessage() {
     suppressOutgoing++;
     try {
         if (selectedChannel === 'whisper') {
+            if (!canSendBcxWhisper(selectedMember)) return;
             ServerSend('ChatRoomChat', { Type: 'Hidden', Target: selectedMember, Content: 'FCM::CHAT::MESSAGE', Dictionary: [{ Tag: 'FCM::CHAT::MESSAGE', MessageId: outgoingId }] });
             if (replyTarget) ServerSend('ChatRoomChat', { Type: 'Hidden', Target: selectedMember, Content: 'FCM::CHAT::TAG', Dictionary: [{ Tag: 'FCM::CHAT::TAG', ReplyId: replyId, TargetSharedId: replyTarget.sharedMsgId, Preview: replyTarget.preview }] });
             const data = typeof globalThis.ChatRoomGenerateChatRoomChatMessage === 'function'
@@ -1308,7 +1359,7 @@ function sendCurrentMessage() {
             data.Target = selectedMember;
             ServerSend('ChatRoomChat', data);
         }
-        else ServerSend('AccountBeep', { MemberNumber: selectedMember, BeepType: '', Message: content });
+        else if (!sendBcxAwareBeep({ MemberNumber: selectedMember, BeepType: '', Message: content })) return;
     } finally { suppressOutgoing--; }
     recordMessage({ id: outgoingId, sharedMsgId: outgoingId, memberNumber: selectedMember, direction: 'out', channel: selectedChannel, content, replyPreview: replyTarget?.preview || '', replyToId: replyTarget?.sharedMsgId || '' }, { notify: false });
     replyTarget = null;
@@ -1499,7 +1550,7 @@ function exportedMessageHtml(message, peerName, selfName) {
     const sender = message.direction === 'out' ? selfName : peerName;
     const reply = message.replyPreview ? `<div class="reply">↩ ${esc(message.replyPreview)}</div>` : '';
     const translation = message.translatedContent ? `<div class="translation">[${esc(message.translatedContent)}]</div>` : '';
-    return `<article class="message ${message.direction}">${reply}<div class="sender">${esc(sender)}</div><div class="content">${messageContentHtml(message.content)}</div>${translation}<footer>${esc(message.channel === 'whisper' ? T('chatChannelWhisper') : T('chatChannelPrivate'))} · <time datetime="${new Date(message.timestamp).toISOString()}">${esc(new Date(message.timestamp).toLocaleString())}</time></footer></article>`;
+    return `<article class="message ${message.direction}">${reply}<div class="sender">${esc(sender)}</div><div class="content">${messageContentHtml(message.content, false)}</div>${translation}<footer>${esc(message.channel === 'whisper' ? T('chatChannelWhisper') : T('chatChannelPrivate'))} · <time datetime="${new Date(message.timestamp).toISOString()}">${esc(new Date(message.timestamp).toLocaleString())}</time></footer></article>`;
 }
 
 function exportTimestamp(date = new Date()) {
@@ -1566,7 +1617,7 @@ function inviteCurrent() {
     const description = String(room.Description || '').trim();
     const message = `|${room.Name}| - ${room.Creator || '?'} ＜${count ?? 0}/${limit ?? 0}＞${description ? `\n${description}` : ''}`;
     suppressOutgoing++;
-    try { ServerSend('AccountBeep', { MemberNumber: selectedMember, BeepType: '', IsSecret: false, Message: message }); }
+    try { if (!sendBcxAwareBeep({ MemberNumber: selectedMember, BeepType: '', IsSecret: false, Message: message })) return; }
     finally { suppressOutgoing--; }
     recordMessage({ memberNumber: selectedMember, direction: 'out', channel: 'beep', content: room.Name, roomName: room.Name }, { notify: false });
 }
@@ -1576,7 +1627,7 @@ async function summonCurrent() {
     if (!await showFcmConfirm(T('beepSummonTitle'), T('beepSummon'))) return;
     suppressOutgoing++;
     try {
-        ServerSend('AccountBeep', { MemberNumber: selectedMember, BeepType: '', Message: 'summon', ChatRoomName: ChatRoomData.Name, ChatRoomSpace: ChatRoomData.Space });
+        if (!sendBcxAwareBeep({ MemberNumber: selectedMember, BeepType: '', Message: 'summon', ChatRoomName: ChatRoomData.Name, ChatRoomSpace: ChatRoomData.Space })) return;
     } finally { suppressOutgoing--; }
     recordMessage({ memberNumber: selectedMember, direction: 'out', channel: 'beep', content: 'summon', roomName: ChatRoomData.Name }, { notify: false });
 }
@@ -1598,7 +1649,7 @@ async function handleOnlineFriendsUpdate(result) {
     ready.forEach((row, index) => setTimeout(async () => {
         let delivered = false;
         suppressOutgoing++;
-        try { ServerSend('AccountBeep', { MemberNumber: row.memberNumber, BeepType: '', Message: row.content }); delivered = true; }
+        try { delivered = sendBcxAwareBeep({ MemberNumber: row.memberNumber, BeepType: '', Message: row.content }); }
         catch (error) { console.warn('🐈‍⬛ [FCM] offline message delivery failed:', error); }
         finally { suppressOutgoing--; }
         if (delivered) {
@@ -1648,13 +1699,12 @@ function syncMaximizedBalloonVisibility() {
 }
 
 function refreshBalloonBadges() {
-    const railButton = root?.querySelector('.fcm-chat-rail [data-view="chat"]');
+    const railButton = root?.querySelector('.fcm-chat-rail-button.active');
     const railBadge = railButton?.querySelector('.fcm-chat-unread');
     if (railBadge) {
         const count = unreadCount();
         railBadge.textContent = Math.min(count, 99);
         railBadge.classList.toggle('hidden', !count);
-        railButton.classList.toggle('has-unread', !!count);
     }
     const main = document.querySelector('#fcm-chat-balloon .fcm-chat-unread');
     if (main) { const count = unreadCount(); main.textContent = Math.min(count, 99); main.classList.toggle('hidden', !count); }
@@ -1797,14 +1847,14 @@ function injectStyles() {
 #fcm-chat-panel.fcm-size-animating{transform-origin:50% 50%!important;transition:none!important;will-change:translate,scale}
 #fcm-chat-root *{scrollbar-color:var(--ac) rgba(0,0,0,.55)!important;scrollbar-width:thin}#fcm-chat-root *::-webkit-scrollbar{width:10px;height:10px}#fcm-chat-root *::-webkit-scrollbar-track{background:rgba(0,0,0,.55)!important}#fcm-chat-root *::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--ac) 65%,transparent)!important;border:0!important;border-radius:4px}#fcm-chat-root *::-webkit-scrollbar-thumb:hover{background:var(--ac)!important}
 .fcm-chat-titlebar{height:44px;display:flex;align-items:center;gap:6px;padding:0 10px;background:var(--surface-alt);border-bottom:1px solid var(--ac);cursor:move;touch-action:none}.fcm-chat-titlebar b{color:var(--ac)}.fcm-chat-titlebar>span{flex:1}.fcm-chat-titlebar button{width:30px;height:30px;padding:0;background:transparent!important;color:var(--dim);border:1px solid var(--ac);border-radius:6px;font-size:16px;line-height:1;display:flex;align-items:center;justify-content:center}
-.fcm-chat-body{height:calc(100% - 44px);min-height:0;display:grid;grid-template-columns:54px 260px minmax(0,1fr);grid-template-rows:minmax(0,1fr);position:relative;overflow:hidden}.fcm-chat-rail{min-height:0;background:var(--surface-alt);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0;z-index:5;overflow:visible}.fcm-chat-rail>span{flex:1}.fcm-chat-rail-button{position:relative;width:36px!important;height:36px!important;min-width:36px;flex:0 0 36px;padding:0!important;background:transparent;border:1px solid transparent;border-radius:7px;color:var(--dim);font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;overflow:visible}.fcm-chat-rail-button:hover,.fcm-chat-rail-button.active,.fcm-chat-rail-button.has-unread{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-chat-self .fcm-chat-avatar{width:34px!important;height:34px!important;border-radius:7px}
+.fcm-chat-body{height:calc(100% - 44px);min-height:0;display:grid;grid-template-columns:54px 260px minmax(0,1fr);grid-template-rows:minmax(0,1fr);position:relative;overflow:hidden}.fcm-chat-rail{min-height:0;background:var(--surface-alt);border-right:1px solid var(--border);display:flex;flex-direction:column;align-items:center;gap:6px;padding:10px 0;z-index:5;overflow:visible}.fcm-chat-rail>span{flex:1}.fcm-chat-rail-button{position:relative;width:36px!important;height:36px!important;min-width:36px;flex:0 0 36px;padding:0!important;background:transparent;border:1px solid transparent;border-radius:7px;color:var(--dim);font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;overflow:visible}.fcm-chat-rail-button:hover,.fcm-chat-rail-button.active{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-chat-self .fcm-chat-avatar{width:34px!important;height:34px!important;border-radius:7px}
 .fcm-chat-list{min-width:0;min-height:0;height:100%;display:flex;flex-direction:column;border-right:1px solid var(--border);overflow:hidden}.fcm-chat-main{min-width:0;min-height:0;height:100%;display:flex;flex-direction:column;overflow:hidden}.fcm-chat-list-title{padding:10px 12px 6px;color:var(--dim);font-size:11px;text-transform:uppercase;letter-spacing:.08em}.fcm-chat-scroll{flex:1;min-height:0;overflow:auto;padding:2px 6px 6px;scrollbar-color:var(--ac) var(--surface-alt)}
 .fcm-chat-search{padding:8px 10px}.fcm-chat-search input{width:100%;padding:7px 8px;background:var(--surface-alt);color:var(--tx);border:1px solid var(--border);border-radius:7px}.fcm-chat-search input:focus{outline:0;border-color:var(--ac)}.fcm-chat-presence,.fcm-chat-tags,.fcm-chat-group-tabs,.fcm-chat-subtabs{display:flex;gap:5px;padding:0 10px 8px}.fcm-chat-presence button,.fcm-chat-tags button,.fcm-chat-group-tabs button,.fcm-chat-subtabs button{flex:1;padding:5px 4px;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:7px;font-size:11px}.fcm-chat-presence button.active,.fcm-chat-tags button.active,.fcm-chat-group-tabs button.active,.fcm-chat-subtabs button.active{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-chat-subtabs{padding-top:8px;border-bottom:1px solid var(--border)}
 .fcm-chat-row{width:100%;display:flex;align-items:center;gap:8px;padding:7px 6px;background:transparent;color:var(--tx);border:1px solid transparent;border-radius:7px;text-align:left}.fcm-chat-row:hover{background:var(--surface-raised)}.fcm-chat-row.selected{background:color-mix(in srgb,var(--ac) 14%,transparent);border-color:var(--border)}.fcm-chat-row-meta{flex:1;min-width:0;display:flex;flex-direction:column}.fcm-chat-row-meta b,.fcm-chat-row-meta small{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.fcm-chat-row-meta small,.fcm-chat-row time{font-size:10.5px;color:var(--dim)}.fcm-chat-row em{background:var(--ac);color:var(--s);border-radius:9px;padding:2px 6px;font-style:normal}
 .fcm-chat-avatar{position:relative;display:inline-flex;flex:none;align-items:center;justify-content:center;border-radius:7px;overflow:visible;background:var(--surface-alt);color:var(--ac);border:1px solid var(--border);font-size:11px;font-weight:700}.fcm-chat-avatar img{width:100%;height:100%;border-radius:inherit;object-fit:cover;pointer-events:none}.fcm-chat-avatar i{position:absolute;right:-4px;bottom:-4px;width:15px;height:15px;border:2px solid var(--s);border-radius:50%;background:#58c878}.fcm-chat-avatar i.busy,.fcm-status-dot.busy,.fcm-chat-status-menu i.busy{background:#e85d68}.fcm-chat-avatar i.afk,.fcm-status-dot.afk,.fcm-chat-status-menu i.afk{background:#e9bd4b}.fcm-chat-avatar i.offline,.fcm-status-dot.offline,.fcm-chat-status-menu i.offline{background:#777}
 .fcm-chat-avatar.fcm-avatar-loading img{opacity:.42;filter:saturate(.55)}.fcm-chat-avatar.fcm-avatar-loading::after{content:"";position:absolute;z-index:4;width:30%;height:30%;min-width:18px;min-height:18px;border:3px solid #ffffff55;border-top-color:var(--ac);border-radius:50%;animation:fcm-avatar-spin .75s linear infinite;box-sizing:border-box;pointer-events:none}@keyframes fcm-avatar-spin{to{transform:rotate(360deg)}}
-.fcm-chat-conversation-header{padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);animation:fcm-chat-rise .3s cubic-bezier(.2,.8,.2,1) both}.fcm-chat-conversation-header>span{display:flex;flex-direction:column}.fcm-chat-conversation-header small{color:var(--dim)}.fcm-chat-conversation-header small[data-room-name]{cursor:pointer}.fcm-chat-conversation-header small[data-room-name]:hover{color:var(--ac);text-decoration:underline}.fcm-chat-not-friend{margin-left:8px;color:var(--dim);font-size:.85em;font-style:normal;font-weight:400}.fcm-chat-conversation-header>.fcm-chat-avatar{cursor:pointer}.fcm-chat-messages{flex:1;min-height:0;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:8px;scrollbar-color:var(--ac) var(--surface-alt)}.fcm-chat-message{max-width:70%;padding:7px 10px;border-radius:7px;border:1px solid transparent;animation:fcm-chat-rise .32s cubic-bezier(.2,.8,.2,1) both}.fcm-chat-message.in{align-self:flex-start;background:var(--surface-alt)}.fcm-chat-message.out{align-self:flex-end;background:color-mix(in srgb,var(--ac) 14%,transparent);border-color:var(--ac)}.fcm-chat-message time{display:block;margin-top:3px;font-size:9px;color:var(--dim)}.fcm-chat-actions{display:flex;flex-shrink:0;gap:6px;padding:6px 12px 0;border-top:1px solid var(--border);animation:fcm-chat-rise .3s cubic-bezier(.2,.8,.2,1) .06s both}.fcm-chat-actions button{padding:4px 8px;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:7px}.fcm-chat-compose{display:flex;flex-shrink:0;gap:8px;padding:6px 12px 10px;animation:fcm-chat-rise .3s cubic-bezier(.2,.8,.2,1) .1s both}.fcm-chat-compose textarea{flex:1;resize:none;padding:8px;background:var(--surface-alt);color:var(--tx);border:1px solid var(--border);border-radius:7px;user-select:text!important;-webkit-user-select:text!important}.fcm-chat-compose>button{padding:0 16px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:7px}.fcm-chat-channels{display:flex;flex-direction:column;gap:3px}.fcm-chat-channels button{min-width:66px;flex:1;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:7px}.fcm-chat-channels button.active{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-chat-channels button:disabled{opacity:1;color:var(--dim);cursor:default}
-.fcm-chat-content{white-space:pre-wrap;overflow-wrap:anywhere}.fcm-chat-link{color:var(--ac);text-decoration:underline;user-select:text!important}.fcm-chat-image-link{display:block;margin-top:5px}.fcm-chat-image{display:block;max-width:min(360px,100%);max-height:280px;border:1px solid var(--ac);border-radius:7px;object-fit:contain;background:#0004}
+.fcm-chat-conversation-header{padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border);animation:fcm-chat-rise .3s cubic-bezier(.2,.8,.2,1) both}.fcm-chat-conversation-header>span{display:flex;flex-direction:column}.fcm-chat-conversation-header small{color:var(--dim)}.fcm-chat-conversation-header small[data-room-name]{cursor:pointer}.fcm-chat-conversation-header small[data-room-name]:hover{color:var(--ac);text-decoration:underline}.fcm-chat-not-friend{margin-left:8px;color:var(--dim);font-size:.85em;font-style:normal;font-weight:400}.fcm-chat-conversation-header>.fcm-chat-avatar{cursor:pointer}.fcm-chat-messages{flex:1;min-height:0;overflow:auto;padding:14px;display:flex;flex-direction:column;gap:8px;scrollbar-color:var(--ac) var(--surface-alt)}.fcm-chat-message{max-width:70%;padding:7px 10px;border-radius:7px;border:1px solid transparent;animation:fcm-chat-rise .32s cubic-bezier(.2,.8,.2,1) both}.fcm-chat-message.in{align-self:flex-start;background:var(--surface-alt)}.fcm-chat-message.out{align-self:flex-end;background:color-mix(in srgb,var(--ac) 14%,transparent);border-color:var(--ac)}.fcm-chat-message time{display:block;margin-top:3px;font-size:9px;color:var(--dim)}.fcm-chat-actions{display:flex;flex-shrink:0;gap:6px;padding:6px 12px 0;border-top:1px solid var(--border);animation:fcm-chat-rise .3s cubic-bezier(.2,.8,.2,1) .06s both}.fcm-chat-actions button{padding:4px 8px;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:7px}.fcm-chat-compose{position:relative;display:flex;flex-shrink:0;gap:8px;padding:6px 12px 10px;animation:fcm-chat-rise .3s cubic-bezier(.2,.8,.2,1) .1s both}.fcm-chat-compose-notice{position:absolute;left:12px;right:12px;bottom:100%;padding:6px 10px;background:color-mix(in srgb,#b02035 82%,var(--s));color:#fff;border:1px solid #ff7485;border-radius:7px 7px 0 0;text-align:center;font-size:12px;box-shadow:0 -4px 14px #0007}.fcm-chat-compose textarea{flex:1;resize:none;padding:8px;background:var(--surface-alt);color:var(--tx);border:1px solid var(--border);border-radius:7px;user-select:text!important;-webkit-user-select:text!important}.fcm-chat-compose>button{padding:0 16px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:7px}.fcm-chat-channels{display:flex;flex-direction:column;gap:3px}.fcm-chat-channels button{min-width:66px;flex:1;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:7px}.fcm-chat-channels button.active{color:var(--ac);border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-chat-channels button:disabled{opacity:1;color:var(--dim);cursor:default}
+.fcm-chat-content{white-space:pre-wrap;overflow-wrap:anywhere}.fcm-chat-link{color:var(--ac);text-decoration:underline;user-select:text!important}.fcm-chat-image-link{display:block;margin-top:5px}.fcm-chat-image{display:block;max-width:min(360px,100%);max-height:280px;border:1px solid var(--ac);border-radius:7px;object-fit:contain;background:#0004}.fcm-chat-image-trust{margin-left:4px;padding:2px 7px;background:color-mix(in srgb,var(--ac) 12%,var(--s));color:var(--ac);border:1px solid var(--ac);border-radius:6px;cursor:pointer}
 .fcm-chat-actions>span{flex:1}.fcm-chat-tools{position:relative}.fcm-chat-tools-menu{position:absolute;right:0;bottom:calc(100% + 7px);display:flex;flex-direction:column;align-items:stretch;gap:5px;padding:5px;opacity:0;visibility:hidden;transform:translateY(8px);background:var(--s);border:1px solid var(--ac);border-radius:8px;box-shadow:0 8px 24px #0009;transition:.18s ease}.fcm-chat-tools-menu button{justify-content:flex-start!important;gap:7px;white-space:nowrap}.fcm-chat-tools.open .fcm-chat-tools-menu{opacity:1;visibility:visible;transform:translateY(0)}.fcm-chat-tools.open>[data-toggle-tools]{color:var(--ac);border-color:var(--ac)}.fcm-chat-channels.offline button{color:#777!important;border-color:#555!important;background:#7771!important;box-shadow:none!important}.fcm-chat-message.queued{opacity:.68;border-style:dashed}.fcm-chat-message.queued time{color:#e9bd4b}.fcm-chat-header-action{width:38px;height:38px;padding:6px;background:transparent;color:var(--dim);border:1px solid var(--border);border-radius:7px}.fcm-chat-header-action:disabled{opacity:.35}.fcm-chat-header-action svg{width:26px!important;height:26px!important;fill:currentColor}.fcm-chat-rail-button svg,.fcm-chat-actions svg{width:18px;height:18px;fill:currentColor}
 .fcm-chat-settings{padding:8px 10px;display:flex;flex-direction:column;gap:7px}.fcm-chat-setting-row{display:flex;align-items:center;gap:10px;padding:10px 8px;border:0}.fcm-chat-setting-row>span{flex:1;display:flex;flex-direction:column}.fcm-chat-setting-row small{color:var(--dim)}.fcm-chat-switch{width:34px;height:18px;padding:2px;background:var(--surface-alt);border:1px solid var(--ac);border-radius:10px}.fcm-chat-switch i{display:block;width:12px;height:12px;border-radius:50%;background:var(--dim);transition:transform .18s ease}.fcm-chat-switch.on{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 18%,transparent)}.fcm-chat-switch.on i{background:var(--ac);transform:translateX(14px)}.fcm-chat-main-settings{padding:7px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:7px}
 .fcm-chat-status-menu{display:none;position:absolute;left:58px;bottom:45px;z-index:10;padding:4px;background:var(--s);border:1px solid var(--ac);border-radius:7px;box-shadow:0 6px 20px #0008}.fcm-chat-status-menu.open{display:flex;flex-direction:column;animation:fcm-chat-pop .12s ease}.fcm-chat-status-menu button{display:flex;align-items:center;gap:8px;padding:6px 10px;background:transparent;color:var(--tx);border:1px solid transparent;border-radius:6px}.fcm-chat-status-menu button:hover{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,transparent)}.fcm-chat-status-menu i,.fcm-status-dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:#58c878}.fcm-chat-empty{margin:auto;padding:20px;text-align:center;color:var(--dim)}
@@ -1859,7 +1909,7 @@ body>.fcm-chat-user-balloon{border:0!important;box-shadow:0 0 15px color-mix(in 
 .fcm-chat-profile{--profile-label-width:193px}.fcm-chat-profile :is(.fcm-chat-profile-line>span,.fcm-chat-profile-field>span,.fcm-profile-auto-replies label>b,.fcm-profile-edit){font-size:16px!important}.fcm-chat-profile-line>b{font-size:13px}.fcm-profile-edit{padding:5px 8px;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:6px}.fcm-profile-nickname-editor[hidden]{display:none!important}.fcm-profile-nickname-editor{grid-column:2/4;display:flex;align-items:center;gap:6px}.fcm-profile-nickname-editor input{flex:1;min-width:0}.fcm-profile-nickname-editor button{width:30px;height:30px;padding:0;background:transparent;color:var(--ac);border:1px solid var(--ac);border-radius:6px}.fcm-chat-profile-field,.fcm-chat-profile label.fcm-chat-profile-field{display:grid!important;grid-template-columns:var(--profile-label-width) minmax(0,1fr);align-items:start;gap:10px;max-width:680px!important;color:var(--dim)}.fcm-chat-profile-field>span{padding-top:8px}.fcm-chat-profile-field>input,.fcm-chat-profile-field>textarea{width:100%;max-width:none}.fcm-profile-auto-replies{display:grid;grid-template-columns:1fr 1fr;gap:12px}.fcm-chat-profile .fcm-profile-auto-replies>label{position:relative;display:grid!important;grid-template-columns:1fr auto;gap:6px;max-width:none}.fcm-profile-auto-replies label>b{align-self:center;color:var(--dim)}.fcm-profile-auto-replies textarea{grid-column:1/3;width:100%}.fcm-profile-auto-replies .fcm-chat-switch{grid-column:2;grid-row:1}.fcm-chat-avatar i,.fcm-status-dot,.fcm-chat-status-menu i,.fcm-profile-statuses button>i{box-shadow:0 0 7px 2px color-mix(in srgb,#58c878 70%,transparent)}.fcm-chat-avatar i.busy,.fcm-status-dot.busy,.fcm-chat-status-menu i.busy,.fcm-profile-statuses button>i.busy{box-shadow:0 0 7px 2px color-mix(in srgb,#e85d68 70%,transparent)}.fcm-chat-avatar i.afk,.fcm-status-dot.afk,.fcm-chat-status-menu i.afk,.fcm-profile-statuses button>i.afk{box-shadow:0 0 7px 2px color-mix(in srgb,#e9bd4b 70%,transparent)}.fcm-chat-avatar i.offline,.fcm-status-dot.offline{box-shadow:0 0 6px 1px #7778}
 .fcm-chat-icon-action{display:inline-flex!important;align-items:center;justify-content:center;min-width:30px;min-height:30px}.fcm-chat-icon-action svg{width:17px!important;height:17px!important;display:block;fill:currentColor}.fcm-chat-back{width:30px;height:30px}
 .fcm-chat-conversation-header .fcm-chat-header-action svg{width:26px!important;height:26px!important}
-.fcm-chat-conversation-header>.fcm-chat-back,.fcm-chat-conversation-header>.fcm-chat-header-action,.fcm-chat-conversation-header>.fcm-chat-assign>button{width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;flex:0 0 38px!important;padding:6px!important}.fcm-chat-conversation-header>.fcm-chat-avatar{width:38px!important;height:38px!important;flex:0 0 38px}.fcm-chat-rail .fcm-chat-unread{pointer-events:none;right:0;top:0}.fcm-chat-rail-button.has-unread{box-shadow:0 0 10px color-mix(in srgb,var(--ac) 38%,transparent)}.fcm-balloon-icon svg [id="Path 0"]{display:none}
+.fcm-chat-conversation-header>.fcm-chat-back,.fcm-chat-conversation-header>.fcm-chat-header-action,.fcm-chat-conversation-header>.fcm-chat-assign>button{width:38px!important;height:38px!important;min-width:38px!important;min-height:38px!important;flex:0 0 38px!important;padding:6px!important}.fcm-chat-conversation-header>.fcm-chat-avatar{width:38px!important;height:38px!important;flex:0 0 38px}.fcm-chat-rail .fcm-chat-unread{pointer-events:none;right:-4px;top:-4px}.fcm-balloon-icon svg [id="Path 0"]{display:none}
 .fcm-chat-switch{transition:border-color .16s ease,background .16s ease,box-shadow .16s ease}.fcm-chat-switch i{transition:transform .18s ease,background .16s ease}.fcm-chat-switch:hover{border-color:var(--ac);background:color-mix(in srgb,var(--ac) 14%,var(--surface-alt));box-shadow:0 0 9px color-mix(in srgb,var(--ac) 22%,transparent)}.fcm-chat-switch:hover i{background:color-mix(in srgb,var(--ac) 70%,var(--tx))}
 #fcm-chat-balloon,.fcm-chat-user-balloon{z-index:100010}.fcm-balloon-preview{display:none!important;position:absolute!important;right:60px!important;left:auto!important;bottom:0!important;z-index:100011!important;width:260px!important;padding:9px!important;text-align:left!important;background:var(--s)!important;color:var(--tx)!important;border:1px solid var(--ac)!important;border-radius:9px!important;font-size:13px!important;pointer-events:none}.preview-right>.fcm-balloon-preview{right:auto!important;left:60px!important}.fcm-balloon-preview strong{display:block;color:var(--ac)}#fcm-chat-balloon:hover>.fcm-balloon-preview,.fcm-chat-user-balloon:hover>.fcm-balloon-preview{display:block!important}
 #fcm-chat-balloon,.fcm-chat-user-balloon{transform-origin:50% 65%;will-change:transform,left,top;transition:transform .34s cubic-bezier(.2,1.45,.35,1),left .14s ease-out,top .14s ease-out,border-radius .24s ease,box-shadow .24s ease}#fcm-chat-balloon.dragging,.fcm-chat-user-balloon.dragging{transform:rotate(var(--drag-angle,0deg)) scale(var(--drag-stretch,1),var(--drag-squash,1))!important;transform-origin:50% 20%;border-radius:46% 46% 58% 58% / 36% 36% 68% 68%;box-shadow:0 14px 28px #0009,0 0 16px color-mix(in srgb,var(--ac) 35%,transparent);transition:border-radius .16s ease,box-shadow .16s ease}#fcm-chat-balloon.released,.fcm-chat-user-balloon.released{animation:fcm-balloon-release .5s cubic-bezier(.2,.8,.2,1)}#fcm-chat-balloon.stirred,.fcm-chat-user-balloon.stirred{transform:translate(var(--stir-x,0),var(--stir-y,0)) rotate(var(--stir-angle,0deg)) scale(.96,1.04)!important;transition:transform .12s ease-out}@keyframes fcm-balloon-release{0%{transform:scale(1.16,.82)}28%{transform:scale(.9,1.13)}52%{transform:scale(1.07,.94)}74%{transform:scale(.97,1.04)}100%{transform:scale(1)}}

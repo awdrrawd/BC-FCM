@@ -143,7 +143,14 @@
     chatShareProfile: 'Chia sẻ hồ sơ',
     chatProfileNotFound: 'Không tìm thấy hồ sơ đã lưu; sẽ gửi dưới dạng @ID thông thường',
     chatNoBiography: 'Không có giới thiệu',
-    addFriend: 'Thêm bạn'
+    addFriend: 'Thêm bạn',
+    bypassBcxCommunication: 'Bỏ qua hạn chế tin nhắn riêng/thì thầm của BCX (gian lận)',
+    bypassBcxCommunicationNote: 'Mặc định tắt. Khi bật, FCM sẽ bỏ qua các hạn chế của BCX đối với việc gửi và nhận BEEP và tin nhắn thì thầm.',
+    bcxWhisperBlocked: 'BCX không cho phép bạn gửi tin nhắn thì thầm',
+    bcxBeepBlocked: 'BCX không cho phép bạn gửi tin nhắn riêng',
+    chatTrustImageDomain: 'Tin cậy miền hình ảnh',
+    chatTrustImagePrompt: 'Tin cậy “{0}” và hiển thị trực tiếp hình ảnh trong phiên chơi này? Quyền tin cậy sẽ được đặt lại khi tải lại trang.',
+    chatTrustImage: 'Tin cậy'
     };
     var T = {}; Object.keys(V).forEach(function (k) { T[k] = { VI: V[k] }; });
     I.register('FCM', T);

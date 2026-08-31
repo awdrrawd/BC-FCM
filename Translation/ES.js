@@ -143,7 +143,14 @@
     chatShareProfile: 'Compartir perfil',
     chatProfileNotFound: 'No se encontró ningún perfil guardado; se enviará como un @ID simple',
     chatNoBiography: 'Sin descripción',
-    addFriend: 'Añadir amigo'
+    addFriend: 'Añadir amigo',
+    bypassBcxCommunication: 'Omitir las restricciones de BCX para mensajes privados/susurros (trampa)',
+    bypassBcxCommunicationNote: 'Desactivado de forma predeterminada. Al activarlo, FCM omite las restricciones de BCX para enviar y recibir BEEP y susurros.',
+    bcxWhisperBlocked: 'BCX te impide enviar susurros',
+    bcxBeepBlocked: 'BCX te impide enviar mensajes privados',
+    chatTrustImageDomain: 'Confiar en el dominio de imágenes',
+    chatTrustImagePrompt: '¿Confiar en «{0}» y mostrar sus imágenes durante esta sesión de juego? La confianza se restablece al recargar la página.',
+    chatTrustImage: 'Confiar'
     };
     var T = {}; Object.keys(V).forEach(function (k) { T[k] = { ES: V[k] }; });
     I.register('FCM', T);
