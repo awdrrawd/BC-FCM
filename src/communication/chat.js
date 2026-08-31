@@ -2,7 +2,7 @@ import { cfg, saveCfg } from '../core/config.js';
 import { getDisplayName as getSharedDisplayName, getRoomInfo, inRoomFn, onlineFriends, requestOnlineFriends, buildFriendList, getAllRels, isFav, isFriendOf } from '../data/data.js';
 import { getCachedRoomInfo, queryRoomInfo } from '../panel/panel-rooms-data.js';
 import { PDB, Snapshot, loadAvatarFromBundle, syncRoomAvatar, updateOwnAvatarSnapshot, updateOwnAvatarProfile } from '../data/profile-db.js';
-import { ChatStore, AudioStore, OfflineQueue } from './chat-store.js';
+import { ChatStore, OfflineQueue } from './chat-store.js';
 import { T, TH, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, ensureLang } from '../i18n/i18n.js';
 import { chatFontFamily, availableFontChoices } from './chat-font.js';
 import { isSupportedAvatarUrl, profileHtml as renderProfileHtml } from './chat-profile.js';
@@ -12,11 +12,17 @@ import { applyTheme } from '../panel/styles.js';
 import { THEME_KEYS, themeColors } from '../core/themes.js';
 import { showAddFriendConfirm, showRoomJoinConfirm, showIncomingRoomInvite } from '../chat/actions.js';
 import { canSendBcxWhisper, sendBcxAwareBeep, sendBcxAwareWhisper } from './bcx-compat.js';
-import { imageOriginTrusted, normalizedImageOrigin, trustImageOrigin } from './image-trust.js';
+import { normalizedImageOrigin, trustImageOrigin } from './image-trust.js';
 import { injectChatStyles } from './chat-styles.js';
 import { warnLimited } from '../core/logger.js';
+import { balloonPreviewText, cleanMessage, esc, messageContentHtml, parseRoomInvite } from './chat-content.js';
+import { exportConversation as exportConversationFile } from './chat-export.js';
+import { hasCustomNotificationSound, initChatAudio, playNotificationSound, saveCustomNotificationSound } from './chat-audio.js';
+import { installChatDrag, resetBalloonInteraction } from './chat-drag.js';
+import { ConversationViewport } from './chat-viewport.js';
+import { createChatBalloonController } from './chat-balloon.js';
 import {
-    FCM_ICON_SVG, CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
+    CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     ALARM_MUTED_ICON, ALARM_ACTIVE_ICON, EXIT_ICON, DOWNLOAD_ICON,
     TRASH_ICON, SPLIT_ICON, MERGE_ICON, EDIT_ICON, SETTINGS_ICON,
     SUMMON_ICON, INVITE_ICON, WATER_ICON, FOLDER_ICON, MAXIMIZE_ICON, REPLY_ICON, ADD_FRIEND_ICON,
@@ -29,8 +35,7 @@ let conversationMessages = [];
 let conversationHasMore = false;
 let conversationLoading = false;
 let conversationUnread = 0;
-let conversationFollowingLatest = true;
-const CONVERSATION_FOLLOW_THRESHOLD = 40;
+const conversationViewport = new ConversationViewport(40);
 const CONVERSATION_PAGE_SIZE = 50;
 let search = '';
 let presenceFilter = 'online';
@@ -45,7 +50,6 @@ let channel = 'beep';
 let maximized = false;
 let stackedDetail = false;
 let suppressOutgoing = 0;
-let customAudioUrl = '';
 let justOpenedMember = null;
 let replyTarget = null;
 let contactCardOpen = false;
@@ -61,74 +65,20 @@ const bypassedIncomingWhispers = new WeakSet();
 // CHAT 固定使用「暱稱優先、沒有暱稱才用 BC 名稱」，不跟隨 FCM 主面板的名稱切換。
 const getDisplayName = memberNumber => getSharedDisplayName(memberNumber, true);
 let initialized = false;
-const esc = value => {
-    const el = document.createElement('div');
-    el.textContent = String(value ?? '');
-    return el.innerHTML;
-};
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
-
-function cleanMessage(value) {
-    let text = String(value ?? '');
-    // 相容舊版曾使用的 U+F124 隱藏尾碼，避免既有歷史資料重新洩漏。
-    const hiddenIndex = text.indexOf('\uf124');
-    if (hiddenIndex >= 0) text = text.slice(0, hiddenIndex);
-    const legacyIndex = text.indexOf('{"messageType"');
-    if (legacyIndex > 0) text = text.slice(0, legacyIndex);
-    return text.replace(/[\r\n]+$/g, '').trim();
-}
-
-const CHAT_IMAGE_EXT = /\.(?:png|jpe?g|gif|webp|bmp|avif|apng|jfif|svg|ico)$/iu;
-const BALLOON_PREVIEW_MAX_CHARS = 80;
-
-function balloonPreviewText(value) {
-    const normalized = cleanMessage(value).replace(/\s+/gu, ' ').trim();
-    const characters = Array.from(normalized);
-    return characters.length > BALLOON_PREVIEW_MAX_CHARS
-        ? `${characters.slice(0, BALLOON_PREVIEW_MAX_CHARS).join('')}…`
-        : normalized;
-}
-
-function messageContentHtml(value, interactive = true) {
-    const text = cleanMessage(value);
-    const urlPattern = /https?:\/\/[^\s<>"']+/giu;
-    let html = '', cursor = 0;
-    for (const match of text.matchAll(urlPattern)) {
-        const raw = match[0];
-        const trailing = raw.match(/[),.!?\]]+$/u)?.[0] || '';
-        const candidate = trailing ? raw.slice(0, -trailing.length) : raw;
-        let url;
-        try { url = new URL(candidate); } catch { continue; }
-        if (!['http:', 'https:'].includes(url.protocol)) continue;
-        html += esc(text.slice(cursor, match.index));
-        const href = esc(url.href);
-        if (CHAT_IMAGE_EXT.test(url.pathname)) {
-            html += imageOriginTrusted(url)
-                ? `<a class="fcm-chat-image-link" href="${href}" target="_blank" rel="noopener noreferrer" title="${href}"><img class="fcm-chat-image" src="${href}" alt="${href}" loading="lazy" referrerpolicy="no-referrer"></a>`
-                : `<a class="fcm-chat-link" href="${href}" target="_blank" rel="noopener noreferrer">${esc(candidate)}</a>${interactive ? ` <button class="fcm-chat-image-trust" data-trust-image-origin="${esc(url.origin)}" type="button">${TH('chatTrustImage')}</button>` : ''}`;
-        } else {
-            html += `<a class="fcm-chat-link" href="${href}" target="_blank" rel="noopener noreferrer">${esc(candidate)}</a>`;
-        }
-        html += esc(trailing);
-        cursor = match.index + raw.length;
-    }
-    return html + esc(text.slice(cursor));
-}
-
-function parseRoomInvite(value) {
-    const lines = String(value ?? '').replace(/\r\n?/g, '\n').split('\n');
-    // 最小協議只需要 |房名|；由 FCM 按鈕發送時，後方再附房主與人數等完整資料。
-    const match = lines[0]?.trim().match(/^\|([^|]+)\|(.*)$/u);
-    if (!match?.[1]?.trim()) return null;
-    const full = (match[2] || '').match(/^\s*-\s*(.*?)\s*＜(\d+)\/(\d+)＞\s*$/u);
-    return {
-        roomName: match[1].trim(),
-        creator: full?.[1]?.trim() || '',
-        count: full?.[2] == null ? null : Number(full[2]),
-        limit: full?.[3] == null ? null : Number(full[3]),
-        desc: lines.slice(1).join('\n').trim(),
-    };
-}
+const chatBalloons = createChatBalloonController({
+    avatarHtml: (...args) => avatarHtml(...args),
+    avatarUrl: memberNumber => avatarUrl(memberNumber),
+    balloonPreviewText,
+    chatColors: () => chatColors(),
+    getDisplayName,
+    getRoot: () => root,
+    isMaximized: () => maximized,
+    toggleChat: memberNumber => toggleChat(memberNumber),
+    unreadBadge: memberNumber => unreadBadge(memberNumber),
+    unreadCount: memberNumber => unreadCount(memberNumber),
+    waterShapeHtml,
+});
 
 function isOnline(memberNumber) {
     const mn = Number(memberNumber);
@@ -211,14 +161,13 @@ async function initChat() {
     messages = await ChatStore.prune();
     // 舊版本曾把完整隱藏尾碼寫入 IndexedDB；讀取時一併淨化，避免舊資料再次洩漏。
     messages = messages.map(message => ({ ...message, content: cleanMessage(message.content) }));
-    const customSound = await AudioStore.get();
-    if (customSound?.blob) customAudioUrl = URL.createObjectURL(customSound.blob);
+    await initChatAudio();
     injectChatStyles();
-    ensureBalloon();
+    chatBalloons.ensure();
     // FCM 與 CHAT 是同一套設定的兩個畫面：任一邊改主題/語言都要讓另一邊即時反映，
     // 不必（也不應該）整個重建 — 分別掛勾兩個共用事件，各自只重繪自己負責的畫面。
     window.addEventListener('fcm-theme-change', refreshChatSettings);
-    window.addEventListener('fcm-language-change', () => { if (root?.isConnected && root.style.display !== 'none') renderChat(); ensureBalloon(); });
+    window.addEventListener('fcm-language-change', () => { if (root?.isConnected && root.style.display !== 'none') renderChat(); chatBalloons.ensure(); });
     window.addEventListener('fcm:bcx-send-blocked', event => {
         const notice = root?.querySelector('[data-bcx-compose-notice]');
         if (!notice) return;
@@ -269,7 +218,7 @@ async function recordMessage(data, { notify = true } = {}) {
         refreshVisibleChatScroll();
     }
     if (notify && message.direction === 'in') {
-        showIncomingBalloon(message);
+        chatBalloons.showIncoming(message);
         playNotificationSound();
         sendStatusAutoReply(message);
     }
@@ -426,7 +375,7 @@ async function openChat(memberNumber = null) {
     if (selectedMember) await ChatStore.markRead(selectedMember);
     messages = await ChatStore.prune();
     if (selectedMember) await loadConversation(selectedMember);
-    refreshBalloonBadges();
+    chatBalloons.refreshBadges();
     renderChat();
     return true;
 }
@@ -442,8 +391,8 @@ function toggleChat(memberNumber = null) {
 
 function minimizeChat() {
     if (root) root.style.display = 'none';
-    syncMaximizedBalloonVisibility();
-    ensureBalloon(true);
+    chatBalloons.syncVisibility();
+    chatBalloons.ensure(true);
 }
 
 function filteredNotificationRows(rows) {
@@ -458,15 +407,15 @@ function closeChat() {
     replyTarget = null;
     stackedDetail = false;
     if (root) root.style.display = 'none';
-    syncMaximizedBalloonVisibility();
+    chatBalloons.syncVisibility();
     document.querySelectorAll('#fcm-chat-balloon,.fcm-chat-user-balloon').forEach(resetBalloonInteraction);
     if (memberToClose) document.getElementById(`fcm-chat-user-${memberToClose}`)?.remove();
     const balloon = document.getElementById('fcm-chat-balloon');
     if (!cfg.persistentBalloon) balloon?.remove();
-    else if (!balloon) ensureBalloon();
+    else if (!balloon) chatBalloons.ensure();
     else {
         // 關閉視窗只恢復外觀，不重新套用儲存座標或執行貼邊落位。
-        paintBalloon(balloon);
+        chatBalloons.paint(balloon);
         balloon.classList.toggle('persistent', !!cfg.communicationEnabled);
     }
 }
@@ -533,7 +482,7 @@ function groupsHtml() {
 function settingsHtml() {
     const languageOpts = FCM_LANGS.map(value => `<option value="${esc(value)}" ${String(cfg.lang || 'auto').toLowerCase() === value.toLowerCase() ? 'selected' : ''}>${esc(FCM_LANG_FLAGS[value] || '')} ${esc(FCM_LANG_NAMES[value] || value)}</option>`).join('');
     const sounds = [['', T('off')], ['Audio/BeepAlarm.mp3','BeepAlarm'], ['Audio/BellMedium.mp3','BellMedium'], ['Audio/Belt1.mp3','Belt1'], ['Audio/VibrationTone4ShortLoop.mp3','VibrationTone4ShortLoop'], ['custom', T('chatSoundCustom')]];
-    const soundEnabled = !!cfg.notificationAudio && !!cfg.notificationSound && (cfg.notificationSound !== 'custom' || !!customAudioUrl);
+    const soundEnabled = !!cfg.notificationAudio && !!cfg.notificationSound && (cfg.notificationSound !== 'custom' || hasCustomNotificationSound());
     const themeKeys = THEME_KEYS;
     const placementOptions = current => [['off', T('balloonOff')], ['top-left', `⬉ ${T('balloonTopLeft')}`], ['middle-left', `⭠ ${T('balloonMiddleLeft')}`], ['bottom-left', `⬋ ${T('balloonBottomLeft')}`], ['top-right', `⬈ ${T('balloonTopRight')}`], ['middle-right', `⭢ ${T('balloonMiddleRight')}`], ['bottom-right', `⬊ ${T('balloonBottomRight')}`]]
         .map(([value, label]) => `<option value="${esc(value)}" ${current === value ? 'selected' : ''}>${esc(label)}</option>`).join('');
@@ -671,21 +620,12 @@ function refreshVisibleChatScroll() {
     hydrateChatAvatars();
 }
 
-function isConversationNearBottom(log) {
-    return !!log && log.scrollHeight - log.scrollTop - log.clientHeight <= CONVERSATION_FOLLOW_THRESHOLD;
-}
-
-function scrollConversationToLatest(log) {
-    if (!log) return;
-    log.scrollTop = log.scrollHeight;
-}
-
 function bindMessageImages(scope, log) {
     scope?.querySelectorAll?.('.fcm-chat-image').forEach(image => {
         image.addEventListener('load', () => {
             // Image decoding can increase the message height after the message was
             // appended. Keep following only while the user has not left the bottom.
-            if (log && conversationFollowingLatest) scrollConversationToLatest(log);
+            if (log && conversationViewport.followingLatest) conversationViewport.scrollToLatest(log);
         }, { once: true });
         image.addEventListener('error', () => {
             const link = image.closest('a');
@@ -709,7 +649,7 @@ function appendConversationMessage(message) {
     if (!log || log.querySelector(`[data-msg-id="${CSS.escape(String(message.id))}"]`)) return;
     // This must be captured before inserting the new row. Measuring afterwards
     // makes the new row itself look like the user scrolled away from the bottom.
-    const shouldFollowLatest = message.direction === 'out' || conversationFollowingLatest || isConversationNearBottom(log);
+    const shouldFollowLatest = conversationViewport.shouldFollow(log, message.direction);
     log.querySelector(':scope > .fcm-chat-empty')?.remove();
     log.insertAdjacentHTML('beforeend', messageHtml(message));
     const inserted = log.lastElementChild;
@@ -719,9 +659,9 @@ function appendConversationMessage(message) {
     });
     bindMessageImages(inserted, log);
     if (shouldFollowLatest) {
-        conversationFollowingLatest = true;
+        conversationViewport.follow();
         conversationUnread = 0;
-        requestAnimationFrame(() => { scrollConversationToLatest(log); updateConversationUnreadNotice(); });
+        requestAnimationFrame(() => { conversationViewport.scrollToLatest(log); updateConversationUnreadNotice(); });
     } else {
         conversationUnread++;
         updateConversationUnreadNotice();
@@ -736,7 +676,7 @@ async function loadConversation(memberNumber) {
         conversationMessages = page.messages.map(message => ({ ...message, content: cleanMessage(message.content) }));
         conversationHasMore = page.hasMore;
         conversationUnread = 0;
-        conversationFollowingLatest = true;
+        conversationViewport.follow();
     }
     conversationLoading = false;
 }
@@ -841,7 +781,7 @@ function renderChat() {
         <div class="fcm-chat-context-menu" hidden><button data-context-reply>${TH('chatReply')}</button><button data-context-select>${TH('chatSelectMessage')}</button><button data-context-copy>${TH('chatCopy')}</button><button data-context-cancel>${TH('chatCancel')}</button></div>
     </div>`;
     positionPanel();
-    syncMaximizedBalloonVisibility();
+    chatBalloons.syncVisibility();
     bindEvents();
     installDragScroll(root, '.fcm-chat-scroll,.fcm-chat-messages,.fcm-chat-profile,.fcm-chat-body.view-settings .fcm-chat-list');
     refreshConversationRoomMeta();
@@ -849,8 +789,8 @@ function renderChat() {
     const log = root.querySelector('.fcm-chat-messages');
     if (log) {
         bindMessageImages(log, log);
-        conversationFollowingLatest = true;
-        scrollConversationToLatest(log);
+        conversationViewport.follow();
+        conversationViewport.scrollToLatest(log);
     }
     if (settingsScrollTop !== null && settingsScrollTop !== undefined) {
         const settingsList = root.querySelector('.fcm-chat-list');
@@ -920,7 +860,7 @@ function bindMemberRows(scope = root) {
         await ChatStore.markRead(selectedMember);
         messages = await ChatStore.prune();
         await loadConversation(selectedMember);
-        refreshBalloonBadges();
+        chatBalloons.refreshBadges();
         renderChat();
         setTimeout(() => { justOpenedMember = null; }, 350);
     }));
@@ -929,7 +869,7 @@ function bindMemberRows(scope = root) {
 function bindEvents() {
     const panel = root.querySelector('#fcm-chat-panel');
     chatPanelSession.observe(panel, () => maximized);
-    makeDraggable(panel, panel.querySelector('.fcm-chat-titlebar'), 'chatPanelPosition');
+    installChatDrag(panel, panel.querySelector('.fcm-chat-titlebar'), { configKey: 'chatPanelPosition', isMaximized: () => maximized });
     root.querySelector('[data-close]')?.addEventListener('click', closeChat);
     root.querySelector('[data-min]')?.addEventListener('click', minimizeChat);
     root.querySelector('[data-max]')?.addEventListener('click', event => {
@@ -938,7 +878,7 @@ function bindEvents() {
         panel.classList.add('fcm-size-animating');
         maximized = !maximized; panel.classList.toggle('maximized', maximized);
         event.currentTarget.classList.toggle('active', maximized); const label=event.currentTarget.querySelector('i'); if(label) label.textContent=maximized?T('chatRestore'):T('chatMaximize');
-        syncMaximizedBalloonVisibility();
+        chatBalloons.syncVisibility();
         animatePanelSize(panel, before);
     });
     root.querySelector('button[data-layout]')?.addEventListener('click', event => {
@@ -984,15 +924,14 @@ function bindEvents() {
     const conversationLog = root.querySelector('.fcm-chat-messages');
     conversationLog?.addEventListener('scroll', () => {
         if (conversationLog.scrollTop < 80) loadOlderConversation(conversationLog);
-        conversationFollowingLatest = isConversationNearBottom(conversationLog);
-        if (conversationFollowingLatest && conversationUnread) {
+        if (conversationViewport.updateFromScroll(conversationLog) && conversationUnread) {
             conversationUnread = 0;
             updateConversationUnreadNotice();
         }
     });
     root.querySelector('[data-new-messages]')?.addEventListener('click', () => {
-        conversationFollowingLatest = true;
-        scrollConversationToLatest(conversationLog);
+        conversationViewport.follow();
+        conversationViewport.scrollToLatest(conversationLog);
         conversationUnread = 0;
         updateConversationUnreadNotice();
     });
@@ -1001,7 +940,13 @@ function bindEvents() {
     root.querySelector('[data-input]')?.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendCurrentMessage(); } });
     root.querySelector('[data-input]')?.addEventListener('input', updateProfileSuggestion);
     root.querySelector('[data-delete]')?.addEventListener('click', deleteConversation);
-    root.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => exportConversation(button.dataset.export)));
+    root.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => exportConversationFile(button.dataset.export, {
+        memberNumber: selectedMember,
+        getDisplayName,
+        biography,
+        avatarUrl,
+        chatColors,
+    })));
     root.querySelector('[data-invite]')?.addEventListener('click', inviteCurrent);
     root.querySelector('[data-summon]')?.addEventListener('click', summonCurrent);
     root.querySelector('[data-toggle-tools]')?.addEventListener('click', event => { event.stopPropagation(); event.currentTarget.closest('.fcm-chat-tools')?.classList.toggle('open'); });
@@ -1059,7 +1004,7 @@ function bindEvents() {
     });
     root.querySelector('[data-chat-sound]')?.addEventListener('change', event => {
         const value = event.target.value;
-        if (value === 'custom' && !customAudioUrl) { event.target.value = cfg.notificationAudio ? (cfg.notificationSound || '') : ''; root.querySelector('[data-custom-sound]')?.click(); return; }
+        if (value === 'custom' && !hasCustomNotificationSound()) { event.target.value = cfg.notificationAudio ? (cfg.notificationSound || '') : ''; root.querySelector('[data-custom-sound]')?.click(); return; }
         cfg.notificationSound = value; cfg.notificationAudio = !!value; saveCfg(); renderChat();
     });
     root.querySelector('[data-preview-sound]')?.addEventListener('click', playNotificationSound);
@@ -1153,162 +1098,6 @@ function positionPanel() {
         panel.style.top = `${cfg.chatPanelPosition.y}px`;
         panel.style.transform = 'none';
     }
-}
-
-function makeDraggable(element, handle, configKey, memberNumber = null) {
-    if (!element || !handle) return;
-    handle.addEventListener('pointerdown', event => {
-        if ((event.target.closest('button') && handle !== element) || maximized) return;
-        const rect = element.getBoundingClientRect();
-        const offsetX = event.clientX - rect.left;
-        const offsetY = event.clientY - rect.top;
-        let moved = false;
-        const isBalloon = element.matches('#fcm-chat-balloon,.fcm-chat-user-balloon');
-        const startX = event.clientX;
-        const startY = event.clientY;
-        let lastX = event.clientX;
-        let lastY = event.clientY;
-        if (isBalloon) element.classList.remove('released', 'release-water');
-        handle.setPointerCapture(event.pointerId);
-        const move = next => {
-            if (isBalloon && !moved) {
-                if (Math.hypot(next.clientX - startX, next.clientY - startY) < 6) return;
-                moved = true;
-                element.classList.add('dragging');
-            } else if (!isBalloon) moved = true;
-            const dx = next.clientX - lastX;
-            const dy = next.clientY - lastY;
-            lastX = next.clientX;
-            lastY = next.clientY;
-            const nextLeft = isBalloon ? next.clientX - element.offsetWidth / 2 : next.clientX - offsetX;
-            const nextTop = isBalloon ? next.clientY + 20 : next.clientY - offsetY;
-            element.style.left = `${Math.max(0, Math.min(innerWidth - element.offsetWidth, nextLeft))}px`;
-            element.style.top = `${Math.max(0, Math.min(innerHeight - element.offsetHeight, nextTop))}px`;
-            element.style.right = element.style.bottom = 'auto';
-            if (isBalloon) {
-                const speed = Math.min(0.22, Math.hypot(dx, dy) / 90);
-                element.style.setProperty('--drag-angle', `${Math.max(-7, Math.min(7, dx * .3))}deg`);
-                element.style.setProperty('--drag-stretch', `${1 + speed}`);
-                element.style.setProperty('--drag-squash', `${1 - speed * .55}`);
-                stirNearbyBalloons(element, dx, dy);
-            } else element.style.transform = 'none';
-            updateBalloonPreviewSide(element);
-        };
-        const up = next => {
-            handle.removeEventListener('pointermove', move);
-            handle.removeEventListener('pointerup', up);
-            handle.removeEventListener('pointercancel', cancel);
-            handle.removeEventListener('lostpointercapture', cancel);
-            try { if (handle.hasPointerCapture(next.pointerId)) handle.releasePointerCapture(next.pointerId); } catch {}
-            if (isBalloon && moved) {
-                element.classList.remove('dragging');
-                element.classList.add('released');
-                element.classList.add('release-water');
-                element.style.removeProperty('--drag-angle');
-                element.style.removeProperty('--drag-stretch');
-                element.style.removeProperty('--drag-squash');
-                settleStirredBalloons();
-                setTimeout(() => {
-                    element.classList.remove('release-water');
-                }, 150); // 落地前先由水滴恢復圓形，回彈動能仍繼續播放
-                setTimeout(() => {
-                    element.classList.remove('released');
-                }, 540);
-            }
-            if (!moved) return;
-            element.dataset.dragMoved = '1';
-            setTimeout(() => { delete element.dataset.dragMoved; }, 0);
-            if (cfg.balloonSnap) snapBalloonToNearestEdge(element);
-            resolveBalloonCollision(element);
-            const position = { x: element.offsetLeft, y: element.offsetTop };
-            if (memberNumber) { cfg[configKey] ||= {}; cfg[configKey][memberNumber] = position; }
-            else cfg[configKey] = position;
-            saveCfg();
-        };
-        const cancel = next => up(next);
-        handle.addEventListener('pointermove', move);
-        handle.addEventListener('pointerup', up);
-        handle.addEventListener('pointercancel', cancel);
-        handle.addEventListener('lostpointercapture', cancel);
-    });
-}
-
-function resetBalloonInteraction(element) {
-    element?.classList.remove('dragging', 'released', 'release-water', 'stirred', 'notify');
-    ['--drag-angle', '--drag-stretch', '--drag-squash', '--stir-x', '--stir-y', '--stir-angle'].forEach(name => element?.style.removeProperty(name));
-}
-
-function stirNearbyBalloons(dragged, dx, dy) {
-    const source = dragged.getBoundingClientRect();
-    const sx = source.left + source.width / 2;
-    const sy = source.top + source.height / 2;
-    document.querySelectorAll('#fcm-chat-balloon,.fcm-chat-user-balloon').forEach(other => {
-        if (other === dragged || getComputedStyle(other).display === 'none') return;
-        const rect = other.getBoundingClientRect();
-        const ox = rect.left + rect.width / 2;
-        const oy = rect.top + rect.height / 2;
-        const distance = Math.hypot(ox - sx, oy - sy);
-        if (distance > 150) return;
-        const force = (1 - distance / 150) * 13;
-        const length = Math.hypot(dx, dy) || 1;
-        other.style.setProperty('--stir-x', `${dx / length * force}px`);
-        other.style.setProperty('--stir-y', `${dy / length * force}px`);
-        other.style.setProperty('--stir-angle', `${Math.max(-9, Math.min(9, dx * .35))}deg`);
-        other.classList.add('stirred');
-    });
-}
-
-function settleStirredBalloons() {
-    document.querySelectorAll('.stirred').forEach(balloon => {
-        balloon.classList.remove('stirred');
-        balloon.style.removeProperty('--stir-x');
-        balloon.style.removeProperty('--stir-y');
-        balloon.style.removeProperty('--stir-angle');
-    });
-}
-
-function snapBalloonToNearestEdge(element) {
-    if (!element?.matches?.('#fcm-chat-balloon,.fcm-chat-user-balloon')) return;
-    const rect = element.getBoundingClientRect();
-    const distances = { left: rect.left, right: innerWidth - rect.right, top: rect.top, bottom: innerHeight - rect.bottom };
-    const edge = Object.entries(distances).sort((a, b) => a[1] - b[1])[0][0];
-    const margin = 8;
-    element.dataset.snapEdge = edge;
-    // 水滴尖端朝吸附邊緣的反方向；只轉外框，讓頭像仍受重力向下。
-    const waterAngles = { bottom: '0deg', top: '180deg', left: '90deg', right: '-90deg' };
-    element.style.setProperty('--water-angle', waterAngles[edge]);
-    element.style.right = element.style.bottom = 'auto';
-    if (edge === 'left') element.style.left = `${margin}px`;
-    else if (edge === 'right') element.style.left = `${Math.max(margin, innerWidth - element.offsetWidth - margin)}px`;
-    else if (edge === 'top') element.style.top = `${margin}px`;
-    else element.style.top = `${Math.max(margin, innerHeight - element.offsetHeight - margin)}px`;
-    updateBalloonPreviewSide(element);
-}
-
-function resolveBalloonCollision(element) {
-    if (!element.matches('#fcm-chat-balloon,.fcm-chat-user-balloon')) return;
-    const others = [...document.querySelectorAll('#fcm-chat-balloon,.fcm-chat-user-balloon')].filter(other => other !== element && getComputedStyle(other).display !== 'none');
-    let rect = element.getBoundingClientRect();
-    for (let pass = 0; pass < 12 && others.some(other => { const r = other.getBoundingClientRect(); return rect.left < r.right + 6 && rect.right + 6 > r.left && rect.top < r.bottom + 6 && rect.bottom + 6 > r.top; }); pass++) {
-        const horizontal = ['top', 'bottom'].includes(element.dataset.snapEdge);
-        if (horizontal) {
-            const nextLeft = rect.right + 8;
-            element.style.left = `${nextLeft + rect.width <= innerWidth ? nextLeft : Math.max(0, rect.left - rect.width - 8)}px`;
-            element.style.right = 'auto';
-        } else {
-            const nextTop = rect.bottom + 8;
-            element.style.top = `${nextTop + rect.height <= innerHeight ? nextTop : Math.max(0, rect.top - rect.height - 8)}px`;
-            element.style.bottom = 'auto';
-        }
-        rect = element.getBoundingClientRect();
-    }
-    updateBalloonPreviewSide(element);
-}
-
-function updateBalloonPreviewSide(element) {
-    if (!element?.matches?.('#fcm-chat-balloon,.fcm-chat-user-balloon')) return;
-    const rect = element.getBoundingClientRect();
-    element.classList.toggle('preview-right', rect.left < innerWidth * 0.25);
 }
 
 async function openSharedProfile(memberNumber) {
@@ -1553,77 +1342,6 @@ async function deleteConversation() {
     renderChat();
 }
 
-function downloadConversationFile(content, type, extension) {
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(new Blob([content], { type }));
-    link.download = `FCM-Chat-${selectedMember}-${new Date().toISOString().replace(/[:.]/g, '-')}.${extension}`;
-    link.click();
-    setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-}
-
-function exportedMessageHtml(message, peerName, selfName) {
-    const sender = message.direction === 'out' ? selfName : peerName;
-    const reply = message.replyPreview ? `<div class="reply">↩ ${esc(message.replyPreview)}</div>` : '';
-    const translation = message.translatedContent ? `<div class="translation">[${esc(message.translatedContent)}]</div>` : '';
-    return `<article class="message ${message.direction}">${reply}<div class="sender">${esc(sender)}</div><div class="content">${messageContentHtml(message.content, false)}</div>${translation}<footer>${esc(message.channel === 'whisper' ? T('chatChannelWhisper') : T('chatChannelPrivate'))} · <time datetime="${new Date(message.timestamp).toISOString()}">${esc(new Date(message.timestamp).toLocaleString())}</time></footer></article>`;
-}
-
-function exportTimestamp(date = new Date()) {
-    const pad = value => String(value).padStart(2, '0');
-    return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()} ${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
-}
-
-function blobAsDataUrl(blob) {
-    return new Promise(resolve => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '');
-        reader.onerror = () => resolve('');
-        reader.readAsDataURL(blob);
-    });
-}
-
-async function exportAvatarUrl(memberNumber) {
-    const direct = avatarUrl(memberNumber);
-    if (direct?.startsWith('data:image/')) return direct;
-    const record = await Snapshot.getRecord(memberNumber);
-    if (record?.blob instanceof Blob) return blobAsDataUrl(record.blob);
-    if (direct && !direct.startsWith('blob:')) {
-        try {
-            const response = await fetch(direct);
-            if (response.ok) return await blobAsDataUrl(await response.blob());
-        } catch (error) { warnLimited('chat export avatar conversion failed', error); }
-        return direct;
-    }
-    return '';
-}
-
-function conversationExportHtml(storedMessages, peerAvatar = '') {
-    const peerName = `${getDisplayName(selectedMember)} (${selectedMember})`;
-    const selfDisplayName = String(Player?.Nickname || Player?.Name || getDisplayName(Player?.MemberNumber));
-    const selfName = `${selfDisplayName} (${Player?.MemberNumber})`;
-    const peerAvatarHtml = peerAvatar ? `<img class="avatar" src="${esc(peerAvatar)}" alt="" onerror="this.remove()">` : '';
-    const [panel, text, accent] = chatColors();
-    const title = `FCM Chat — ${peerName}`;
-    return `<!doctype html><html lang="${esc(document.documentElement.lang || cfg.lang || 'en')}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc(title)}</title><style>
-:root{color-scheme:dark;--panel:${esc(panel)};--text:${esc(text)};--accent:${esc(accent)};--surface:color-mix(in srgb,var(--panel) 82%,#000);--incoming-border:color-mix(in srgb,var(--text) 65%,transparent)}*{box-sizing:border-box}body{margin:0;background:#111;color:var(--text);font:14px/1.45 system-ui,sans-serif}.app{width:min(860px,100%);min-height:100vh;margin:auto;background:var(--panel);box-shadow:0 0 40px #000}.header{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:11px;padding:14px 22px;background:color-mix(in srgb,var(--panel) 92%,transparent);border-bottom:1px solid color-mix(in srgb,var(--accent) 35%,transparent);backdrop-filter:blur(10px)}.avatar{width:42px;height:42px;flex:0 0 42px;object-fit:cover;border:1px solid var(--accent);border-radius:50%}h1{margin:0;color:var(--accent);font-size:18px}.messages{display:flex;flex-direction:column;gap:10px;padding:22px}.message{position:relative;width:fit-content;max-width:72%;padding:9px 12px;border:1px solid var(--incoming-border);border-radius:9px;background:var(--surface)}.message::before{content:"";position:absolute;top:16px;width:8px;height:8px;background:var(--surface);transform:rotate(45deg)}.message.in::before{left:-5px;border-left:1px solid var(--incoming-border);border-bottom:1px solid var(--incoming-border)}.message.out{align-self:flex-end;background:color-mix(in srgb,var(--accent) 14%,var(--panel));border-color:var(--accent)}.message.out::before{right:-5px;background:color-mix(in srgb,var(--accent) 14%,var(--panel));border-top:1px solid var(--accent);border-right:1px solid var(--accent)}.sender{margin-bottom:3px;color:var(--accent);font-size:12px;font-weight:700}.content{white-space:pre-wrap;overflow-wrap:anywhere;user-select:text}.content a{color:var(--accent)}.content img{display:block;max-width:min(420px,100%);max-height:420px;margin-top:7px;border-radius:7px}.reply{margin-bottom:6px;padding:4px 7px;border-left:3px solid var(--accent);background:#0002;opacity:.82}.translation{margin-top:5px}.message footer{margin-top:5px;font-size:10px;opacity:.62}.empty{text-align:center;opacity:.65}</style></head><body><main class="app"><header class="header">${peerAvatarHtml}<h1>${esc(peerName)} - ${esc(exportTimestamp())} · ${storedMessages.length}</h1></header><section class="messages">${storedMessages.map(message => exportedMessageHtml(message, peerName, selfName)).join('') || `<div class="empty">${esc(T('chatNoMessages'))}</div>`}</section></main></body></html>`;
-}
-
-async function exportConversation(format = 'html') {
-    const storedMessages = await ChatStore.memberAll(selectedMember);
-    if (format === 'json') {
-        const payload = {
-            format: 'FCM_CHAT_EXPORT', version: 1, exportedAt: new Date().toISOString(),
-            owner: { memberNumber: Number(Player?.MemberNumber), name: String(Player?.Nickname || Player?.Name || getDisplayName(Player?.MemberNumber)) },
-            contact: { memberNumber: Number(selectedMember), name: getDisplayName(selectedMember), biography: biography(selectedMember) || '' },
-            messageCount: storedMessages.length,
-            messages: storedMessages.map(({ ownerMemberNumber: _owner, ...message }) => message),
-        };
-        downloadConversationFile(JSON.stringify(payload, null, 2), 'application/json;charset=utf-8', 'json');
-        return;
-    }
-    downloadConversationFile(conversationExportHtml(storedMessages, await exportAvatarUrl(selectedMember)), 'text/html;charset=utf-8', 'html');
-}
-
 function inviteCurrent() {
     if (!selectedMember || !isOnline(selectedMember) || inRoomFn(selectedMember) || !ChatRoomData?.Name) return;
     const room = ChatRoomData;
@@ -1697,126 +1415,6 @@ function setStatus(status, rerender = true) {
     if (rerender) renderChat();
 }
 
-function paintBalloon(element) {
-    const [panel, text, accent] = chatColors();
-    element.style.setProperty('--s', panel);
-    element.style.setProperty('--tx', text);
-    element.style.setProperty('--ac', accent);
-}
-
-function syncMaximizedBalloonVisibility() {
-    const chatVisible = !!root?.isConnected && root.style.display !== 'none';
-    const hidden = maximized && chatVisible;
-    document.querySelectorAll('#fcm-chat-balloon,.fcm-chat-user-balloon').forEach(balloon => {
-        balloon.classList.toggle('fcm-hidden-by-chat-maximized', hidden);
-        balloon.setAttribute('aria-hidden', hidden ? 'true' : 'false');
-    });
-}
-
-function refreshBalloonBadges() {
-    const railButton = root?.querySelector('.fcm-chat-rail [data-view="notifications"]');
-    const railBadge = railButton?.querySelector('.fcm-chat-unread');
-    if (railBadge) {
-        const count = unreadCount();
-        railBadge.textContent = Math.min(count, 99);
-        railBadge.classList.toggle('hidden', !count);
-    }
-    const main = document.querySelector('#fcm-chat-balloon .fcm-chat-unread');
-    if (main) { const count = unreadCount(); main.textContent = Math.min(count, 99); main.classList.toggle('hidden', !count); }
-    document.querySelectorAll('.fcm-chat-user-balloon').forEach(balloon => {
-        const badge = balloon.querySelector('.fcm-chat-unread'); const count = unreadCount(balloon.id.replace('fcm-chat-user-', ''));
-        if (badge) { badge.textContent = Math.min(count, 99); badge.classList.toggle('hidden', !count); }
-    });
-}
-
-function placeBalloon(element, placement, index = 0) {
-    const gap = 22 + index * 58;
-    element.style.left = element.style.right = element.style.top = element.style.bottom = 'auto';
-    if (placement.endsWith('left')) element.style.left = '22px'; else element.style.right = '22px';
-    if (placement.startsWith('top')) element.style.top = `${gap}px`;
-    else if (placement.startsWith('middle')) element.style.top = `calc(50% - 27px + ${index * 58}px)`;
-    else element.style.bottom = `${gap}px`;
-    element.style.transform = 'none';
-    delete element.dataset.snapEdge;
-}
-
-function placeSavedBalloon(element, saved) {
-    const maxX = Math.max(0, innerWidth - element.offsetWidth);
-    const maxY = Math.max(0, innerHeight - element.offsetHeight);
-    element.style.left = `${Math.max(0, Math.min(maxX, saved.x))}px`;
-    element.style.top = `${Math.max(0, Math.min(maxY, saved.y))}px`;
-    element.style.right = element.style.bottom = 'auto';
-}
-
-function ensureBalloon(force = false) {
-    let created = false;
-    let balloon = document.getElementById('fcm-chat-balloon');
-    if (!balloon) {
-        created = true;
-        balloon = document.createElement('button');
-        balloon.id = 'fcm-chat-balloon';
-        balloon.innerHTML = `${waterShapeHtml()}<span class="fcm-balloon-icon">${FCM_ICON_SVG}</span>${unreadBadge()}<span class="fcm-balloon-preview"><strong>FCM Chat</strong></span>`;
-        balloon.title = 'FCM Chat';
-        balloon.addEventListener('click', () => { if (!balloon.dataset.dragMoved) toggleChat(); });
-        document.body.appendChild(balloon);
-        makeDraggable(balloon, balloon, 'chatBalloonPosition');
-    }
-    paintBalloon(balloon);
-    const saved = cfg.chatBalloonPosition;
-    if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
-        placeSavedBalloon(balloon, saved);
-    } else placeBalloon(balloon, cfg.balloonPlacement === 'off' ? 'bottom-right' : cfg.balloonPlacement);
-    balloon.classList.toggle('persistent', !!cfg.communicationEnabled && (cfg.balloonPlacement !== 'off' || force));
-    syncMaximizedBalloonVisibility();
-    if (created) resolveBalloonCollision(balloon);
-}
-
-function showIncomingBalloon(message) {
-    if (cfg.userBalloonPlacement !== 'off') {
-        ensureBalloon();
-        let balloon = document.getElementById(`fcm-chat-user-${message.memberNumber}`);
-        if (!balloon) {
-            balloon = document.createElement('button');
-            balloon.id = `fcm-chat-user-${message.memberNumber}`;
-            balloon.className = 'fcm-chat-user-balloon';
-            balloon.addEventListener('click', () => { if (!balloon.dataset.dragMoved) toggleChat(message.memberNumber); });
-            document.body.appendChild(balloon);
-            makeDraggable(balloon, balloon, 'chatUserBalloonPositions', String(message.memberNumber));
-        }
-        paintBalloon(balloon);
-        const saved = cfg.chatUserBalloonPositions?.[message.memberNumber];
-        if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) {
-            placeSavedBalloon(balloon, saved);
-        } else placeBalloon(balloon, cfg.userBalloonPlacement, [...document.querySelectorAll('.fcm-chat-user-balloon')].indexOf(balloon));
-        balloon.innerHTML = `${waterShapeHtml()}${avatarHtml(message.memberNumber, 50)}${unreadBadge(message.memberNumber)}<span class="fcm-balloon-preview"><strong>${esc(getDisplayName(message.memberNumber))}</strong>${esc(balloonPreviewText(message.content))}</span>`;
-        requestAnimationFrame(() => resolveBalloonCollision(balloon));
-        if (!avatarUrl(message.memberNumber)) Snapshot.get(message.memberNumber).then(url => { if (url && balloon.isConnected) balloon.innerHTML = `${waterShapeHtml()}${avatarHtml(message.memberNumber, 50)}${unreadBadge(message.memberNumber)}<span class="fcm-balloon-preview"><strong>${esc(getDisplayName(message.memberNumber))}</strong>${esc(balloonPreviewText(message.content))}</span>`; });
-        showBalloon(balloon);
-    } else if (cfg.balloonPlacement !== 'off') {
-        ensureBalloon();
-        const balloon = document.getElementById('fcm-chat-balloon');
-        balloon.querySelector('.fcm-balloon-preview').innerHTML = '<strong>FCM Chat</strong>';
-        const badge = balloon.querySelector('.fcm-chat-unread'); const count = unreadCount(); if (badge) { badge.textContent = Math.min(count, 99); badge.classList.toggle('hidden', !count); }
-        showBalloon(balloon);
-    }
-}
-
-function showBalloon(balloon) {
-    balloon.classList.add('visible');
-    syncMaximizedBalloonVisibility();
-    if (cfg.notificationAnimation) {
-        balloon.classList.remove('notify');
-        void balloon.offsetWidth;
-        balloon.classList.add('notify');
-        balloon.addEventListener('animationend', () => balloon.classList.remove('notify'), { once: true });
-    }
-}
-
-function playNotificationSound() {
-    if (!cfg.notificationAudio) return;
-    try { const source = cfg.notificationSound === 'custom' ? customAudioUrl : (cfg.notificationSound || 'Audio/BeepAlarm.mp3'); if (!source) return; const audio = new Audio(source); audio.volume = 0.8; audio.play().catch(() => {}); } catch {}
-}
-
 function showGroupNameDialog() {
     return new Promise(resolve => {
         const overlay = document.createElement('div'); overlay.className = 'fcm-chat-modal-overlay';
@@ -1831,17 +1429,9 @@ function showGroupNameDialog() {
     });
 }
 
-async function saveCustomNotificationSound(file) {
-    if (!file || !await AudioStore.save(file)) return false;
-    if (customAudioUrl) URL.revokeObjectURL(customAudioUrl);
-    customAudioUrl = URL.createObjectURL(file);
-    cfg.notificationSound = 'custom'; cfg.notificationAudio = true; saveCfg();
-    return true;
-}
-
 function refreshChatSettings() {
-    ensureBalloon();
-    document.querySelectorAll('.fcm-chat-user-balloon').forEach(paintBalloon);
+    chatBalloons.ensure();
+    document.querySelectorAll('.fcm-chat-user-balloon').forEach(chatBalloons.paint);
     document.getElementById('fcm-chat-balloon')?.classList.toggle('persistent', !!cfg.communicationEnabled && cfg.balloonPlacement !== 'off');
     if (cfg.userBalloonPlacement === 'off') document.querySelectorAll('.fcm-chat-user-balloon').forEach(balloon => balloon.remove());
     if (!cfg.communicationEnabled) {
