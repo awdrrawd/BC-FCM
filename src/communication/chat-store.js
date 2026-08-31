@@ -1,10 +1,8 @@
 import { warnLimited } from '../core/logger.js';
 
 const DB_NAME = 'fcm-chat';
-const DB_VERSION = 2;
-const OWNER_TIME_INDEX = 'ownerTimestamp';
-const OWNER_MEMBER_TIME_INDEX = 'ownerMemberTimestamp';
-const MAX_TIME_KEY = Number.MAX_SAFE_INTEGER;
+// Do not pass a version here. This database may be opened by other plugins;
+// schema upgrades require explicit coordination with their maintainers first.
 const accountNumber = () => Number(globalThis.Player?.MemberNumber) || 0;
 const OFFLINE_TTL = 48 * 60 * 60 * 1000;
 
@@ -44,24 +42,20 @@ const ChatStore = {
         if (this.db) return true;
         return new Promise(resolve => {
             try {
-                const req = indexedDB.open(DB_NAME, DB_VERSION);
+                const req = indexedDB.open(DB_NAME);
                 req.onupgradeneeded = e => {
                     const db = e.target.result;
-                    let store;
                     if (!db.objectStoreNames.contains('messages')) {
-                        store = db.createObjectStore('messages', { keyPath: 'id' });
+                        const store = db.createObjectStore('messages', { keyPath: 'id' });
                         store.createIndex('memberNumber', 'memberNumber');
                         store.createIndex('timestamp', 'timestamp');
-                    } else store = e.target.transaction.objectStore('messages');
-                    if (!store.indexNames.contains(OWNER_TIME_INDEX)) store.createIndex(OWNER_TIME_INDEX, ['ownerMemberNumber', 'timestamp']);
-                    if (!store.indexNames.contains(OWNER_MEMBER_TIME_INDEX)) store.createIndex(OWNER_MEMBER_TIME_INDEX, ['ownerMemberNumber', 'memberNumber', 'timestamp']);
+                    }
                 };
                 req.onsuccess = () => {
                     this.db = req.result;
                     this.db.onversionchange = () => { this.db.close(); this.db = null; };
                     resolve(true);
                 };
-                req.onblocked = () => console.warn('🐈‍⬛ [FCM Chat] database upgrade is blocked by another tab');
                 req.onerror = () => { warnLimited('chat database open failed', req.error); resolve(false); };
             } catch (error) { warnLimited('chat database open failed', error); resolve(false); }
         });
@@ -85,9 +79,8 @@ const ChatStore = {
         if (!this.db) return [];
         return new Promise(resolve => {
             try {
-                const index = this.db.transaction('messages', 'readonly').objectStore('messages').index(OWNER_TIME_INDEX);
-                const req = index.getAll(IDBKeyRange.bound([ownerMemberNumber, 0], [ownerMemberNumber, MAX_TIME_KEY]));
-                req.onsuccess = () => resolve(req.result || []);
+                const req = this.db.transaction('messages', 'readonly').objectStore('messages').getAll();
+                req.onsuccess = () => resolve((req.result || []).filter(message => Number(message.ownerMemberNumber) === ownerMemberNumber).sort((a, b) => a.timestamp - b.timestamp));
                 req.onerror = () => { warnLimited('chat history read failed', req.error); resolve([]); };
             } catch (error) { warnLimited('chat history read failed', error); resolve([]); }
         });
@@ -95,30 +88,39 @@ const ChatStore = {
     // Returns a lightweight recent-message index for the UI. Despite the legacy
     // name this must never delete history; deletion is an explicit user action.
     async prune({ maxCount = 100 } = {}) {
-        const all = await this.all();
-        return all.slice(-maxCount);
+        const ownerMemberNumber = accountNumber();
+        if (!ownerMemberNumber || !this.db) await this.init();
+        if (!ownerMemberNumber || !this.db || maxCount <= 0) return [];
+        const rows = [];
+        return new Promise(resolve => {
+            try {
+                const index = this.db.transaction('messages', 'readonly').objectStore('messages').index('timestamp');
+                const req = index.openCursor(null, 'prev');
+                req.onsuccess = () => {
+                    const cursor = req.result;
+                    if (!cursor || rows.length >= maxCount) { resolve(rows.reverse()); return; }
+                    if (Number(cursor.value.ownerMemberNumber) === ownerMemberNumber) rows.push(cursor.value);
+                    cursor.continue();
+                };
+                req.onerror = () => { warnLimited('recent chat history read failed', req.error); resolve([]); };
+            } catch (error) { warnLimited('recent chat history read failed', error); resolve([]); }
+        });
     },
     async page(memberNumber, { before = Infinity, limit = 50 } = {}) {
         const ownerMemberNumber = accountNumber();
         if (!ownerMemberNumber || !this.db) await this.init();
         if (!ownerMemberNumber || !this.db) return { messages: [], hasMore: false };
         const target = Number(memberNumber);
-        const rows = [];
         return new Promise(resolve => {
             try {
-                const index = this.db.transaction('messages', 'readonly').objectStore('messages').index(OWNER_MEMBER_TIME_INDEX);
-                const upperTime = Number.isFinite(before) ? Math.max(0, before) : MAX_TIME_KEY;
-                const range = IDBKeyRange.bound([ownerMemberNumber, target, 0], [ownerMemberNumber, target, upperTime], false, Number.isFinite(before));
-                const req = index.openCursor(range, 'prev');
+                const index = this.db.transaction('messages', 'readonly').objectStore('messages').index('memberNumber');
+                const req = index.getAll(target);
                 req.onsuccess = () => {
-                    const cursor = req.result;
-                    if (!cursor || rows.length > limit) {
-                        const hasMore = rows.length > limit;
-                        resolve({ messages: rows.slice(0, limit).reverse(), hasMore });
-                        return;
-                    }
-                    rows.push(cursor.value);
-                    cursor.continue();
+                    const eligible = (req.result || [])
+                        .filter(message => Number(message.ownerMemberNumber) === ownerMemberNumber && (!Number.isFinite(before) || Number(message.timestamp) < before))
+                        .sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
+                    const start = Math.max(0, eligible.length - limit);
+                    resolve({ messages: eligible.slice(start), hasMore: start > 0 });
                 };
                 req.onerror = () => { warnLimited('chat page read failed', req.error); resolve({ messages: [], hasMore: false }); };
             } catch (error) { warnLimited('chat page read failed', error); resolve({ messages: [], hasMore: false }); }
@@ -131,28 +133,52 @@ const ChatStore = {
         const target = Number(memberNumber);
         return new Promise(resolve => {
             try {
-                const index = this.db.transaction('messages', 'readonly').objectStore('messages').index(OWNER_MEMBER_TIME_INDEX);
-                const range = IDBKeyRange.bound([ownerMemberNumber, target, 0], [ownerMemberNumber, target, MAX_TIME_KEY]);
-                const req = index.getAll(range);
-                req.onsuccess = () => resolve(req.result || []);
+                const index = this.db.transaction('messages', 'readonly').objectStore('messages').index('memberNumber');
+                const req = index.getAll(target);
+                req.onsuccess = () => resolve((req.result || []).filter(message => Number(message.ownerMemberNumber) === ownerMemberNumber).sort((a, b) => Number(a.timestamp) - Number(b.timestamp)));
                 req.onerror = () => { warnLimited('member chat history read failed', req.error); resolve([]); };
             } catch (error) { warnLimited('member chat history read failed', error); resolve([]); }
         });
     },
     async markRead(memberNumber) {
-        const messages = (await this.memberAll(memberNumber)).filter(m => !m.read);
-        await Promise.all(messages.map(m => this.put({ ...m, read: true })));
+        const ownerMemberNumber = accountNumber();
+        if (!ownerMemberNumber || !this.db) await this.init();
+        if (!ownerMemberNumber || !this.db) return false;
+        const target = Number(memberNumber);
+        return new Promise(resolve => {
+            try {
+                const tx = this.db.transaction('messages', 'readwrite');
+                const index = tx.objectStore('messages').index('memberNumber');
+                const req = index.openCursor(IDBKeyRange.only(target));
+                req.onsuccess = () => {
+                    const cursor = req.result;
+                    if (!cursor) return;
+                    const message = cursor.value;
+                    if (Number(message.ownerMemberNumber) === ownerMemberNumber && !message.read) cursor.update({ ...message, read: true });
+                    cursor.continue();
+                };
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = () => { warnLimited('chat read state update failed', tx.error); resolve(false); };
+            } catch (error) { warnLimited('chat read state update failed', error); resolve(false); }
+        });
     },
     async deleteMember(memberNumber) {
         if (!this.db) await this.init();
         if (!this.db) return false;
+        const ownerMemberNumber = accountNumber();
+        if (!ownerMemberNumber) return false;
         const target = Number(memberNumber);
-        const records = await this.memberAll(target);
         return new Promise(resolve => {
             try {
                 const tx = this.db.transaction('messages', 'readwrite');
                 const store = tx.objectStore('messages');
-                records.forEach(m => store.delete(m.id));
+                const req = store.index('memberNumber').openCursor(IDBKeyRange.only(target));
+                req.onsuccess = () => {
+                    const cursor = req.result;
+                    if (!cursor) return;
+                    if (Number(cursor.value.ownerMemberNumber) === ownerMemberNumber) cursor.delete();
+                    cursor.continue();
+                };
                 tx.oncomplete = () => resolve(true);
                 tx.onerror = () => { warnLimited('member chat deletion failed', tx.error); resolve(false); };
             } catch (error) { warnLimited('member chat deletion failed', error); resolve(false); }
