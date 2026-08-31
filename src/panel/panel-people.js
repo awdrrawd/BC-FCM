@@ -5,6 +5,7 @@ import { makeAvEl, makeRelEl, mkBtn, buildMgmtBtns, buildPersonOps } from './pan
 import { makeIdCell } from '../chat/actions.js';
 import { wpsShareProfile } from '../chat/wps-share.js';
 import { getRenderToken } from './panel-controller.js';
+import { warnLimited } from '../core/logger.js';
 // ════════════════════════════════════════
 //  FCM module: panel-people.js  (split from panel.js)
 //  人員查詢頁（renderPeople）＋ Profile 匯出/匯入。
@@ -252,7 +253,7 @@ async function exportProfiles() {
             req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error);
         });
         let notes = [];
-        try { if (PDB.db.objectStoreNames.contains('notes')) { notes = await new Promise((res,rej) => { const req = PDB.db.transaction('notes','readonly').objectStore('notes').getAll(); req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); } } catch {}
+        try { if (PDB.db.objectStoreNames.contains('notes')) { notes = await new Promise((res,rej) => { const req = PDB.db.transaction('notes','readonly').objectStore('notes').getAll(); req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); } } catch (error) { warnLimited('profile notes export failed', error); }
         const data = { exportedAt: new Date().toISOString(), dbVersion: PDB.db.version, profiles: allProfiles, notes };
         const today = new Date(); const ymd = today.getFullYear() + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });

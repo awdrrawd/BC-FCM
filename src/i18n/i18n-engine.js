@@ -19,7 +19,7 @@
 //    window.Liko.__Sys_L10N__   聊天訊息在地化（送出英文底本 + Dictionary 標記，接收端依己方語言重寫）
 //
 //  佔位符：具名 {name} 為主，亦相容位置式 {0}{1}（vars 傳陣列時）。
-//  字庫可用「單一合併 JS」或「依語言分檔（.js 自註冊 / .json 純資料）」兩種方式載入。
+//  遠端字庫只接受 JSON 純資料；JavaScript 字庫入口僅保留相容 API，呼叫時會拒絕載入。
 //  語言解析鏈：目前語言 →（TW/CN 互退、再退 ZH）→ EN → 表中任一。
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -62,6 +62,14 @@
     // ── 共用：字庫存取（_bank[realm][ns][key][lang] = string）─────────────────
     //  realm: 'ui' 給 Liko.__Sys_i18n__；'msg' 給 Liko.__Sys_L10N__。兩者隔離但共用同一套函式。
     const _bank = { ui: Object.create(null), msg: Object.create(null) };
+    const _warningTimes = new Map();
+
+    function _warnLimited(scope, error) {
+        const now = Date.now();
+        if (now - (_warningTimes.get(scope) || 0) < 10_000) return;
+        _warningTimes.set(scope, now);
+        console.warn(`🐈‍⬛ [Liko i18n] ${scope}:`, error instanceof Error ? (error.stack || error.message) : error);
+    }
 
     function _register(realm, ns, strings) {
         if (!ns || !strings || typeof strings !== 'object') return;
@@ -138,7 +146,7 @@
 
     // 依語言分檔：只抓「目標語言」與 EN 後備。urlMap = { TW:url, CN:url, EN:url, ... }
     //  forceLang 省略時用 detectLang()；插件有自己的語言選單時可指定要抓的語言。
-    //  .json → 當純資料（該檔即該語言）；.js → 自註冊（可含多語，抓來執行即可）
+    //  .json → 當純資料（該檔即該語言）；其他副檔名會被 loadScript 明確拒絕。
     function _loadLangs(realm, ns, urlMap, forceLang) {
         if (!urlMap || typeof urlMap !== 'object') return Promise.resolve();
         const lang = forceLang || detectLang();
@@ -199,7 +207,7 @@
                     { Tag: L10N_TAG, ns, key: String(key), data: JSON.stringify(args) },
                 ],
             });
-        } catch {}
+        } catch (error) { _warnLimited('message localization send failed', error); }
     }
 
     function msg_install(modApi) {
@@ -220,7 +228,7 @@
                             if (custom) custom.Text = local; else data.Content = local;
                         }
                     }
-                } catch {}
+                } catch (error) { _warnLimited('incoming message localization failed', error); }
                 return next(a);
             });
         } catch (e) { console.warn('🐈‍⬛ [Liko L10N] hook 失敗:', e.message); }

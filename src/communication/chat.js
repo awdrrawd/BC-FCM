@@ -14,6 +14,7 @@ import { showAddFriendConfirm, showRoomJoinConfirm, showIncomingRoomInvite } fro
 import { canSendBcxWhisper, sendBcxAwareBeep, sendBcxAwareWhisper } from './bcx-compat.js';
 import { imageOriginTrusted, normalizedImageOrigin, trustImageOrigin } from './image-trust.js';
 import { injectChatStyles } from './chat-styles.js';
+import { warnLimited } from '../core/logger.js';
 import {
     FCM_ICON_SVG, CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     ALARM_MUTED_ICON, ALARM_ACTIVE_ICON, EXIT_ICON, DOWNLOAD_ICON,
@@ -28,6 +29,8 @@ let conversationMessages = [];
 let conversationHasMore = false;
 let conversationLoading = false;
 let conversationUnread = 0;
+let conversationFollowingLatest = true;
+const CONVERSATION_FOLLOW_THRESHOLD = 40;
 const CONVERSATION_PAGE_SIZE = 50;
 let search = '';
 let presenceFilter = 'online';
@@ -292,7 +295,7 @@ function handleIncomingBeep(data) {
         try {
             const info = JSON.parse(data.Message);
             remoteProfiles.set(Number(data.MemberNumber), { avatarUrl: info.avatarUrl || info.Avatar || '', signature: info.signature || info.Signature || '', status: info.status || 'online', updatedAt: Number(info.updatedAt || info.UpdateTime) || Date.now() });
-        } catch {}
+        } catch (error) { warnLimited('LianChat profile payload parse failed', error); }
         return;
     }
     const invite = parseRoomInvite(data.Message);
@@ -668,10 +671,21 @@ function refreshVisibleChatScroll() {
     hydrateChatAvatars();
 }
 
+function isConversationNearBottom(log) {
+    return !!log && log.scrollHeight - log.scrollTop - log.clientHeight <= CONVERSATION_FOLLOW_THRESHOLD;
+}
+
+function scrollConversationToLatest(log) {
+    if (!log) return;
+    log.scrollTop = log.scrollHeight;
+}
+
 function bindMessageImages(scope, log) {
     scope?.querySelectorAll?.('.fcm-chat-image').forEach(image => {
         image.addEventListener('load', () => {
-            if (log && image.closest('.fcm-chat-message')?.classList.contains('out')) log.scrollTop = log.scrollHeight;
+            // Image decoding can increase the message height after the message was
+            // appended. Keep following only while the user has not left the bottom.
+            if (log && conversationFollowingLatest) scrollConversationToLatest(log);
         }, { once: true });
         image.addEventListener('error', () => {
             const link = image.closest('a');
@@ -693,6 +707,9 @@ function bindMessageImages(scope, log) {
 function appendConversationMessage(message) {
     const log = root?.querySelector('.fcm-chat-main .fcm-chat-messages');
     if (!log || log.querySelector(`[data-msg-id="${CSS.escape(String(message.id))}"]`)) return;
+    // This must be captured before inserting the new row. Measuring afterwards
+    // makes the new row itself look like the user scrolled away from the bottom.
+    const shouldFollowLatest = message.direction === 'out' || conversationFollowingLatest || isConversationNearBottom(log);
     log.querySelector(':scope > .fcm-chat-empty')?.remove();
     log.insertAdjacentHTML('beforeend', messageHtml(message));
     const inserted = log.lastElementChild;
@@ -701,14 +718,13 @@ function appendConversationMessage(message) {
         if (room) showRoomJoinConfirm({ room });
     });
     bindMessageImages(inserted, log);
-    if (message.direction === 'out') {
+    if (shouldFollowLatest) {
+        conversationFollowingLatest = true;
         conversationUnread = 0;
-        requestAnimationFrame(() => { log.scrollTop = log.scrollHeight; updateConversationUnreadNotice(); });
+        requestAnimationFrame(() => { scrollConversationToLatest(log); updateConversationUnreadNotice(); });
     } else {
-        requestAnimationFrame(() => {
-            if (log.scrollHeight - log.scrollTop - log.clientHeight > 12) conversationUnread++;
-            updateConversationUnreadNotice();
-        });
+        conversationUnread++;
+        updateConversationUnreadNotice();
     }
 }
 
@@ -720,6 +736,7 @@ async function loadConversation(memberNumber) {
         conversationMessages = page.messages.map(message => ({ ...message, content: cleanMessage(message.content) }));
         conversationHasMore = page.hasMore;
         conversationUnread = 0;
+        conversationFollowingLatest = true;
     }
     conversationLoading = false;
 }
@@ -832,7 +849,8 @@ function renderChat() {
     const log = root.querySelector('.fcm-chat-messages');
     if (log) {
         bindMessageImages(log, log);
-        log.scrollTop = log.scrollHeight;
+        conversationFollowingLatest = true;
+        scrollConversationToLatest(log);
     }
     if (settingsScrollTop !== null && settingsScrollTop !== undefined) {
         const settingsList = root.querySelector('.fcm-chat-list');
@@ -966,13 +984,15 @@ function bindEvents() {
     const conversationLog = root.querySelector('.fcm-chat-messages');
     conversationLog?.addEventListener('scroll', () => {
         if (conversationLog.scrollTop < 80) loadOlderConversation(conversationLog);
-        if (conversationLog.scrollHeight - conversationLog.scrollTop - conversationLog.clientHeight <= 12 && conversationUnread) {
+        conversationFollowingLatest = isConversationNearBottom(conversationLog);
+        if (conversationFollowingLatest && conversationUnread) {
             conversationUnread = 0;
             updateConversationUnreadNotice();
         }
     });
     root.querySelector('[data-new-messages]')?.addEventListener('click', () => {
-        if (conversationLog) conversationLog.scrollTop = conversationLog.scrollHeight;
+        conversationFollowingLatest = true;
+        scrollConversationToLatest(conversationLog);
         conversationUnread = 0;
         updateConversationUnreadNotice();
     });
@@ -1300,7 +1320,7 @@ async function openSharedProfile(memberNumber) {
     try {
         const loaded = globalThis.CharacterLoadOnline(JSON.parse(profile.characterBundle), mn);
         globalThis.InformationSheetLoadCharacter?.(loaded);
-    } catch {}
+    } catch (error) { warnLimited(`saved chat profile open failed (${mn})`, error); }
 }
 
 async function updateProfileSuggestion(event) {
@@ -1505,7 +1525,7 @@ function saveOwnProfile() {
         Player.OnlineSharedSettings.LCData ??= {}; Player.OnlineSharedSettings.LCData.MessageSetting ??= {};
         Object.assign(Player.OnlineSharedSettings.LCData.MessageSetting, { Signature: signature, Avatar: cfg.avatarMode === 'url' ? cfg.avatarUrl : '' });
         ServerAccountUpdate.QueueData({ OnlineSharedSettings: Player.OnlineSharedSettings });
-    } catch {}
+    } catch (error) { warnLimited('LianChat compatibility settings sync failed', error); }
     renderChat();
 }
 
@@ -1571,7 +1591,7 @@ async function exportAvatarUrl(memberNumber) {
         try {
             const response = await fetch(direct);
             if (response.ok) return await blobAsDataUrl(await response.blob());
-        } catch {}
+        } catch (error) { warnLimited('chat export avatar conversion failed', error); }
         return direct;
     }
     return '';
@@ -1671,7 +1691,7 @@ function setStatus(status, rerender = true) {
         Player.OnlineSharedSettings.FCM.status = status;
         Player.OnlineSharedSettings.FCM.updatedAt = Date.now();
         globalThis.ServerPlayerOnlineSharedSettingsSync?.();
-    } catch {}
+    } catch (error) { warnLimited('chat presence sync failed', error); }
     const dot = root?.querySelector('.fcm-chat-rail [data-status] .fcm-status-dot');
     if (dot) dot.className = `fcm-status-dot ${status}`;
     if (rerender) renderChat();

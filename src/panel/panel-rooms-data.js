@@ -1,4 +1,6 @@
 // ════════════════════════════════════════
+
+import { warnLimited } from '../core/logger.js';
 //  FCM module: panel-rooms-data.js  (split from panel.js)
 //  房間搜尋 / 房間資訊快取。被「好友」與「房間搜尋」兩頁共用。
 //  _roomResults 由房間搜尋頁寫入，getCachedRoomInfo 會讀取，故以 getter/setter 共享。
@@ -53,7 +55,7 @@ async function queryRoomInfo(roomName, space, onUpdate) {
                 if (!res || res.err || !res.value) continue;
                 const found = res.value.find(r => r.Name === roomName);
                 if (found) { _cacheRooms([found]); if (onUpdate) onUpdate(_roomCache.get(roomName)); break; }
-            } catch {}
+            } catch (error) { warnLimited(`favorite room lookup failed (${roomName})`, error); }
         }
     } finally { _pendingRoomQueries.delete(roomName); }
 }
@@ -79,7 +81,7 @@ async function fetchRoomFull(roomName, space) {
             if (!res || res.err || !res.value) continue;
             const found = res.value.find(r => r.Name === roomName);
             if (found) { _cacheRooms(res.value); return found; }
-        } catch {}
+        } catch (error) { warnLimited(`room lookup failed (${roomName})`, error); }
     }
     return null;
 }

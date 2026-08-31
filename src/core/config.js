@@ -4,6 +4,7 @@
 // ════════════════════════════════════════
 
 import { MOD_VER } from './version.js';
+import { warnLimited } from './logger.js';
 
     const existingFcmMod = bcModSdk.getModsInfo?.().find(mod => mod.name === 'Liko - FCM');
     if (existingFcmMod) {
@@ -95,11 +96,11 @@ import { MOD_VER } from './version.js';
         statusMessage: '',
     };
     function loadCfg() {
-        try { const s = Player?.ExtensionSettings?.FCM?.settings; if (s && typeof s === 'object') Object.assign(cfg, s); } catch {}
+        try { const s = Player?.ExtensionSettings?.FCM?.settings; if (s && typeof s === 'object') Object.assign(cfg, s); } catch (error) { warnLimited('settings load failed', error); }
         // Settings belong to the BC account. The former localStorage mirror was
         // shared by every account in the same browser and is intentionally not
         // migrated because its owner cannot be identified safely.
-        if (Player?.MemberNumber) { try { localStorage.removeItem('LikoFCM'); } catch {} }
+        if (Player?.MemberNumber) { try { localStorage.removeItem('LikoFCM'); } catch (error) { warnLimited('legacy settings cleanup failed', error); } }
         // Migrate the former built-in purple defaults; intentional custom colors are untouched.
         if (cfg.panelColor === '#1e1635' && cfg.fontColor === '#f0e4ff' && cfg.accentColor === '#a078e8') {
             Object.assign(cfg, THEME_DEFAULTS, { themePreset: 'violet' });
@@ -123,7 +124,7 @@ import { MOD_VER } from './version.js';
             Player.ExtensionSettings.FCM ??= {};
             Player.ExtensionSettings.FCM.settings = { ...cfg };
             if (typeof globalThis.ServerPlayerExtensionSettingsSync === 'function') globalThis.ServerPlayerExtensionSettingsSync('FCM');
-        } catch {}
+        } catch (error) { warnLimited('settings sync failed', error); }
     }
 
 export { MOD_VER, modApi, BTN_X, BTN_Y, BTN_W, BTN_H, FCM_ICON_SVG, _fcmIconImg, cfg, loadCfg, saveCfg, THEME_DEFAULTS };

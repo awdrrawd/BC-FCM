@@ -17,7 +17,7 @@ import { warnLimited } from '../core/logger.js';
                     req.onsuccess = () => { this.db = req.result; res(this.db.objectStoreNames.contains('profiles')); };
                     req.onerror = () => res(false);
                     req.onupgradeneeded = e => { const db = e.target.result; if (!db.objectStoreNames.contains('profiles')) db.createObjectStore('profiles', { keyPath: 'memberNumber' }); };
-                } catch { res(false); }
+                } catch (error) { warnLimited('profile database open failed', error); res(false); }
             });
         },
         _face(C, sz = 100) {
@@ -31,7 +31,7 @@ import { warnLimited } from '../core/logger.js';
                 const cropSize = 210;
                 ctx.drawImage(src, src.width / 2 - cropSize / 2, 740, cropSize, cropSize, 0, 0, sz, sz);
                 return cv.toDataURL('image/webp', 0.9);
-            } catch { return ''; }
+            } catch (error) { warnLimited('profile avatar rendering failed', error); return ''; }
         },
         save(C, raw) {
             if (cfg.saveMode === 'off' || !this.db || !C || !C.MemberNumber) return;
@@ -61,11 +61,11 @@ import { warnLimited } from '../core/logger.js';
                         if (url) Snapshot.save(C.MemberNumber, url, { source: 'profile-capture' });
                     });
                 }
-            } catch {}
+            } catch (error) { warnLimited('profile cache write failed', error); }
         },
         get(mn) {
             mn = parseInt(mn); if (_pc[mn] !== undefined) return Promise.resolve(_pc[mn]); if (!this.db) { _pc[mn] = null; return Promise.resolve(null); }
-            return new Promise(res => { try { const req = this.db.transaction('profiles', 'readonly').objectStore('profiles').get(mn); req.onsuccess = () => { _pc[mn] = req.result || null; res(_pc[mn]); }; req.onerror = () => { _pc[mn] = null; res(null); }; } catch { _pc[mn] = null; res(null); } });
+            return new Promise(res => { try { const req = this.db.transaction('profiles', 'readonly').objectStore('profiles').get(mn); req.onsuccess = () => { _pc[mn] = req.result || null; res(_pc[mn]); }; req.onerror = () => { warnLimited('profile cache read failed', req.error); _pc[mn] = null; res(null); }; } catch (error) { warnLimited('profile cache read failed', error); _pc[mn] = null; res(null); } });
         },
         async batchGet(mns) { for (const mn of mns) if (_pc[parseInt(mn)] === undefined) await this.get(mn); },
     };
@@ -87,7 +87,7 @@ import { warnLimited } from '../core/logger.js';
                     };
                     req.onsuccess = () => { this.db = req.result; res(true); };
                     req.onerror = () => res(false);
-                } catch { res(false); }
+                } catch (error) { warnLimited('avatar database open failed', error); res(false); }
             });
         },
         async save(mn, data, meta = {}) {
@@ -95,7 +95,7 @@ import { warnLimited } from '../core/logger.js';
             if (!this.db || !data) return;
             let blob = data;
             if (typeof data === 'string') {
-                try { blob = await (await fetch(data)).blob(); } catch { return; }
+                try { blob = await (await fetch(data)).blob(); } catch (error) { warnLimited('avatar data conversion failed', error); return; }
             }
             if (!(blob instanceof Blob)) return;
             const oldUrl = this._cache[mn];
@@ -133,7 +133,7 @@ import { warnLimited } from '../core/logger.js';
                         res(r);
                     };
                     req.onerror = () => { this._records[mn] = null; res(null); };
-                } catch { this._records[mn] = null; res(null); }
+                } catch (error) { warnLimited('avatar cache read failed', error); this._records[mn] = null; res(null); }
             });
         },
         get(mn) {
@@ -163,7 +163,7 @@ import { warnLimited } from '../core/logger.js';
                 try {
                     const req = this.db.transaction('avatars', 'readwrite').objectStore('avatars').delete(mn);
                     req.onsuccess = req.onerror = () => res();
-                } catch { res(); }
+                } catch (error) { warnLimited('avatar cache deletion failed', error); res(); }
             });
         },
         async clear() {
@@ -176,7 +176,7 @@ import { warnLimited } from '../core/logger.js';
                     const req = this.db.transaction('avatars', 'readwrite').objectStore('avatars').clear();
                     req.onsuccess = () => res();
                     req.onerror = () => res();
-                } catch { res(); }
+                } catch (error) { warnLimited('avatar cache clear failed', error); res(); }
             });
         },
     };
@@ -227,7 +227,7 @@ import { warnLimited } from '../core/logger.js';
                         record = await Snapshot.getRecord(mn);
                     }
                 }
-            } catch {}
+            } catch (error) { warnLimited(`avatar refresh check failed (${mn})`, error); }
         }
         if (shared?.avatarMode === 'none') return record ? Snapshot.get(mn) : null;
         if (shared && (shared.avatarUrl || shared.avatarSnapshot)) {
@@ -268,7 +268,7 @@ import { warnLimited } from '../core/logger.js';
         if (!dataUrl) return false;
         shared.avatarSnapshot = dataUrl;
         shared.avatarUpdatedAt = Date.now();
-        try { ServerAccountUpdate.QueueData({ OnlineSharedSettings: Player.OnlineSharedSettings }); } catch { return false; }
+        try { ServerAccountUpdate.QueueData({ OnlineSharedSettings: Player.OnlineSharedSettings }); } catch (error) { warnLimited('avatar snapshot sync failed', error); return false; }
         return true;
     }
 
@@ -286,7 +286,7 @@ import { warnLimited } from '../core/logger.js';
         shared.avatarUrl = shared.avatarMode === 'url' ? String(avatarUrl || '').trim() : '';
         if (shared.avatarMode !== 'none' && !shared.avatarSnapshot) await updateOwnAvatarSnapshot();
         shared.avatarUpdatedAt = Date.now();
-        try { ServerAccountUpdate.QueueData({ OnlineSharedSettings: Player.OnlineSharedSettings }); return true; } catch { return false; }
+        try { ServerAccountUpdate.QueueData({ OnlineSharedSettings: Player.OnlineSharedSettings }); return true; } catch (error) { warnLimited('avatar profile sync failed', error); return false; }
     }
     const _avQueue = []; let _avBusy = false;
     let _avStatusEl = null;
@@ -356,7 +356,7 @@ import { warnLimited } from '../core/logger.js';
             }
             if (url && url.length > 800) await Snapshot.save(mn, url, { source: 'manual' });
             return url || null;
-        } catch { return null; }
+        } catch (error) { warnLimited(`avatar reconstruction failed (${mn})`, error); return null; }
         finally {
             // CharacterLoadOnline registers reconstructed characters globally. Release temporary ones
             // through BC's cleanup path so animations and character-owned resources are purged as well.
@@ -365,7 +365,7 @@ import { warnLimited } from '../core/logger.js';
                     || C === globalThis.CharacterAppearanceSelection
                     || (ChatRoomCharacter || []).includes(C));
                 if (C && !isLive && typeof globalThis.CharacterDelete === 'function') globalThis.CharacterDelete(C, false);
-            } catch {}
+            } catch (error) { warnLimited(`temporary avatar character cleanup failed (${mn})`, error); }
         }
     }
     function _captureSnapshotDelayed(C) {

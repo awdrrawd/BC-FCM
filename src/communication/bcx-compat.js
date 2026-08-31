@@ -1,4 +1,5 @@
 import { cfg } from '../core/config.js';
+import { warnLimited } from '../core/logger.js';
 
 let bcxApi = null;
 
@@ -6,19 +7,19 @@ function getBcxApi() {
     if (bcxApi) return bcxApi;
     try {
         bcxApi = window.bcx?.getModApi?.('Liko - FCM') ?? null;
-    } catch { bcxApi = null; }
+    } catch (error) { warnLimited('BCX API discovery failed', error); bcxApi = null; }
     return bcxApi;
 }
 
 function getRuleState(rule) {
-    try { return getBcxApi()?.getRuleState?.(rule) ?? null; } catch { return null; }
+    try { return getBcxApi()?.getRuleState?.(rule) ?? null; } catch (error) { warnLimited(`BCX rule read failed (${rule})`, error); return null; }
 }
 
 function blockedBy(rule, target, channel) {
     if (cfg.bypassBcxCommunication) return false;
     const state = getRuleState(rule);
     if (!state?.isEnforced) return false;
-    try { state.triggerAttempt?.(Number(target)); } catch {}
+    try { state.triggerAttempt?.(Number(target)); } catch (error) { warnLimited(`BCX blocked-attempt notice failed (${rule})`, error); }
     window.dispatchEvent(new CustomEvent('fcm:bcx-send-blocked', { detail: { channel } }));
     return true;
 }

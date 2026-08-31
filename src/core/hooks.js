@@ -157,7 +157,7 @@ import { warnLimited } from './logger.js';
     });
     modApi.hookFunction('ChatRoomSyncRoomProperties', 0, (args, next) => {
         let r; try { r = next(args); } catch(e) { console.warn('🐈‍⬛ [FCM] SyncRoomProperties:', e); }
-        try { if (panelOpen && !panelMini && uiTab === 'room') renderCurrent(); } catch {}
+        try { if (panelOpen && !panelMini && uiTab === 'room') renderCurrent(); } catch (error) { warnLimited('room panel refresh failed', error); }
         return r;
     });
     modApi.hookFunction('ChatRoomSyncMemberLeave', 0, (args, next) => {
@@ -250,14 +250,14 @@ import { warnLimited } from './logger.js';
                 const gl = Player.GhostList;
                 if (Array.isArray(gl) && gl.includes(C.MemberNumber)) return;
             }
-        } catch {}
+        } catch (error) { warnLimited('ghost drawing suppression failed', error); }
         return next(args);
     });
         // 擷取關係列座標：僅在 InformationSheet 繪製期間（_relCollect 非 null）作用
         modApi.hookFunction('DrawTextFit', 0, (args, next) => {
             const ret = next(args);
             if (_relCollect && cfg.profileRelations) {
-                try { const reg = _measureRelRegion(args[0], args[1], args[2], args[3]); if (reg) _relCollect.push(reg); } catch {}
+                try { const reg = _measureRelRegion(args[0], args[1], args[2], args[3]); if (reg) _relCollect.push(reg); } catch (error) { warnLimited('profile relation region capture failed', error); }
             }
             return ret;
         });
@@ -279,7 +279,7 @@ import { warnLimited } from './logger.js';
                     try { if (C && typeof C.OwnerNumber === 'function') { const on = C.OwnerNumber(); if (on && on !== -1) valid.add(parseInt(on)); } } catch {}
                     try { if (C && C.Ownership && C.Ownership.MemberNumber) valid.add(parseInt(C.Ownership.MemberNumber)); } catch {}
                     regions = C ? regions.filter(reg => valid.has(reg.mn)) : [];
-                } catch {}
+                } catch (error) { warnLimited('profile relation filtering failed', error); }
                 _relRegions = regions;
                 try {
                     for (const reg of _relRegions) {
@@ -292,7 +292,7 @@ import { warnLimited } from './logger.js';
                             MainCanvas.restore();
                         }
                     }
-                } catch {}
+                } catch (error) { warnLimited('profile relation overlay draw failed', error); }
             } else {
                 _relRegions = [];
             }
@@ -317,7 +317,7 @@ import { warnLimited } from './logger.js';
                     for (const reg of _relRegions) {
                         if (typeof MouseIn === 'function' && MouseIn(reg.x, reg.y, reg.w, reg.h)) { openPeopleSearch(reg.mn); return; }
                     }
-                } catch {}
+                } catch (error) { warnLimited('profile relation click handling failed', error); }
             }
             return next(args);
         });
@@ -348,7 +348,7 @@ import { warnLimited } from './logger.js';
                         }
                     }
                 }
-            } catch { _afcRegions = []; }
+            } catch (error) { warnLimited('AFC profile region capture failed', error); _afcRegions = []; }
             return r;
         });
         modApi.hookFunction('InformationSheetClick', 8, (args, next) => {
@@ -357,7 +357,7 @@ import { warnLimited } from './logger.js';
                     for (const reg of _afcRegions) {
                         if (typeof MouseIn === 'function' && MouseIn(reg.x, reg.y, reg.w, reg.h)) { openPeopleSearch(reg.mn); return; }
                     }
-                } catch {}
+                } catch (error) { warnLimited('AFC profile click handling failed', error); }
             }
             return next(args);
         });

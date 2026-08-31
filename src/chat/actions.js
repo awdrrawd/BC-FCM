@@ -3,6 +3,7 @@ import { PDB } from '../data/profile-db.js';
 import { amAdmin, inRoomFn, getDisplayName, isFriendOf } from '../data/data.js';
 import { renderCurrent, minimizePanel, closePanel } from '../panel/panel-controller.js';
 import { sendBcxAwareBeep } from '../communication/bcx-compat.js';
+import { warnLimited } from '../core/logger.js';
 // ════════════════════════════════════════
 //  FCM module: actions.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -560,7 +561,7 @@ import { sendBcxAwareBeep } from '../communication/bcx-compat.js';
     function makeIdCell(mn) {
         const td = document.createElement('td'); td.className = 'fcm-id fcm-id-copy'; td.textContent = String(mn); td.title = T('copyId');
         td.addEventListener('click', async () => {
-            try { await navigator.clipboard.writeText(String(mn)); td.textContent = T('copyDone'); td.style.color = '#50d880'; setTimeout(() => { td.textContent = String(mn); td.style.color = ''; }, 1200); } catch {}
+            try { await navigator.clipboard.writeText(String(mn)); td.textContent = T('copyDone'); td.style.color = '#50d880'; setTimeout(() => { td.textContent = String(mn); td.style.color = ''; }, 1200); } catch (error) { warnLimited('member number clipboard copy failed', error); }
         });
         return td;
     }
