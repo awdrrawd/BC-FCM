@@ -10,6 +10,11 @@
 一個 BondageClub UserScript 插件，提供完整的好友關係管理、房間管理、個人資料保存與查詢功能。  
 A BondageClub UserScript plugin for managing friends, rooms, profiles, and more.
 
+## 📚 文件 · Documentation
+
+- [FCM 架構與擴充指南](docs/architecture.md)
+- [互動式功能分支圖](docs/fcm-architecture.html)
+
 ---
 
 ## ✨ 功能 · Features
