@@ -555,7 +555,7 @@ function conversationHtml() {
         <div class="fcm-chat-assign"><button class="fcm-chat-rail-button" data-toggle-assign title="${TH('chatAssignGroup')}">${GROUP_ICON}</button><div class="fcm-chat-assign-menu" data-assign-menu>${Object.entries(cfg.chatGroups || {}).map(([id,label]) => `<button data-assign-group="${esc(id)}">${esc(label)}</button>`).join('')}<button class="create" data-create-group-from-chat>＋ ${TH('chatNewGroup')}</button></div></div>
     </header>
     ${contactCardOpen ? contactCardHtml() : ''}
-    <div class="fcm-chat-messages">${rows.map(messageHtml).join('') || `<div class="fcm-chat-empty">${TH('chatNoMessages')}</div>`}</div>
+    <div class="fcm-chat-messages">${conversationMessagesHtml(rows) || `<div class="fcm-chat-empty">${TH('chatNoMessages')}</div>`}</div>
     <button class="fcm-chat-new-messages" data-new-messages ${conversationUnread ? '' : 'hidden'}>${TH('chatNewUnread', conversationUnread)}</button>
     <div class="fcm-chat-actions"><button class="fcm-chat-icon-action" data-invite ${available === 'none' || inRoomFn(selectedMember) ? 'disabled' : ''} title="${TH('chatInviteRoom')}" aria-label="${TH('chatInviteRoom')}">${INVITE_ICON}</button><span></span><div class="fcm-chat-tools"><div class="fcm-chat-tools-menu"><button class="fcm-chat-icon-action" data-export="html" title="${TH('chatExportHtml')}">${DOWNLOAD_ICON}<span>${TH('chatExportHtml')}</span></button><button class="fcm-chat-icon-action" data-export="json" title="${TH('chatExportJson')}">${DOWNLOAD_ICON}<span>${TH('chatExportJson')}</span></button><button class="fcm-chat-icon-action" data-delete title="${TH('chatDeleteAll')}">${TRASH_ICON}<span>${TH('chatDeleteAll')}</span></button></div><button class="fcm-chat-icon-action" data-toggle-tools title="${TH('chatMessageTools')}">${FOLDER_ICON}</button></div></div>
     <div class="fcm-chat-compose">
@@ -589,6 +589,26 @@ function profileMentionsHtml(content) {
 
 function expandProfileMentions(content) {
     return String(content).replace(/@(\d+)/gu, (all, id) => `@${getDisplayName(Number(id))} (${id})`);
+}
+
+function messageDateKey(timestamp) {
+    const date = new Date(timestamp);
+    return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
+}
+
+function messageDateLabel(timestamp) {
+    const date = new Date(timestamp);
+    return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
+}
+
+function conversationMessagesHtml(rows) {
+    let previousDate = '';
+    return rows.map(message => {
+        const date = messageDateKey(message.timestamp);
+        const separator = date !== previousDate ? `<div class="fcm-chat-date-separator" data-message-date="${esc(date)}"><span>${esc(messageDateLabel(message.timestamp))}</span></div>` : '';
+        previousDate = date;
+        return separator + messageHtml(message);
+    }).join('');
 }
 
 function visibleChatScrollHtml() {
@@ -651,6 +671,11 @@ function appendConversationMessage(message) {
     // makes the new row itself look like the user scrolled away from the bottom.
     const shouldFollowLatest = conversationViewport.shouldFollow(log, message.direction);
     log.querySelector(':scope > .fcm-chat-empty')?.remove();
+    const previousElement = [...log.querySelectorAll(':scope > .fcm-chat-message')].at(-1);
+    const previousMessage = previousElement ? conversationMessages.find(row => String(row.id) === previousElement.dataset.msgId) : null;
+    if (!previousMessage || messageDateKey(previousMessage.timestamp) !== messageDateKey(message.timestamp)) {
+        log.insertAdjacentHTML('beforeend', `<div class="fcm-chat-date-separator" data-message-date="${esc(messageDateKey(message.timestamp))}"><span>${esc(messageDateLabel(message.timestamp))}</span></div>`);
+    }
     log.insertAdjacentHTML('beforeend', messageHtml(message));
     const inserted = log.lastElementChild;
     inserted?.querySelector('[data-join-room]')?.addEventListener('click', event => {
@@ -692,8 +717,11 @@ async function loadOlderConversation(log) {
         const existing = new Set(conversationMessages.map(message => message.id));
         const older = page.messages.filter(message => !existing.has(message.id));
         conversationMessages = [...older, ...conversationMessages];
-        log.insertAdjacentHTML('afterbegin', older.map(messageHtml).join(''));
+        log.innerHTML = conversationMessagesHtml(conversationMessages);
         bindMessageImages(log, log);
+        log.querySelectorAll('[data-join-room]').forEach(button => button.addEventListener('click', () => {
+            if (button.dataset.joinRoom) showRoomJoinConfirm({ room: button.dataset.joinRoom });
+        }));
         log.scrollTop = oldTop + (log.scrollHeight - oldHeight);
         conversationHasMore = page.hasMore;
     } else if (Number(selectedMember) === target) conversationHasMore = false;
