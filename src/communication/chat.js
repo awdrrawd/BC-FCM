@@ -35,6 +35,7 @@ let conversationMessages = [];
 let conversationHasMore = false;
 let conversationLoading = false;
 let conversationUnread = 0;
+let historyDateFrame = 0;
 const conversationViewport = new ConversationViewport(40);
 const CONVERSATION_PAGE_SIZE = 50;
 let search = '';
@@ -556,6 +557,7 @@ function conversationHtml() {
     </header>
     ${contactCardOpen ? contactCardHtml() : ''}
     <div class="fcm-chat-messages">${conversationMessagesHtml(rows) || `<div class="fcm-chat-empty">${TH('chatNoMessages')}</div>`}</div>
+    <div class="fcm-chat-history-date" data-history-date hidden></div>
     <button class="fcm-chat-new-messages" data-new-messages ${conversationUnread ? '' : 'hidden'}>${TH('chatNewUnread', conversationUnread)}</button>
     <div class="fcm-chat-actions"><button class="fcm-chat-icon-action" data-invite ${available === 'none' || inRoomFn(selectedMember) ? 'disabled' : ''} title="${TH('chatInviteRoom')}" aria-label="${TH('chatInviteRoom')}">${INVITE_ICON}</button><span></span><div class="fcm-chat-tools"><div class="fcm-chat-tools-menu"><button class="fcm-chat-icon-action" data-export="html" title="${TH('chatExportHtml')}">${DOWNLOAD_ICON}<span>${TH('chatExportHtml')}</span></button><button class="fcm-chat-icon-action" data-export="json" title="${TH('chatExportJson')}">${DOWNLOAD_ICON}<span>${TH('chatExportJson')}</span></button><button class="fcm-chat-icon-action" data-delete title="${TH('chatDeleteAll')}">${TRASH_ICON}<span>${TH('chatDeleteAll')}</span></button></div><button class="fcm-chat-icon-action" data-toggle-tools title="${TH('chatMessageTools')}">${FOLDER_ICON}</button></div></div>
     <div class="fcm-chat-compose">
@@ -568,7 +570,7 @@ function conversationHtml() {
 
 function messageHtml(message) {
     const kind = message.channel === 'whisper' && cleanMessage(message.content).startsWith('*') ? ' emote' : message.channel === 'whisper' && cleanMessage(message.content).startsWith('(') ? ' ooc' : '';
-    return `<div class="fcm-chat-message ${message.direction}${kind} ${message.queued ? 'queued' : ''}" data-msg-id="${esc(message.id)}" data-shared-msg-id="${esc(message.sharedMsgId || message.id)}" data-native-msg-id="${esc(message.nativeMsgId || '')}"><button class="fcm-chat-message-reply" data-message-reply title="${TH('chatReply')}">${REPLY_ICON}</button>${message.replyPreview ? `<button class="fcm-chat-tag-preview" data-reply-jump="${esc(message.replyToId || '')}">${REPLY_ICON}<i>${esc(message.replyPreview)}</i></button>` : ''}<span class="fcm-chat-content">${profileMentionsHtml(cleanMessage(message.content))}</span>${message.translatedContent ? `<span class="fcm-chat-message-original">[${esc(cleanMessage(message.translatedContent))}]</span>` : ''}${message.roomName ? `<button class="fcm-chat-room-join" data-join-room="${esc(message.roomName)}">${TH('roomJoinRoomBtn')}</button>` : ''}<time>${message.channel === 'whisper' ? TH('chatChannelWhisper') : TH('chatChannelPrivate')} · ${new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${message.queued ? ` · ${TH('chatQueued')}` : ''}</time></div>`;
+    return `<div class="fcm-chat-message ${message.direction}${kind} ${message.queued ? 'queued' : ''}" data-msg-id="${esc(message.id)}" data-message-date="${esc(messageDateKey(message.timestamp))}" data-shared-msg-id="${esc(message.sharedMsgId || message.id)}" data-native-msg-id="${esc(message.nativeMsgId || '')}"><button class="fcm-chat-message-reply" data-message-reply title="${TH('chatReply')}">${REPLY_ICON}</button>${message.replyPreview ? `<button class="fcm-chat-tag-preview" data-reply-jump="${esc(message.replyToId || '')}">${REPLY_ICON}<i>${esc(message.replyPreview)}</i></button>` : ''}<span class="fcm-chat-content">${profileMentionsHtml(cleanMessage(message.content))}</span>${message.translatedContent ? `<span class="fcm-chat-message-original">[${esc(cleanMessage(message.translatedContent))}]</span>` : ''}${message.roomName ? `<button class="fcm-chat-room-join" data-join-room="${esc(message.roomName)}">${TH('roomJoinRoomBtn')}</button>` : ''}<time>${message.channel === 'whisper' ? TH('chatChannelWhisper') : TH('chatChannelPrivate')} · ${new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${message.queued ? ` · ${TH('chatQueued')}` : ''}</time></div>`;
 }
 
 function contactCardHtml() {
@@ -723,6 +725,7 @@ async function loadOlderConversation(log) {
             if (button.dataset.joinRoom) showRoomJoinConfirm({ room: button.dataset.joinRoom });
         }));
         log.scrollTop = oldTop + (log.scrollHeight - oldHeight);
+        updateHistoryDateBubble(log);
         conversationHasMore = page.hasMore;
     } else if (Number(selectedMember) === target) conversationHasMore = false;
     conversationLoading = false;
@@ -733,6 +736,28 @@ function updateConversationUnreadNotice() {
     if (!button) return;
     button.hidden = !conversationUnread;
     button.textContent = T('chatNewUnread', conversationUnread);
+}
+
+function updateHistoryDateBubble(log) {
+    const bubble = root?.querySelector('[data-history-date]');
+    if (!log || !bubble) return;
+    cancelAnimationFrame(historyDateFrame);
+    historyDateFrame = requestAnimationFrame(() => {
+        const distanceFromLatest = log.scrollHeight - log.scrollTop - log.clientHeight;
+        if (distanceFromLatest <= 24) {
+            bubble.hidden = true;
+            return;
+        }
+        const logTop = log.getBoundingClientRect().top;
+        const current = [...log.querySelectorAll(':scope > .fcm-chat-message')].find(message => message.getBoundingClientRect().bottom > logTop + 4);
+        if (!current?.dataset.messageDate) {
+            bubble.hidden = true;
+            return;
+        }
+        const [year, month, day] = current.dataset.messageDate.split('-');
+        bubble.textContent = `${year}/${month}/${day}`;
+        bubble.hidden = false;
+    });
 }
 
 function refreshConversationRoomMeta() {
@@ -956,6 +981,7 @@ function bindEvents() {
             conversationUnread = 0;
             updateConversationUnreadNotice();
         }
+        updateHistoryDateBubble(conversationLog);
     });
     root.querySelector('[data-new-messages]')?.addEventListener('click', () => {
         conversationViewport.follow();
