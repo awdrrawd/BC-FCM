@@ -21,7 +21,6 @@ import { initChatAudio, playNotificationSound } from './chat-audio.js';
 import { installChatDrag, resetBalloonInteraction } from './chat/controllers/chat-drag.js';
 import { createChatBalloonController } from './chat/controllers/chat-balloon.js';
 import { createDialogHost } from '../ui/dialog.js';
-import { forEachForwardedMessage, forwardedMessageText, selectedMessages } from './chat/data/chat-selection.js';
 import { updateMultiSelectUi as syncMultiSelectUi } from './chat/views/chat-selection-view.js';
 import { installMessageActions } from './chat/events/chat-message-actions.js';
 import { bindChatSettingsEvents } from './chat/events/chat-settings-events.js';
@@ -48,6 +47,7 @@ import { createChatContactCardController } from './chat/controllers/chat-contact
 import { createChatHistoryViewportController } from './chat/controllers/chat-history-viewport.js';
 import { createChatMessageSelectionController } from './chat/controllers/chat-message-selection.js';
 import { createChatForwardTargetsController } from './chat/controllers/chat-forward-targets.js';
+import { createChatSelectedActions } from './chat/services/chat-selected-actions.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -164,12 +164,20 @@ const forwardTargets = createChatForwardTargetsController({
     getSelfMemberNumber: () => Player?.MemberNumber, getConversationMemberNumber: () => selectedMember,
     isFriend: isFriendOf, isOnline, avatarHtml, displayName: getDisplayName, text: TH,
     hasSelection: () => messageSelection.size() > 0, isStackedDetail: () => stackedDetail,
-    refreshChatList, hydrateAvatars: hydrateChatAvatars, onSelect: forwardSelectedTo,
+    refreshChatList, hydrateAvatars: hydrateChatAvatars, onSelect: memberNumber => selectedActions.forwardTo(memberNumber),
 });
 const messageSelection = createChatMessageSelectionController({
     getPanel: () => root?.querySelector('#fcm-chat-panel'), getMessages: () => conversation.messages,
-    canForwardToRoom: () => !!ChatRoomData, renderUi: syncMultiSelectUi, selectMessages: selectedMessages,
+    canForwardToRoom: () => !!ChatRoomData, renderUi: syncMultiSelectUi,
     selectedCountText: count => TH('chatSelectedCount', count), onExit: forwardTargets.close,
+});
+const selectedActions = createChatSelectedActions({
+    selection: messageSelection, getPlayer: () => Player, getConversationMemberNumber: () => selectedMember,
+    displayName: getDisplayName, cleanContent: cleanMessage, capability, isFriend: isFriendOf,
+    offlineQueue: OfflineQueue, recordMessage: (...args) => recordMessage(...args), runWithoutOutgoingCapture,
+    sendWhisper: sendBcxAwareWhisper, sendBeep: sendBcxAwareBeep, getRoom: () => ChatRoomData,
+    sendRoomMessage: (...args) => ServerSend(...args), exportConversation: exportConversationFile,
+    biography, avatarUrl, chatColors,
 });
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
@@ -724,8 +732,8 @@ function bindConversationEvents() {
     const conversationLog = main.querySelector('.fcm-chat-messages');
     historyViewport.bind(conversationLog, main.querySelector('[data-new-messages]'));
     main.querySelector('[data-multi-forward-contact]')?.addEventListener('click', forwardTargets.show);
-    main.querySelector('[data-multi-forward-room]')?.addEventListener('click', forwardSelectedToRoom);
-    main.querySelectorAll('[data-multi-export]').forEach(button => button.addEventListener('click', () => exportSelectedMessages(button.dataset.multiExport)));
+    main.querySelector('[data-multi-forward-room]')?.addEventListener('click', selectedActions.forwardToRoom);
+    main.querySelectorAll('[data-multi-export]').forEach(button => button.addEventListener('click', () => selectedActions.exportMessages(button.dataset.multiExport)));
     main.querySelector('[data-multi-cancel]')?.addEventListener('click', messageSelection.exit);
     if (messageSelection.isActive()) messageSelection.updateUi();
     bindMessageActions();
@@ -866,43 +874,6 @@ function sendCurrentMessage() {
     if (!sent) return;
     replyController.clear({ focus: false });
     input.value = '';
-}
-
-function formatForwardedMessage(message) {
-    return forwardedMessageText(message, { player: Player, conversationMemberNumber: selectedMember, displayName: getDisplayName, cleanContent: cleanMessage });
-}
-
-async function forwardSelectedTo(memberNumber) {
-    const target = Number(memberNumber);
-    const available = capability(target);
-    if (!target || (available === 'none' && !isFriendOf(target))) return;
-    const selected = messageSelection.records();
-    await forEachForwardedMessage(selected, async message => {
-        const content = formatForwardedMessage(message);
-        if (available === 'none') {
-            const queued = OfflineQueue.add(target, content);
-            await recordMessage({ memberNumber: target, direction: 'out', channel: 'beep', content, queued: true, queueId: queued.id }, { notify: false });
-            return;
-        }
-        const sent = runWithoutOutgoingCapture(() => available === 'whisper'
-            ? sendBcxAwareWhisper({ Type: 'Whisper', Target: target, Content: content })
-            : sendBcxAwareBeep({ MemberNumber: target, BeepType: '', Message: content }));
-        if (sent) await recordMessage({ memberNumber: target, direction: 'out', channel: available, content }, { notify: false });
-    });
-    messageSelection.exit();
-}
-
-async function forwardSelectedToRoom() {
-    if (!ChatRoomData || !messageSelection.size()) return;
-    const selected = messageSelection.records();
-    await forEachForwardedMessage(selected, message => ServerSend('ChatRoomChat', { Type: 'Chat', Content: formatForwardedMessage(message) }));
-    messageSelection.exit();
-}
-
-function exportSelectedMessages(format) {
-    const selected = messageSelection.records();
-    if (!selected.length) return;
-    exportConversationFile(format, { memberNumber: selectedMember, messages: selected, getDisplayName, biography, avatarUrl, chatColors });
 }
 
 function bindMessageActions() {

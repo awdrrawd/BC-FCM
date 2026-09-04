@@ -1,4 +1,6 @@
-function createChatMessageSelectionController({ getPanel, getMessages, canForwardToRoom, renderUi, selectMessages, selectedCountText, onExit }) {
+import { selectedMessages } from '../data/chat-selection.js';
+
+function createChatMessageSelectionController({ getPanel, getMessages, canForwardToRoom, renderUi, selectedCountText, onExit }) {
     const ids = new Set();
     let active = false;
 
@@ -11,7 +13,7 @@ function createChatMessageSelectionController({ getPanel, getMessages, canForwar
     }
 
     function records() {
-        return selectMessages(getMessages(), ids);
+        return selectedMessages(getMessages(), ids);
     }
 
     function updateUi() {
