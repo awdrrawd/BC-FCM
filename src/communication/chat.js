@@ -42,6 +42,7 @@ import { createChatMessageRecorder } from './chat/services/chat-message-recorder
 import { createChatPresenceService } from './chat/services/chat-presence.js';
 import { createChatRoomStateService } from './chat/services/chat-room-state.js';
 import { buildGroupDefinitions, filterContactRows, filterGroupRows, filterNotificationRows, selectedGroupDefinition } from './chat/data/chat-list-data.js';
+import { createProfileSuggestionController } from './chat/controllers/chat-profile-suggest.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -140,6 +141,11 @@ const presence = createChatPresenceService({
 const roomState = createChatRoomStateService({
     getRoomInfo, inRoom: inRoomFn, isFriend: isFriendOf, isOnline,
     getCurrentRoom: () => ChatRoomData, text: T,
+});
+const profileSuggestion = createProfileSuggestionController({
+    getRoot: () => root, getSelectedMember: () => selectedMember, getFriendRows: buildFriendList,
+    findLiveCharacter: character, loadProfile: memberNumber => PDB.get(memberNumber), displayName: getDisplayName,
+    avatarHtml, text: TH,
 });
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
@@ -649,6 +655,7 @@ function refreshConversationPresence() {
 
 function renderChat() {
     if (!root) return;
+    profileSuggestion.reset();
     const settingsScrollTop = activeView === 'settings' ? root.querySelector('.fcm-chat-list')?.scrollTop : null;
     const [chatPanel, chatText, chatAccent] = chatColors();
     const sessionSizeStyle = chatPanelSession.inlineSizeStyle();
@@ -772,7 +779,7 @@ function bindConversationEvents() {
     bindMessageActions();
     main.querySelector('[data-cancel-reply]')?.addEventListener('click', clearReplyTarget);
     main.querySelector('[data-input]')?.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendCurrentMessage(); } });
-    main.querySelector('[data-input]')?.addEventListener('input', updateProfileSuggestion);
+    main.querySelector('[data-input]')?.addEventListener('input', profileSuggestion.update);
     main.querySelector('[data-delete]')?.addEventListener('click', deleteConversation);
     main.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => exportConversationFile(button.dataset.export, {
         memberNumber: selectedMember, getDisplayName, biography, avatarUrl, chatColors,
@@ -811,6 +818,7 @@ function bindConversationEvents() {
 function refreshConversationMain({ scrollToLatest = true } = {}) {
     const main = root?.querySelector('.fcm-chat-main');
     if (!main) return;
+    profileSuggestion.reset();
     main.innerHTML = conversationHtml();
     bindConversationEvents();
     installDragScroll(main, '.fcm-chat-messages');
@@ -897,32 +905,6 @@ async function openSharedProfile(memberNumber) {
         const loaded = globalThis.CharacterLoadOnline(JSON.parse(profile.characterBundle), mn);
         globalThis.InformationSheetLoadCharacter?.(loaded);
     } catch (error) { warnLimited(`saved chat profile open failed (${mn})`, error); }
-}
-
-async function updateProfileSuggestion(event) {
-    const input = event.currentTarget;
-    const suggest = root?.querySelector('[data-profile-suggest]');
-    const match = input.value.match(/(?:^|\s)@(\d*)$/u);
-    if (!suggest || !match) { if (suggest) suggest.hidden = true; return; }
-    const query = match[1];
-    let candidates = [];
-    if (query) {
-        const mn = Number(query);
-        const profile = character(mn) || await PDB.get(mn);
-        if (profile) candidates = [{ mn, name: getDisplayName(mn) }];
-    } else {
-        const ids = [selectedMember, ...buildFriendList().map(row => Number(row.mn))].filter(Boolean);
-        candidates = [...new Set(ids)].slice(0, 6).map(mn => ({ mn, name: getDisplayName(mn) }));
-    }
-    suggest.innerHTML = candidates.length
-        ? candidates.map(row => `<button data-insert-profile="${row.mn}">${avatarHtml(row.mn, 28)}<span><b>${esc(row.name)} (${row.mn})</b><small>${TH('chatShareProfile')}</small></span></button>`).join('')
-        : `<span>${TH('chatProfileNotFound')}</span>`;
-    suggest.hidden = false;
-    suggest.querySelectorAll('[data-insert-profile]').forEach(button => button.addEventListener('click', () => {
-        input.value = input.value.replace(/@\d*$/u, `@${button.dataset.insertProfile}`);
-        suggest.hidden = true;
-        input.focus();
-    }));
 }
 
 function sendCurrentMessage() {
