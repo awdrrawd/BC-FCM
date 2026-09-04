@@ -7,8 +7,8 @@ import { warnLimited } from '../core/logger.js';
 //  (split from Plugins/liko-FCM.user.js)
 // ════════════════════════════════════════
 
-    const WPS_PREFIX    = '[LIKOSHARE]';
-    const WPS_OPEN_MARK = 'LIKOSHARE_OPEN';
+    const PROFILE_SHARE_PREFIX = '[PROFILESHARE]';
+    const PROFILE_SHARE_OPEN_MARK = 'PROFILESHARE_OPEN';
     const WPS_CHUNK     = 800;
     const WPS_MAX_CHUNKS = 512;
     const WPS_MAX_BYTES = WPS_CHUNK * WPS_MAX_CHUNKS;
@@ -23,6 +23,10 @@ import { warnLimited } from '../core/logger.js';
 
     function wpsSender(data) {
         return Number(data?.Sender ?? data?.SenderMemberNumber) || 0;
+    }
+
+    function isProfileShareMessage(data) {
+        return !!data?.Content && data.Content.startsWith(PROFILE_SHARE_PREFIX);
     }
 
     function pruneWpsState(now = Date.now()) {
@@ -63,7 +67,7 @@ import { warnLimited } from '../core/logger.js';
             return false;
         }
         for (let i = 0; i < total; i++) {
-            ServerSend('ChatRoomChat', { Type: 'Hidden', Content: `${WPS_PREFIX} ${shareId} ${i+1}/${total} ${encoded.slice(i*WPS_CHUNK, (i+1)*WPS_CHUNK)}` });
+            ServerSend('ChatRoomChat', { Type: 'Hidden', Content: `${PROFILE_SHARE_PREFIX} ${shareId} ${i+1}/${total} ${encoded.slice(i*WPS_CHUNK, (i+1)*WPS_CHUNK)}` });
         }
         const displayName = prof.lastNick || prof.name || mn;
         if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('shareLocalMsg', displayName, mn), 0);
@@ -71,7 +75,7 @@ import { warnLimited } from '../core/logger.js';
     }
 
     function wpsHandleMessage(data) {
-        if (!data?.Content?.startsWith(WPS_PREFIX)) return false;
+        if (!isProfileShareMessage(data)) return false;
         try {
             pruneWpsState();
             const parts = data.Content.split(' ');
@@ -108,7 +112,7 @@ import { warnLimited } from '../core/logger.js';
                 const fromName = from.name || from.memberNumber || '?';
                 const isSelf = from.memberNumber === Player?.MemberNumber;
                 const displayName = p.lastNick || p.name || p.memberNumber;
-                const openToken = `[${WPS_OPEN_MARK} ${payload.sharedAt} ${p.memberNumber}]`;
+                const openToken = `[${PROFILE_SHARE_OPEN_MARK} ${payload.sharedAt} ${p.memberNumber}]`;
                 const seenDate = new Date(p.seen);
                 const seenText = `${seenDate.getFullYear()}/${seenDate.getMonth()+1}/${seenDate.getDate()}`;
                 if (!isSelf && typeof ChatRoomSendLocal === 'function') {
@@ -130,9 +134,9 @@ import { warnLimited } from '../core/logger.js';
     function wpsProcessOpenTokens(element) {
         if (element.dataset.fcmShareProcessed === '1') return;
         const html = element.innerHTML;
-        if (!html || !html.includes(WPS_OPEN_MARK)) return;
+        if (!html || !html.includes(PROFILE_SHARE_OPEN_MARK)) return;
         const replaced = html.replace(
-            /\[LIKOSHARE_OPEN\s+(\d+)\s+(\d+)\]/g,
+            /\[PROFILESHARE_OPEN\s+(\d+)\s+(\d+)\]/g,
             (m, sharedAt, memberNumber) => {
                 const key = `${sharedAt}:${memberNumber}`;
                 const payload = _wpsCache.get(key);
@@ -178,4 +182,4 @@ import { warnLimited } from '../core/logger.js';
         _wpsTokenObserver.observe(document.body, { childList: true, subtree: true });
     }
 
-export { WPS_PREFIX, wpsShareProfile, wpsHandleMessage, wpsProcessOpenTokens, observeWpsOpenTokens };
+export { PROFILE_SHARE_PREFIX, isProfileShareMessage, wpsShareProfile, wpsHandleMessage, wpsProcessOpenTokens, observeWpsOpenTokens };

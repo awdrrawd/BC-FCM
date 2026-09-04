@@ -5,7 +5,7 @@ import { setOnlineFriends } from '../data/data.js';
 import { PDB, syncRoomAvatar } from '../data/profile-db.js';
 import { renderCurrent, panelOpen, panelMini, uiTab, buildPanel, togglePanel, closePanel, openPanel, openPeopleSearch } from '../panel/panel.js';
 import { _applyWhisperStyle, _updateWhisperAvatar, _drawWavOnCanvas } from '../chat/chat-fx.js';
-import { WPS_PREFIX, wpsHandleMessage, observeWpsOpenTokens } from '../chat/wps-share.js';
+import { isProfileShareMessage, wpsHandleMessage, observeWpsOpenTokens } from '../chat/wps-share.js';
 import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSHARE_TAG } from '../chat/actions.js';
 import { handleIncomingBeep, handleIncomingChatMessageId, handleIncomingChatTag, handleIncomingFriendRequestNotice, handleIncomingWhisper, handleIncomingWhisperDisplay, handleOutgoingServerSend, handleOnlineFriendsUpdate } from '../communication/chat.js';
 import { shouldBypassBcxReceiveRules } from '../communication/bcx-compat.js';
@@ -226,7 +226,7 @@ import { warnLimited } from './logger.js';
         const data = args[0];
         if (data?.Type === 'Hidden' && data?.Content === 'FCM::CHAT::TAG' && handleIncomingChatTag(data)) return;
         if (data?.Type === 'Hidden' && data?.Content === 'FCM::CHAT::MESSAGE' && handleIncomingChatMessageId(data)) return;
-        if (data?.Type === 'Hidden' && data?.Content?.startsWith(WPS_PREFIX)) {
+        if (data?.Type === 'Hidden' && isProfileShareMessage(data)) {
             wpsHandleMessage(data);
             return;
         }

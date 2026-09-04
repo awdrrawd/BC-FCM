@@ -83,8 +83,9 @@ Search encountered characters by name or ID, and take actions directly from resu
 
 **📜 Profile 分享 · Profile Share**
 
-透過 LIKOSHARE 協議，在房間內將角色資料分享給其他人。  
-Share character profiles with others in the room via the LIKOSHARE protocol.
+透過 PROFILESHARE 協議，在房間內將角色資料分享給其他人。
+
+Share character profiles with others in the room via the PROFILESHARE protocol.
 
 與 Liko-WPS 插件相容。  
 Compatible with the Liko-WPS plugin.
@@ -187,7 +188,7 @@ src/
     config.js          # 版本、modApi、按鈕座標、圖示、設定存取
     i18n.js            # 語言偵測 + T() 取字（與 HSC 共用 Liko-i18n 引擎）
     profile-db.js      # Profile DB（WCE 相容）、Snapshot DB、頭像佇列
-    wps-share.js       # LIKOSHARE 分享協議
+    wps-share.js       # PROFILESHARE 分享協議
     data.js            # 關係／名稱／房間等資料查詢
     actions.js         # 查看 / BEEP / 悄悄話 / 名單操作 / 房管動作
     styles.js          # 面板 CSS
