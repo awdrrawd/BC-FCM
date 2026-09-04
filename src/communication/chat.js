@@ -38,6 +38,7 @@ import { animateLayoutChange, animatePanelSize, positionPanel as applyPanelPosit
 import { createChatAutoReplyService } from './chat/services/chat-auto-reply.js';
 import { createOfflineDeliveryService } from './chat/services/chat-offline-delivery.js';
 import { createChatSender } from './chat/services/chat-sender.js';
+import { createChatMessageRecorder } from './chat/services/chat-message-recorder.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -93,6 +94,22 @@ const runWithoutOutgoingCapture = callback => {
     try { return callback(); }
     finally { suppressOutgoing--; }
 };
+const messageRecorder = createChatMessageRecorder({
+    config: cfg,
+    normalizeMessage: data => normalizeTransportMessage(data, { displayName: getDisplayName, selectedMember }),
+    chatStore: ChatStore,
+    conversation,
+    isPanelVisible: () => !!root?.isConnected && root.style.display !== 'none',
+    isSelectedMember: memberNumber => Number(memberNumber) === Number(selectedMember),
+    setMessageIndex: value => { messages = value; },
+    appendMessage: message => appendConversationMessage(message),
+    refreshList: () => refreshVisibleChatScroll(),
+    notifyIncoming: message => {
+        chatBalloons.showIncoming(message);
+        playNotificationSound();
+        autoReply.handle(message);
+    },
+});
 const autoReply = createChatAutoReplyService({
     config: cfg, inRoom: inRoomFn, isOnline, sendWhisper: sendBcxAwareWhisper, sendBeep: sendBcxAwareBeep,
     recordMessage: (...args) => recordMessage(...args), runWithoutOutgoingCapture,
@@ -167,28 +184,8 @@ async function initChat() {
     }, true);
 }
 
-function normalizeMessage(data) {
-    return normalizeTransportMessage(data, { displayName: getDisplayName, selectedMember });
-}
-
-async function recordMessage(data, { notify = true } = {}) {
-    if (!cfg.communicationEnabled || !data?.memberNumber) return;
-    const message = normalizeMessage(data);
-    if (!message.content) return;
-    await ChatStore.put(message);
-            messages = await ChatStore.recentIndex();
-    if (root?.isConnected && root.style.display !== 'none') {
-        if (Number(message.memberNumber) === Number(selectedMember)) {
-            conversation.add(message);
-            appendConversationMessage(message);
-        }
-        refreshVisibleChatScroll();
-    }
-    if (notify && message.direction === 'in') {
-        chatBalloons.showIncoming(message);
-        playNotificationSound();
-        autoReply.handle(message);
-    }
+function recordMessage(data, options) {
+    return messageRecorder.record(data, options);
 }
 
 function handleIncomingBeep(data) {
