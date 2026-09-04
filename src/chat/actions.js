@@ -165,8 +165,6 @@ import { createDialogHost } from '../ui/dialog.js';
         let confirmed = false;
         const host = createDialogHost({
             id: 'fcm-confirm-overlay',
-            overlayStyle: 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center;',
-            dialogStyle: 'background:#241840;border:2px solid #7060c0;border-radius:14px;padding:28px 24px;width:min(380px,88vw);box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:20px;font-family:-apple-system,sans-serif;',
             onKeyDown: (event, close) => {
                 event.stopPropagation();
                 if (event.key === 'Escape') close();
@@ -174,12 +172,11 @@ import { createDialogHost } from '../ui/dialog.js';
             },
         });
         const { dialog: box } = host;
-        const msgEl = document.createElement('div'); msgEl.style.cssText = 'color:#e8d0ff;font-size:14px;text-align:center;line-height:1.7;white-space:pre-wrap;'; msgEl.textContent = msg;
-        const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex;gap:12px;';
-        const cancelBtn = document.createElement('button'); cancelBtn.textContent = T('btnCancel');
-        cancelBtn.style.cssText = 'flex:1;padding:12px;background:#1e1635;border:1.5px solid #5a48a8;border-radius:10px;color:#c4a0e0;font-size:13px;cursor:pointer;font-weight:600;'; host.listen(cancelBtn, 'click', () => host.close());
-        const okBtn = document.createElement('button'); okBtn.textContent = okLabel || T('btnConfirm');
-        okBtn.style.cssText = 'flex:2;padding:12px;background:#1a3060;border:1.5px solid #4080d8;border-radius:10px;color:#90c8ff;font-size:13px;cursor:pointer;font-weight:700;';
+        const msgEl = document.createElement('div'); msgEl.className = 'fcm-dialog-message'; msgEl.textContent = msg;
+        const btnRow = document.createElement('div'); btnRow.className = 'fcm-dialog-actions';
+        const cancelBtn = document.createElement('button'); cancelBtn.className = 'fcm-dialog-action fcm-dialog-action-cancel'; cancelBtn.textContent = T('btnCancel');
+        host.listen(cancelBtn, 'click', () => host.close());
+        const okBtn = document.createElement('button'); okBtn.className = 'fcm-dialog-action fcm-dialog-action-primary'; okBtn.textContent = okLabel || T('btnConfirm');
         host.listen(okBtn, 'click', () => { if (confirmed) return; confirmed = true; host.close(); onOk?.(); });
         btnRow.appendChild(cancelBtn); btnRow.appendChild(okBtn);
         box.appendChild(msgEl); box.appendChild(btnRow);
@@ -201,29 +198,25 @@ import { createDialogHost } from '../ui/dialog.js';
         mn = parseInt(mn);
         const host = createDialogHost({
             id: 'fcm-confirm-overlay',
-            overlayStyle: 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center;',
-            dialogStyle: 'background:#241840;border:2px solid #7060c0;border-radius:14px;padding:26px 24px;width:min(400px,90vw);box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:18px;font-family:-apple-system,sans-serif;',
+            dialogClass: 'fcm-dialog fcm-dialog-choice',
             onKeyDown: (event, close) => { event.stopPropagation(); if (event.key === 'Escape') close(); },
         });
         const { dialog: box } = host;
 
-        const msgEl = document.createElement('div'); msgEl.style.cssText = 'color:#e8d0ff;font-size:14px;text-align:center;line-height:1.7;white-space:pre-wrap;';
-        const hint = document.createElement('span'); hint.style.cssText = 'display:block;color:#9a86c8;font-size:12px;margin-top:6px;';
+        const msgEl = document.createElement('div'); msgEl.className = 'fcm-dialog-message';
+        const hint = document.createElement('span'); hint.className = 'fcm-dialog-hint';
         hint.textContent = T('addFriendNotifyHint');
         msgEl.textContent = T('addFriendTitle', dname) + (oneSided ? '\n\n' + T('peopleOneSidedWarn') : '');
         msgEl.appendChild(hint);
 
-        const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex;gap:10px;';
-        const cancelBtn = document.createElement('button'); cancelBtn.textContent = T('btnCancel');
-        cancelBtn.style.cssText = 'flex:1;padding:11px;background:#1e1635;border:1.5px solid #5a48a8;border-radius:10px;color:#c4a0e0;font-size:13px;cursor:pointer;font-weight:600;';
+        const btnRow = document.createElement('div'); btnRow.className = 'fcm-dialog-actions';
+        const cancelBtn = document.createElement('button'); cancelBtn.className = 'fcm-dialog-action fcm-dialog-action-cancel'; cancelBtn.textContent = T('btnCancel');
         host.listen(cancelBtn, 'click', () => host.close());
 
-        const okBtn = document.createElement('button'); okBtn.textContent = T('btnAgree');
-        okBtn.style.cssText = 'flex:1;padding:11px;background:#123a20;border:1.5px solid #40a860;border-radius:10px;color:#90f0b0;font-size:13px;cursor:pointer;font-weight:700;';
+        const okBtn = document.createElement('button'); okBtn.className = 'fcm-dialog-action fcm-dialog-action-accept'; okBtn.textContent = T('btnAgree');
         host.listen(okBtn, 'click', () => { host.close(); doAddFriend(mn); });
 
-        const okNotifyBtn = document.createElement('button'); okNotifyBtn.textContent = T('btnAgreeNotify');
-        okNotifyBtn.style.cssText = 'flex:1.3;padding:11px;background:#1a3060;border:1.5px solid #4080d8;border-radius:10px;color:#90c8ff;font-size:13px;cursor:pointer;font-weight:700;';
+        const okNotifyBtn = document.createElement('button'); okNotifyBtn.className = 'fcm-dialog-action fcm-dialog-action-notify'; okNotifyBtn.textContent = T('btnAgreeNotify');
         host.listen(okNotifyBtn, 'click', () => { host.close(); doAddFriend(mn); sendFriendReqNotify(mn); });
         btnRow.appendChild(cancelBtn); btnRow.appendChild(okBtn); btnRow.appendChild(okNotifyBtn);
         box.appendChild(msgEl); box.appendChild(btnRow);
@@ -396,8 +389,6 @@ import { createDialogHost } from '../ui/dialog.js';
         let confirmed = false;
         const host = createDialogHost({
             id: 'fcm-confirm-overlay',
-            overlayStyle: 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center;',
-            dialogStyle: 'background:rgb(36,24,64);border:2px solid rgb(112,96,192);border-radius:14px;padding:28px 24px;width:min(380px,88vw);box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:20px;font-family:-apple-system,sans-serif;',
             onKeyDown: (event, close) => {
                 event.stopPropagation();
                 if (event.key === 'Escape') close();
@@ -415,12 +406,10 @@ import { createDialogHost } from '../ui/dialog.js';
                 .catch(() => { if (overlay.isConnected) detailWrap.replaceChildren(_buildRoomDetail(info, false)); });
         }
 
-        const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex;gap:12px;';
-        const cancelBtn = document.createElement('button'); cancelBtn.textContent = T('btnCancel');
-        cancelBtn.style.cssText = 'flex:1;padding:12px;background:#1e1635;border:1.5px solid #5a48a8;border-radius:10px;color:#c4a0e0;font-size:13px;cursor:pointer;font-weight:600;';
+        const btnRow = document.createElement('div'); btnRow.className = 'fcm-dialog-actions';
+        const cancelBtn = document.createElement('button'); cancelBtn.className = 'fcm-dialog-action fcm-dialog-action-cancel'; cancelBtn.textContent = T('btnCancel');
         host.listen(cancelBtn, 'click', () => host.close());
-        const okBtn = document.createElement('button'); okBtn.textContent = '🚪 ' + T('roomJoinRoomBtn');
-        okBtn.style.cssText = 'flex:2;padding:12px;background:#1a3060;border:1.5px solid #4080d8;border-radius:10px;color:#90c8ff;font-size:13px;cursor:pointer;font-weight:700;';
+        const okBtn = document.createElement('button'); okBtn.className = 'fcm-dialog-action fcm-dialog-action-primary'; okBtn.textContent = '🚪 ' + T('roomJoinRoomBtn');
         host.listen(okBtn, 'click', () => { if (confirmed) return; confirmed = true; host.close(); _doJoinRoom(info.room); });
         btnRow.appendChild(cancelBtn); btnRow.appendChild(okBtn);
         box.appendChild(btnRow);

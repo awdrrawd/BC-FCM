@@ -163,6 +163,9 @@ import { chatFontFamily } from '../communication/chat-font.js';
         const s = document.createElement('style'); s.id = 'fcm-css';
         s.textContent = `
 #fcm-panel,#fcm-panel *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
+.fcm-overlay{position:fixed;inset:0;z-index:100001;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)}
+.fcm-dialog{width:min(380px,88vw);padding:28px 24px;display:flex;flex-direction:column;gap:20px;background:#241840;color:#e8d0ff;border:2px solid #7060c0;border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.8);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+.fcm-dialog-choice{width:min(400px,90vw);padding:26px 24px;gap:18px}.fcm-dialog-message{color:#e8d0ff;font-size:14px;text-align:center;line-height:1.7;white-space:pre-wrap}.fcm-dialog-hint{display:block;margin-top:6px;color:#9a86c8;font-size:12px}.fcm-dialog-actions{display:flex;gap:12px}.fcm-dialog-choice .fcm-dialog-actions{gap:10px}.fcm-dialog-action{padding:12px;background:#1e1635;color:#c4a0e0;border:1.5px solid #5a48a8;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer}.fcm-dialog-action-cancel{flex:1}.fcm-dialog-action-primary{flex:2;background:#1a3060;color:#90c8ff;border-color:#4080d8;font-weight:700}.fcm-dialog-action-accept{flex:1;background:#123a20;color:#90f0b0;border-color:#40a860;font-weight:700}.fcm-dialog-action-notify{flex:1.3;background:#1a3060;color:#90c8ff;border-color:#4080d8;font-weight:700}
 #fcm-panel *{user-select:none;} #fcm-panel input,#fcm-panel textarea{user-select:text!important;}
 #fcm-panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(1050px,96vw);height:min(650px,92vh);
   background:#1a1821;border:2px solid #7648fe;border-radius:14px;box-shadow:0 12px 60px rgba(0,0,0,.75);z-index:99990;display:flex;flex-direction:column;overflow:hidden;}
