@@ -50,6 +50,7 @@ import { createChatDialogs } from './chat/controllers/chat-dialogs.js';
 import { createChatRoomActions } from './chat/services/chat-room-actions.js';
 import { createChatConversationActions } from './chat/services/chat-conversation-actions.js';
 import { createChatMessageImagesController } from './chat/controllers/chat-message-images.js';
+import { createChatProfileViewer } from './chat/services/chat-profile-viewer.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -146,6 +147,11 @@ const profileSuggestion = createProfileSuggestionController({
     avatarHtml, text: TH,
 });
 const replyController = createChatReplyController({ getRoot: () => root, cleanMessage, text: TH });
+const profileViewer = createChatProfileViewer({
+    findLiveCharacter: character, loadProfile: memberNumber => PDB.get(memberNumber),
+    loadCharacter: (bundle, memberNumber) => globalThis.CharacterLoadOnline(bundle, memberNumber),
+    showInformationSheet: characterValue => globalThis.InformationSheetLoadCharacter?.(characterValue), warn: warnLimited,
+});
 const contactCard = createChatContactCardController({
     getRoot: () => root, getMemberNumber: () => selectedMember, loadProfile: memberNumber => PDB.get(memberNumber),
     renderHtml: contactCardHtml, hydrateAvatars: hydrateChatAvatars, findLiveCharacter: character,
@@ -154,7 +160,7 @@ const contactCard = createChatContactCardController({
     nextPaint: () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))),
     createFaceSnapshot: (characterValue, size) => PDB._face(characterValue, size),
     saveSnapshot: (...args) => Snapshot.save(...args), loadAvatarFromBundle,
-    addFriend: showAddFriendConfirm, displayName: getDisplayName, openProfile: openSharedProfile,
+    addFriend: showAddFriendConfirm, displayName: getDisplayName, openProfile: profileViewer.open,
 });
 const historyViewport = createChatHistoryViewportController({
     getRoot: () => root, getMemberNumber: () => selectedMember, conversation, store: ChatStore,
@@ -848,18 +854,6 @@ function bindEvents() {
     bindChatProfileEvents({ root, getPlayer: () => Player, renderChat, saveProfile: ownProfile.save, setStatus });
 }
 
-async function openSharedProfile(memberNumber) {
-    const mn = Number(memberNumber);
-    const live = character(mn);
-    if (live && typeof globalThis.InformationSheetLoadCharacter === 'function') { globalThis.InformationSheetLoadCharacter(live); return; }
-    const profile = await PDB.get(mn);
-    if (!profile?.characterBundle) return;
-    try {
-        const loaded = globalThis.CharacterLoadOnline(JSON.parse(profile.characterBundle), mn);
-        globalThis.InformationSheetLoadCharacter?.(loaded);
-    } catch (error) { warnLimited(`saved chat profile open failed (${mn})`, error); }
-}
-
 function sendCurrentMessage() {
     const input = root?.querySelector('[data-input]');
     const content = expandProfileMentions(input?.value.trim() || '');
@@ -883,7 +877,7 @@ function bindMessageActions() {
         isMultiSelectActive: messageSelection.isActive,
         selectedIds: messageSelection.ids,
         updateMultiSelectUi: messageSelection.updateUi,
-        openProfile: openSharedProfile,
+        openProfile: profileViewer.open,
         replyToMessage: replyController.select,
         enterMultiSelect: messageSelection.enter,
         isMobile: () => typeof globalThis.CommonIsMobile === 'function' && globalThis.CommonIsMobile(),
