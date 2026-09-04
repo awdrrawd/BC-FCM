@@ -3,12 +3,11 @@ import { getDisplayName as getSharedDisplayName, getRoomInfo, inRoomFn, onlineFr
 import { getCachedRoomInfo, queryRoomInfo } from '../panel/panel-rooms-data.js';
 import { PDB, _pc, Snapshot, loadAvatarFromBundle, syncRoomAvatar, updateOwnAvatarSnapshot, updateOwnAvatarProfile } from '../data/profile-db.js';
 import { ChatStore, OfflineQueue } from './chat-store.js';
-import { T, TH, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, ensureLang } from '../i18n/i18n.js';
+import { T, TH, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS } from '../i18n/i18n.js';
 import { chatFontFamily, availableFontChoices } from './chat-font.js';
 import { isSupportedAvatarUrl, profileHtml as renderProfileHtml } from './chat-profile.js';
 import { chatPanelSession } from './chat-panel-session.js';
 import { installDragScroll } from '../ui/drag-scroll.js';
-import { applyTheme } from '../panel/styles.js';
 import { THEME_KEYS, themeColors } from '../core/themes.js';
 import { showAddFriendConfirm, showRoomJoinConfirm, showIncomingRoomInvite } from '../chat/actions.js';
 import { canSendBcxWhisper, sendBcxAwareBeep, sendBcxAwareWhisper } from './bcx-compat.js';
@@ -17,7 +16,7 @@ import { injectChatStyles } from './chat-styles.js';
 import { warnLimited } from '../core/logger.js';
 import { balloonPreviewText, cleanMessage, esc, messageContentHtml, parseRoomInvite } from './chat-content.js';
 import { exportConversation as exportConversationFile } from './chat-export.js';
-import { hasCustomNotificationSound, initChatAudio, playNotificationSound, saveCustomNotificationSound } from './chat-audio.js';
+import { hasCustomNotificationSound, initChatAudio, playNotificationSound } from './chat-audio.js';
 import { installChatDrag, resetBalloonInteraction } from './chat-drag.js';
 import { ConversationViewport } from './chat-viewport.js';
 import { createChatBalloonController } from './chat-balloon.js';
@@ -25,6 +24,7 @@ import { createDialogHost } from '../ui/dialog.js';
 import { buildForwardTargetGroups, forEachForwardedMessage, forwardedMessageText, selectedMessages } from './chat-selection.js';
 import { bindForwardTargetEvents, forwardTargetsHtml as renderForwardTargetsHtml, updateMultiSelectUi as syncMultiSelectUi } from './chat-selection-view.js';
 import { installMessageActions } from './chat-message-actions.js';
+import { bindChatSettingsEvents } from './chat-settings-events.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     ALARM_MUTED_ICON, ALARM_ACTIVE_ICON, EXIT_ICON, DOWNLOAD_ICON,
@@ -42,12 +42,6 @@ let conversationUnread = 0;
 let historyDateFrame = 0;
 const conversationViewport = new ConversationViewport(40);
 const CONVERSATION_PAGE_SIZE = 50;
-const CHAT_TOGGLE_SETTING_KEYS = {
-    takeover: 'takeoverFcmChatButtons',
-    bcxBypass: 'bypassBcxCommunication',
-    animation: 'notificationAnimation',
-    balloonSnap: 'balloonSnap',
-};
 let search = '';
 let presenceFilter = 'online';
 let relationFilter = '';
@@ -1123,56 +1117,6 @@ function refreshConversationMain({ scrollToLatest = true } = {}) {
     requestAnimationFrame(() => { const bio = main.querySelector('.fcm-chat-bio'); if (bio) bio.classList.toggle('marquee', bio.scrollWidth > bio.clientWidth); });
 }
 
-function commitChatSetting(update, { refresh = false, render = true, applySharedTheme = false } = {}) {
-    update();
-    saveCfg();
-    if (refresh) refreshChatSettings();
-    else if (render && root?.style.display !== 'none') renderChat();
-    if (applySharedTheme) applyTheme();
-}
-
-function bindSettingsEvents() {
-    root.querySelectorAll('[data-setting]').forEach(button => button.addEventListener('click', () => {
-        const key = CHAT_TOGGLE_SETTING_KEYS[button.dataset.setting];
-        if (key) commitChatSetting(() => { cfg[key] = !cfg[key]; }, { refresh: true });
-    }));
-    root.querySelector('[data-balloon-placement]')?.addEventListener('change', event => {
-        commitChatSetting(() => { cfg.balloonPlacement = event.target.value; cfg.persistentBalloon = cfg.balloonPlacement !== 'off'; cfg.chatBalloonPosition = null; }, { refresh: true });
-    });
-    root.querySelector('[data-user-balloon-placement]')?.addEventListener('change', event => {
-        commitChatSetting(() => { cfg.userBalloonPlacement = event.target.value; cfg.individualBalloons = cfg.userBalloonPlacement !== 'off'; cfg.chatUserBalloonPositions = {}; }, { refresh: true });
-    });
-    root.querySelector('[data-chat-language]')?.addEventListener('change', async event => {
-        cfg.lang = event.target.value; saveCfg(); await ensureLang(cfg.lang);
-        window.dispatchEvent(new CustomEvent('fcm-language-change'));
-    });
-    root.querySelector('[data-chat-sound]')?.addEventListener('change', event => {
-        const value = event.target.value;
-        if (value === 'custom' && !hasCustomNotificationSound()) { event.target.value = cfg.notificationAudio ? (cfg.notificationSound || '') : ''; root.querySelector('[data-custom-sound]')?.click(); return; }
-        commitChatSetting(() => { cfg.notificationSound = value; cfg.notificationAudio = !!value; });
-    });
-    root.querySelector('[data-preview-sound]')?.addEventListener('click', playNotificationSound);
-    root.querySelector('[data-custom-sound]')?.addEventListener('change', async event => {
-        if (await saveCustomNotificationSound(event.target.files?.[0])) renderChat();
-    });
-    root.querySelector('[data-chat-avatar-shape]')?.addEventListener('change', event => commitChatSetting(() => { cfg.chatAvatarShape = event.target.value; }, { refresh: true }));
-    root.querySelector('[data-chat-theme-manage]')?.addEventListener('click', () => { const box = root.querySelector('[data-chat-theme-options]'); box.hidden = !box.hidden; });
-    root.querySelector('[data-chat-theme-follow]')?.addEventListener('click', () => commitChatSetting(() => { cfg.chatThemeMode = 'follow'; }, { refresh: true }));
-    root.querySelectorAll('button[data-chat-theme-preset]').forEach(button => button.addEventListener('click', () => commitChatSetting(() => { cfg.chatThemePreset = button.dataset.chatThemePreset; cfg.chatThemeMode = 'preset'; }, { refresh: true })));
-    root.querySelectorAll('[data-chat-theme-color]').forEach(input => input.addEventListener('input', () => {
-        cfg[input.dataset.chatThemeColor] = input.value; cfg.chatThemeMode = 'custom'; saveCfg(); refreshChatSettings();
-        const [panelColor, textColor, accentColor] = chatColors();
-        const panel = root.querySelector('#fcm-chat-panel');
-        panel.style.setProperty('--s', panelColor); panel.style.setProperty('--tx', textColor); panel.style.setProperty('--ac', accentColor);
-        const button = root.querySelector('[data-chat-theme-manage]');
-        if (button) button.textContent = `${T('themeSettingsLabel')} · ${T('themeCustom')}`;
-    }));
-    root.querySelector('[data-chat-font-size]')?.addEventListener('change', event => commitChatSetting(() => { cfg.chatFontSize = Math.max(10, Math.min(24, Number(event.target.value) || 13)); }, { applySharedTheme: true }));
-    root.querySelector('[data-chat-font-family]')?.addEventListener('change', event => commitChatSetting(() => { cfg.chatFontFamily = event.target.value; }, { applySharedTheme: true }));
-    root.querySelector('[data-chat-avatar-mode]')?.addEventListener('change', event => commitChatSetting(() => { cfg.chatAvatarMode = event.target.value; }));
-    root.querySelector('[data-chat-avatar-url]')?.addEventListener('change', event => commitChatSetting(() => { cfg.chatAvatarUrl = event.target.value.trim(); }));
-}
-
 function bindProfileEvents() {
     root.querySelector('[data-save-profile]')?.addEventListener('click', saveOwnProfile);
     root.querySelector('[data-profile-nickname-edit]')?.addEventListener('click', () => {
@@ -1274,7 +1218,7 @@ function bindEvents() {
     });
     root.querySelector('[data-status]')?.addEventListener('click', () => root.querySelector('.fcm-chat-status-menu')?.classList.toggle('open'));
     root.querySelectorAll('[data-status-value]').forEach(button => button.addEventListener('click', () => setStatus(button.dataset.statusValue)));
-    bindSettingsEvents();
+    bindChatSettingsEvents({ root, renderChat, refreshChatSettings, chatColors });
     bindProfileEvents();
 }
 
