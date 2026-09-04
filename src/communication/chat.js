@@ -22,6 +22,7 @@ import { installChatDrag, resetBalloonInteraction } from './chat-drag.js';
 import { ConversationViewport } from './chat-viewport.js';
 import { createChatBalloonController } from './chat-balloon.js';
 import { createDialogHost } from '../ui/dialog.js';
+import { buildForwardTargetGroups, forEachForwardedMessage, forwardedMessageText, selectedMessages } from './chat-selection.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     ALARM_MUTED_ICON, ALARM_ACTIVE_ICON, EXIT_ICON, DOWNLOAD_ICON,
@@ -548,17 +549,15 @@ function forwardTargetRows(memberNumbers) {
 }
 
 function forwardTargetsHtml() {
-    const self = Number(Player?.MemberNumber);
-    const excluded = new Set([self, Number(selectedMember)]);
-    const room = [...new Set((ChatRoomCharacter || []).map(character => Number(character.MemberNumber)))]
-        .filter(memberNumber => memberNumber && !excluded.has(memberNumber));
-    const roomSet = new Set(room);
-    const friends = [...new Set(buildFriendList().map(friend => Number(friend.mn)))]
-        .filter(memberNumber => memberNumber && !excluded.has(memberNumber) && !roomSet.has(memberNumber) && isFriendOf(memberNumber));
-    const online = friends.filter(isOnline);
-    const offline = friends.filter(memberNumber => !isOnline(memberNumber));
-    const groups = { room, friends: online, offline };
-    const rows = groups[forwardTargetTab] || room;
+    const groups = buildForwardTargetGroups({
+        roomCharacters: ChatRoomCharacter,
+        friendRows: buildFriendList(),
+        selfMemberNumber: Player?.MemberNumber,
+        conversationMemberNumber: selectedMember,
+        isFriend: isFriendOf,
+        isOnline,
+    });
+    const rows = groups[forwardTargetTab] || groups.room;
     return `<div class="fcm-chat-forward-header"><b>${TH('chatForwardContact')}</b><button data-forward-cancel>${TH('chatCancel')}</button></div>
         <div class="fcm-chat-subtabs fcm-chat-forward-tabs"><button class="${forwardTargetTab === 'room' ? 'active' : ''}" data-forward-tab="room">${TH('chatRoom')}</button><button class="${forwardTargetTab === 'friends' ? 'active' : ''}" data-forward-tab="friends">${TH('chatFriends')}</button><button class="${forwardTargetTab === 'offline' ? 'active' : ''}" data-forward-tab="offline">${TH('chatPresenceOffline')}</button></div>
         <div class="fcm-chat-scroll fcm-chat-forward-targets">${forwardTargetRows(rows) || `<div class="fcm-chat-empty">${TH('chatNoRecord')}</div>`}</div>`;
@@ -1391,7 +1390,7 @@ function selectMessageText(messageElement) {
 }
 
 function selectedMessageRecords() {
-    return conversationMessages.filter(message => selectedMessageIds.has(String(message.id)));
+    return selectedMessages(conversationMessages, selectedMessageIds);
 }
 
 function updateMultiSelectUi() {
@@ -1422,11 +1421,8 @@ function exitMultiSelect() {
     updateMultiSelectUi();
 }
 
-function forwardedMessageText(message) {
-    const sender = message.direction === 'out'
-        ? `${Player?.Nickname || Player?.Name || getDisplayName(Player?.MemberNumber)} (${Player?.MemberNumber})`
-        : `${getDisplayName(selectedMember)} (${selectedMember})`;
-    return `↪ ${sender} · ${new Date(message.timestamp).toLocaleString()}\n${cleanMessage(message.content)}`;
+function formatForwardedMessage(message) {
+    return forwardedMessageText(message, { player: Player, conversationMemberNumber: selectedMember, displayName: getDisplayName, cleanContent: cleanMessage });
 }
 
 async function forwardSelectedTo(memberNumber) {
@@ -1434,13 +1430,12 @@ async function forwardSelectedTo(memberNumber) {
     const available = capability(target);
     if (!target || (available === 'none' && !isFriendOf(target))) return;
     const selected = selectedMessageRecords();
-    for (const [index, message] of selected.entries()) {
-        const content = forwardedMessageText(message);
+    await forEachForwardedMessage(selected, async message => {
+        const content = formatForwardedMessage(message);
         if (available === 'none') {
             const queued = OfflineQueue.add(target, content);
             await recordMessage({ memberNumber: target, direction: 'out', channel: 'beep', content, queued: true, queueId: queued.id }, { notify: false });
-            if (index < selected.length - 1) await new Promise(resolve => setTimeout(resolve, 350));
-            continue;
+            return;
         }
         suppressOutgoing++;
         let sent = false;
@@ -1450,8 +1445,7 @@ async function forwardSelectedTo(memberNumber) {
                 : sendBcxAwareBeep({ MemberNumber: target, BeepType: '', Message: content });
         } finally { suppressOutgoing--; }
         if (sent) await recordMessage({ memberNumber: target, direction: 'out', channel: available, content }, { notify: false });
-        if (index < selected.length - 1) await new Promise(resolve => setTimeout(resolve, 350));
-    }
+    });
     exitMultiSelect();
 }
 
@@ -1504,10 +1498,7 @@ function refreshForwardTargetList() {
 async function forwardSelectedToRoom() {
     if (!ChatRoomData || !selectedMessageIds.size) return;
     const selected = selectedMessageRecords();
-    for (const [index, message] of selected.entries()) {
-        ServerSend('ChatRoomChat', { Type: 'Chat', Content: forwardedMessageText(message) });
-        if (index < selected.length - 1) await new Promise(resolve => setTimeout(resolve, 350));
-    }
+    await forEachForwardedMessage(selected, message => ServerSend('ChatRoomChat', { Type: 'Chat', Content: formatForwardedMessage(message) }));
     exitMultiSelect();
 }
 
