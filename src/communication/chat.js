@@ -31,6 +31,7 @@ import { settingsHtml as renderSettingsHtml } from './chat-settings-view.js';
 import { conversationMessagesHtml, messageDateKey, messageDateLabel, messageHtml } from './chat-message-view.js';
 import { contactCardHtml as renderContactCardHtml, conversationHtml as renderConversationHtml } from './chat-conversation-view.js';
 import { WhisperMetadata, classifyIncomingBeep, findPendingOutgoingWhisper, normalizeMessage as normalizeTransportMessage } from './chat-transport.js';
+import { conversationRows, historyMessageRows, mergeOlderMessages, normalizeConversationPage, recentConversationRows, unreadMessageCount } from './chat-conversation-data.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -313,23 +314,11 @@ function handleOutgoingServerSend(type, data) {
 }
 
 function conversations() {
-    const map = new Map();
-    const self = Number(Player?.MemberNumber);
-    for (const message of messages) {
-        if (Number(message.memberNumber) === self) continue;
-        const row = map.get(message.memberNumber);
-        if (!row || row.timestamp < message.timestamp) map.set(message.memberNumber, { ...message, unread: row?.unread || 0 });
-        if (message.direction === 'in' && !message.read) map.get(message.memberNumber).unread++;
-    }
-    for (const friend of buildFriendList()) {
-        if (Number(friend.mn) === self) continue;
-        if (!map.has(Number(friend.mn))) map.set(Number(friend.mn), { memberNumber: Number(friend.mn), content: '', timestamp: 0, unread: 0 });
-    }
-    return [...map.values()].sort((a, b) => b.timestamp - a.timestamp);
+    return conversationRows(messages, buildFriendList(), Player?.MemberNumber);
 }
 
 function unreadCount(memberNumber = null) {
-    return messages.filter(message => message.direction === 'in' && !message.read && (memberNumber == null || message.memberNumber === Number(memberNumber))).length;
+    return unreadMessageCount(messages, memberNumber);
 }
 
 function unreadBadge(memberNumber = null) {
@@ -338,12 +327,11 @@ function unreadBadge(memberNumber = null) {
 }
 
 function recentConversations() {
-    return conversations().filter(row => row.timestamp).slice(0, 30);
+    return recentConversationRows(conversations());
 }
 
 function historyMessages() {
-    const self = Number(Player?.MemberNumber);
-    return messages.filter(message => Number(message.memberNumber) !== self).sort((a, b) => b.timestamp - a.timestamp).slice(0, 100);
+    return historyMessageRows(messages, Player?.MemberNumber);
 }
 
 async function openChat(memberNumber = null) {
@@ -647,7 +635,7 @@ async function loadConversation(memberNumber) {
     conversationLoading = true;
     const page = await ChatStore.page(target, { limit: CONVERSATION_PAGE_SIZE });
     if (Number(selectedMember) === target) {
-        conversationMessages = page.messages.map(message => ({ ...message, content: cleanMessage(message.content) }));
+        conversationMessages = normalizeConversationPage(page.messages);
         conversationHasMore = page.hasMore;
         conversationUnread = 0;
         conversationViewport.follow();
@@ -663,9 +651,7 @@ async function loadOlderConversation(log) {
     const oldTop = log.scrollTop;
     const page = await ChatStore.page(target, { before: conversationMessages[0].timestamp, limit: CONVERSATION_PAGE_SIZE });
     if (Number(selectedMember) === target && page.messages.length) {
-        const existing = new Set(conversationMessages.map(message => message.id));
-        const older = page.messages.filter(message => !existing.has(message.id));
-        conversationMessages = [...older, ...conversationMessages];
+        conversationMessages = mergeOlderMessages(conversationMessages, page.messages);
         log.innerHTML = conversationMessagesHtml(conversationMessages);
         bindMessageImages(log, log);
         updateMultiSelectUi();
