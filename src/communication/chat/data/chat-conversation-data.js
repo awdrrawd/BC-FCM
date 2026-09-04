@@ -1,4 +1,4 @@
-import { cleanMessage } from '../../chat-content.js';
+import { cleanMessage } from '../services/chat-content.js';
 
 function conversationRows(messages, friendRows, selfMemberNumber) {
     const rows = new Map();

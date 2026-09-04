@@ -1,5 +1,5 @@
 import { cfg, saveCfg } from '../core/config.js';
-import { AudioStore } from './chat-store.js';
+import { AudioStore } from './chat/data/chat-store.js';
 
 let customAudioUrl = '';
 

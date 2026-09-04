@@ -1,4 +1,4 @@
-import { esc } from '../../chat-content.js';
+import { esc } from './chat-content.js';
 
 function createChatContactService({ config, snapshot, syncRoomAvatar, displayName, inRoom, isFriend, getPlayer, getRoomCharacters, getOnlineFriends, getRemoteProfiles, getRoot }) {
     const character = memberNumber => getRoomCharacters()?.find(item => Number(item.MemberNumber) === Number(memberNumber));

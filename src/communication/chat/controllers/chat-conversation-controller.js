@@ -1,4 +1,4 @@
-import { ConversationViewport } from '../../chat-viewport.js';
+import { ConversationViewport } from './chat-viewport.js';
 import { mergeOlderMessages, normalizeConversationPage } from '../data/chat-conversation-data.js';
 
 class ChatConversationController {

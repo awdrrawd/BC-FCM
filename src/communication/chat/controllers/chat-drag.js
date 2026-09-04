@@ -1,4 +1,4 @@
-import { cfg, saveCfg } from '../core/config.js';
+import { cfg, saveCfg } from '../../../core/config.js';
 
 function resetBalloonInteraction(element) {
     element?.classList.remove('dragging', 'released', 'release-water', 'stirred', 'notify');

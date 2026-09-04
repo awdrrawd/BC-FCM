@@ -1,5 +1,5 @@
-import { TH } from '../i18n/i18n.js';
-import { imageOriginTrusted } from './image-trust.js';
+import { TH } from '../../../i18n/i18n.js';
+import { imageOriginTrusted } from '../../image-trust.js';
 
 const CHAT_IMAGE_EXT = /\.(?:png|jpe?g|gif|webp|bmp|avif|apng|jfif|svg|ico)$/iu;
 const BALLOON_PREVIEW_MAX_CHARS = 80;

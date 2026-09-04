@@ -1,6 +1,6 @@
 import { T, TH } from '../../../i18n/i18n.js';
 import { ADD_FRIEND_ICON, DOWNLOAD_ICON, FOLDER_ICON, GROUP_ICON, INVITE_ICON, SEARCH_ICON, SUMMON_ICON, TRASH_ICON, EXIT_ICON } from '../../../ui/icons.js';
-import { esc } from '../../chat-content.js';
+import { esc } from '../services/chat-content.js';
 
 function contactCardHtml({ memberNumber, avatarHtml, displayName, biography, hasProfile, isFriend }) {
     return `<section class="fcm-chat-contact-card">${avatarHtml(memberNumber, 100, 'card')}<div><b>${esc(displayName)} (${memberNumber})</b><small>${esc(biography || T('chatNoBiography'))}</small><span class="fcm-chat-card-actions"><button data-card-refresh>${TH('chatProfileSnapshot')}</button>${hasProfile ? `<button class="fcm-chat-card-search" data-card-profile title="${TH('btnViewProfile')}">${SEARCH_ICON}</button>` : ''}${isFriend ? '' : `<button data-card-add-friend title="${TH('addFriend')}">${ADD_FRIEND_ICON}${TH('addFriend')}</button>`}</span></div></section>`;

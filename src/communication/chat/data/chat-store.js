@@ -1,4 +1,4 @@
-import { warnLimited } from '../core/logger.js';
+import { warnLimited } from '../../../core/logger.js';
 
 const DB_NAME = 'fcm-chat';
 // Do not pass a version here. This database may be opened by other plugins;

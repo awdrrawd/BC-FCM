@@ -1,8 +1,8 @@
-import { cfg } from '../core/config.js';
-import { warnLimited } from '../core/logger.js';
-import { T } from '../i18n/i18n.js';
-import { Snapshot } from '../data/profile-db.js';
-import { ChatStore } from './chat-store.js';
+import { cfg } from '../../../core/config.js';
+import { warnLimited } from '../../../core/logger.js';
+import { T } from '../../../i18n/i18n.js';
+import { Snapshot } from '../../../data/profile-db.js';
+import { ChatStore } from '../data/chat-store.js';
 import { esc, messageContentHtml } from './chat-content.js';
 
 function downloadConversationFile(content, type, extension, memberNumber) {

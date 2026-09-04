@@ -1,6 +1,6 @@
 import { TH } from '../../../i18n/i18n.js';
 import { REPLY_ICON } from '../../../ui/icons.js';
-import { cleanMessage, esc, messageContentHtml } from '../../chat-content.js';
+import { cleanMessage, esc, messageContentHtml } from '../services/chat-content.js';
 
 function messageDateKey(timestamp) {
     const date = new Date(timestamp);

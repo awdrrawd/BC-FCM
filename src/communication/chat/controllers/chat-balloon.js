@@ -1,7 +1,7 @@
-import { cfg } from '../core/config.js';
-import { Snapshot } from '../data/profile-db.js';
-import { FCM_ICON_SVG } from '../ui/icons.js';
-import { esc } from './chat-content.js';
+import { cfg } from '../../../core/config.js';
+import { Snapshot } from '../../../data/profile-db.js';
+import { FCM_ICON_SVG } from '../../../ui/icons.js';
+import { esc } from '../services/chat-content.js';
 import { installChatDrag, resolveBalloonCollision } from './chat-drag.js';
 
 function createChatBalloonController(context) {
