@@ -1,5 +1,5 @@
 function createChatRuntime({ config, chatStore, setMessageIndex, getMessageIndex, cleanMessage, profileDb, initAudio, injectStyles, balloons, getRoot, render, refreshSettings, text, contactCard, presence, refreshList, refreshConversationPresence, offlineDelivery, closeChat }) {
-    let initialized = false;
+    let initPromise = null;
     let blockedNoticeTimer = 0;
 
     function isVisible() {
@@ -7,9 +7,7 @@ function createChatRuntime({ config, chatStore, setMessageIndex, getMessageIndex
         return !!root?.isConnected && root.style.display !== 'none';
     }
 
-    async function init() {
-        if (initialized) return;
-        initialized = true;
+    async function initialize() {
         await chatStore.init();
         setMessageIndex(await chatStore.recentIndex());
         if (config.saveMode !== 'off') {
@@ -34,6 +32,14 @@ function createChatRuntime({ config, chatStore, setMessageIndex, getMessageIndex
             blockedNoticeTimer = window.setTimeout(() => { if (notice.isConnected) notice.hidden = true; }, 4000);
         });
         document.addEventListener('pointerdown', contactCard.handleOutsidePointer, true);
+    }
+
+    function init() {
+        if (!initPromise) initPromise = initialize().catch(error => {
+            initPromise = null;
+            throw error;
+        });
+        return initPromise;
     }
 
     async function updateOnlineFriends(result) {

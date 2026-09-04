@@ -24,8 +24,12 @@ function createChatLifecycle({ config, getRoot, setRoot, getSelectedMember, setS
         requestOnlineFriends();
         const selectedMember = getSelectedMember();
         if (selectedMember) await chatStore.markRead(selectedMember);
-        setMessageIndex(await chatStore.recentIndex());
-        if (selectedMember && Number(getSelectedMember()) === Number(selectedMember)) await loadConversation(selectedMember);
+        if (selectedMember && Number(getSelectedMember()) !== Number(selectedMember)) return false;
+        const messageIndex = await chatStore.recentIndex();
+        if (selectedMember && Number(getSelectedMember()) !== Number(selectedMember)) return false;
+        setMessageIndex(messageIndex);
+        if (selectedMember) await loadConversation(selectedMember);
+        if (selectedMember && Number(getSelectedMember()) !== Number(selectedMember)) return false;
         refreshBadges();
         render();
         return true;

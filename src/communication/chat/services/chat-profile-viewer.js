@@ -11,6 +11,7 @@ function createChatProfileViewer({ findLiveCharacter, loadProfile, loadCharacter
             const profile = await loadProfile(target);
             if (!profile?.characterBundle) return false;
             const loaded = loadCharacter(JSON.parse(profile.characterBundle), target);
+            if (!loaded) return false;
             showInformationSheet?.(loaded);
             return true;
         } catch (error) {

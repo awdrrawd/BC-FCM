@@ -5,8 +5,10 @@ function createChatConversationActions({ getMemberNumber, displayName, confirm, 
         await chatStore.deleteMember(memberNumber);
         offlineQueue.removeMember(memberNumber);
         removeFromIndex(memberNumber);
-        if (Number(getMemberNumber()) === memberNumber) resetConversation();
-        onDeleted();
+        if (Number(getMemberNumber()) === memberNumber) {
+            resetConversation();
+            onDeleted();
+        }
     }
 
     function exportCurrent(format) {
