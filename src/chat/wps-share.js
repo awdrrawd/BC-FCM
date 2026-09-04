@@ -20,7 +20,6 @@ import { warnLimited } from '../core/logger.js';
     const _wpsIncoming  = new Map();
     const _wpsCache     = new Map();
     let _wpsTokenObserver = null;
-    if (!window.__LIKOSHARE_CACHE__) window.__LIKOSHARE_CACHE__ = _wpsCache;
 
     function wpsSender(data) {
         return Number(data?.Sender ?? data?.SenderMemberNumber) || 0;
@@ -104,7 +103,6 @@ import { warnLimited } from '../core/logger.js';
                 Object.defineProperty(payload, '_fcmCachedAt', { value: Date.now(), enumerable: false });
                 _wpsCache.set(key, payload);
                 pruneWpsState();
-                if (window.__LIKOSHARE_CACHE__ && window.__LIKOSHARE_CACHE__ !== _wpsCache) window.__LIKOSHARE_CACHE__.set(key, payload);
                 const p = payload.profile;
                 const from = payload.from || {};
                 const fromName = from.name || from.memberNumber || '?';
@@ -137,7 +135,7 @@ import { warnLimited } from '../core/logger.js';
             /\[LIKOSHARE_OPEN\s+(\d+)\s+(\d+)\]/g,
             (m, sharedAt, memberNumber) => {
                 const key = `${sharedAt}:${memberNumber}`;
-                const payload = _wpsCache.get(key) || (window.__LIKOSHARE_CACHE__ && window.__LIKOSHARE_CACHE__.get(key));
+                const payload = _wpsCache.get(key);
                 if (!payload) return m;
                 return `<span class="fcmShareOpen" data-key="${key}" style="color:#885CB0;cursor:pointer;user-select:none;">${TH('shareOpen')}</span>`;
             }
@@ -152,7 +150,7 @@ import { warnLimited } from '../core/logger.js';
                 el.addEventListener('mousedown', e => { e.preventDefault(); e.stopPropagation(); });
                 el.addEventListener('click', e => {
                     e.preventDefault(); e.stopPropagation();
-                    const payload = _wpsCache.get(el.dataset.key) || (window.__LIKOSHARE_CACHE__ && window.__LIKOSHARE_CACHE__.get(el.dataset.key));
+                    const payload = _wpsCache.get(el.dataset.key);
                     if (!payload) return;
                     const p = payload.profile;
                     try { const C = CharacterLoadOnline(JSON.parse(p.characterBundle), p.memberNumber); InformationSheetLoadCharacter(C); } catch (error) { warnLimited('WPS shared profile open failed', error); }
