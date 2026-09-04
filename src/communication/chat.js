@@ -46,6 +46,7 @@ import { createProfileSuggestionController } from './chat/controllers/chat-profi
 import { createChatReplyController } from './chat/controllers/chat-reply.js';
 import { createChatContactCardController } from './chat/controllers/chat-contact-card.js';
 import { createChatHistoryViewportController } from './chat/controllers/chat-history-viewport.js';
+import { createChatMessageSelectionController } from './chat/controllers/chat-message-selection.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -72,18 +73,15 @@ let suppressOutgoing = 0;
 let justOpenedMember = null;
 let bcxNoticeTimer = 0;
 let cleanupMessageActions = null;
-let multiSelectMode = false;
 let forwardTargetMode = false;
 let forwardTargetTab = 'room';
-const selectedMessageIds = new Set();
 const whisperMetadata = new WhisperMetadata();
 const remoteProfiles = new Map();
 
 function resetMessageSelectionState() {
-    multiSelectMode = false;
+    messageSelection.reset();
     forwardTargetMode = false;
     forwardTargetTab = 'room';
-    selectedMessageIds.clear();
 }
 
 const contactService = createChatContactService({
@@ -160,8 +158,13 @@ const contactCard = createChatContactCardController({
 });
 const historyViewport = createChatHistoryViewportController({
     getRoot: () => root, getMemberNumber: () => selectedMember, conversation, store: ChatStore,
-    renderMessages: conversationMessagesHtml, bindImages: bindMessageImages, syncSelection: updateMultiSelectUi,
+    renderMessages: conversationMessagesHtml, bindImages: bindMessageImages, syncSelection: () => messageSelection.updateUi(),
     joinRoom: showRoomJoinConfirm, text: T,
+});
+const messageSelection = createChatMessageSelectionController({
+    getPanel: () => root?.querySelector('#fcm-chat-panel'), getMessages: () => conversation.messages,
+    canForwardToRoom: () => !!ChatRoomData, renderUi: syncMultiSelectUi, selectMessages: selectedMessages,
+    selectedCountText: count => TH('chatSelectedCount', count), onExit: closeForwardTargetList,
 });
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
@@ -450,9 +453,9 @@ function conversationHtml() {
         roomText, roomName: roomInfo?.name || '', canOpenRoom,
         canSummon: !!ChatRoomData && online && !inRoomFn(selectedMember), groups: Object.entries(cfg.chatGroups || {}),
         contactCardHtml: contactCard.isOpen() ? contactCardHtml() : '', messagesHtml: conversationMessagesHtml(conversation.messages),
-        unread: conversation.unread, multiSelect: multiSelectMode, available, online,
+        unread: conversation.unread, multiSelect: messageSelection.isActive(), available, online,
         canInvite: available !== 'none' && !inRoomFn(selectedMember), inputPlaceholder, unavailable,
-        replyTarget: replyController.get(), selectedCount: selectedMessageIds.size, canForwardToRoom: !!ChatRoomData,
+        replyTarget: replyController.get(), selectedCount: messageSelection.size(), canForwardToRoom: !!ChatRoomData,
     });
 }
 
@@ -730,8 +733,8 @@ function bindConversationEvents() {
     main.querySelector('[data-multi-forward-contact]')?.addEventListener('click', showForwardTargetList);
     main.querySelector('[data-multi-forward-room]')?.addEventListener('click', forwardSelectedToRoom);
     main.querySelectorAll('[data-multi-export]').forEach(button => button.addEventListener('click', () => exportSelectedMessages(button.dataset.multiExport)));
-    main.querySelector('[data-multi-cancel]')?.addEventListener('click', exitMultiSelect);
-    if (multiSelectMode) updateMultiSelectUi();
+    main.querySelector('[data-multi-cancel]')?.addEventListener('click', messageSelection.exit);
+    if (messageSelection.isActive()) messageSelection.updateUi();
     bindMessageActions();
     main.querySelector('[data-cancel-reply]')?.addEventListener('click', replyController.clear);
     main.querySelector('[data-input]')?.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendCurrentMessage(); } });
@@ -872,32 +875,6 @@ function sendCurrentMessage() {
     input.value = '';
 }
 
-function selectedMessageRecords() {
-    return selectedMessages(conversation.messages, selectedMessageIds);
-}
-
-function updateMultiSelectUi() {
-    syncMultiSelectUi(root?.querySelector('#fcm-chat-panel'), {
-        active: multiSelectMode,
-        selectedIds: selectedMessageIds,
-        canForwardToRoom: !!ChatRoomData,
-        selectedCountText: count => TH('chatSelectedCount', count),
-    });
-}
-
-function enterMultiSelect(messageElement) {
-    multiSelectMode = true;
-    if (messageElement?.dataset.msgId) selectedMessageIds.add(String(messageElement.dataset.msgId));
-    root?.querySelectorAll('.fcm-chat-message.selected').forEach(message => message.classList.remove('selected'));
-    updateMultiSelectUi();
-}
-
-function exitMultiSelect() {
-    closeForwardTargetList();
-    resetMessageSelectionState();
-    updateMultiSelectUi();
-}
-
 function formatForwardedMessage(message) {
     return forwardedMessageText(message, { player: Player, conversationMemberNumber: selectedMember, displayName: getDisplayName, cleanContent: cleanMessage });
 }
@@ -906,7 +883,7 @@ async function forwardSelectedTo(memberNumber) {
     const target = Number(memberNumber);
     const available = capability(target);
     if (!target || (available === 'none' && !isFriendOf(target))) return;
-    const selected = selectedMessageRecords();
+    const selected = messageSelection.records();
     await forEachForwardedMessage(selected, async message => {
         const content = formatForwardedMessage(message);
         if (available === 'none') {
@@ -919,11 +896,11 @@ async function forwardSelectedTo(memberNumber) {
             : sendBcxAwareBeep({ MemberNumber: target, BeepType: '', Message: content }));
         if (sent) await recordMessage({ memberNumber: target, direction: 'out', channel: available, content }, { notify: false });
     });
-    exitMultiSelect();
+    messageSelection.exit();
 }
 
 function showForwardTargetList() {
-    if (!selectedMessageIds.size) return;
+    if (!messageSelection.size()) return;
     const list = root?.querySelector('.fcm-chat-list');
     if (!list || forwardTargetMode) return;
     forwardTargetMode = true;
@@ -968,14 +945,14 @@ function refreshForwardTargetList() {
 }
 
 async function forwardSelectedToRoom() {
-    if (!ChatRoomData || !selectedMessageIds.size) return;
-    const selected = selectedMessageRecords();
+    if (!ChatRoomData || !messageSelection.size()) return;
+    const selected = messageSelection.records();
     await forEachForwardedMessage(selected, message => ServerSend('ChatRoomChat', { Type: 'Chat', Content: formatForwardedMessage(message) }));
-    exitMultiSelect();
+    messageSelection.exit();
 }
 
 function exportSelectedMessages(format) {
-    const selected = selectedMessageRecords();
+    const selected = messageSelection.records();
     if (!selected.length) return;
     exportConversationFile(format, { memberNumber: selectedMember, messages: selected, getDisplayName, biography, avatarUrl, chatColors });
 }
@@ -988,12 +965,12 @@ function bindMessageActions() {
         root,
         log,
         menu,
-        isMultiSelectActive: () => multiSelectMode,
-        selectedIds: selectedMessageIds,
-        updateMultiSelectUi,
+        isMultiSelectActive: messageSelection.isActive,
+        selectedIds: messageSelection.ids,
+        updateMultiSelectUi: messageSelection.updateUi,
         openProfile: openSharedProfile,
         replyToMessage: replyController.select,
-        enterMultiSelect,
+        enterMultiSelect: messageSelection.enter,
         isMobile: () => typeof globalThis.CommonIsMobile === 'function' && globalThis.CommonIsMobile(),
     });
 }
