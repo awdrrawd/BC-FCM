@@ -2,65 +2,37 @@ import { cfg, saveCfg } from '../core/config.js';
 import { getDisplayName as getSharedDisplayName, getRoomInfo, inRoomFn, onlineFriends, requestOnlineFriends, buildFriendList, getAllRels, isFav, isFriendOf } from '../data/data.js';
 import { getCachedRoomInfo, queryRoomInfo } from '../panel/panel-rooms-data.js';
 import { PDB, _pc, Snapshot, loadAvatarFromBundle, syncRoomAvatar } from '../data/profile-db.js';
-import { ChatStore, OfflineQueue } from './chat/data/chat-store.js';
+import { ChatStore, OfflineQueue } from './chat/data/index.js';
 import { T, TH } from '../i18n/i18n.js';
 import { chatFontFamily } from './chat-font.js';
-import { chatPanelSession } from './chat/controllers/chat-panel-session.js';
 import { installDragScroll } from '../ui/drag-scroll.js';
 import { themeColors } from '../core/themes.js';
 import { showAddFriendConfirm, showRoomJoinConfirm, showIncomingRoomInvite } from '../chat/actions.js';
 import { canSendBcxWhisper, sendBcxAwareBeep, sendBcxAwareWhisper } from './bcx-compat.js';
-import { injectChatStyles } from './chat/views/chat-styles.js';
 import { warnLimited } from '../core/logger.js';
-import { balloonPreviewText, cleanMessage } from './chat/services/chat-content.js';
-import { exportConversation as exportConversationFile } from './chat/services/chat-export.js';
 import { initChatAudio, playNotificationSound } from './chat-audio.js';
-import { resetBalloonInteraction } from './chat/controllers/chat-drag.js';
-import { createChatBalloonController } from './chat/controllers/chat-balloon.js';
-import { updateMultiSelectUi as syncMultiSelectUi } from './chat/views/chat-selection-view.js';
-import { bindChatSettingsEvents } from './chat/events/chat-settings-events.js';
-import { bindChatProfileEvents } from './chat/events/chat-profile-events.js';
-import { conversationMessagesHtml } from './chat/views/chat-message-view.js';
-import { normalizeMessage as normalizeTransportMessage } from './chat/services/chat-transport.js';
-import { ChatConversationController } from './chat/controllers/chat-conversation-controller.js';
-import { createChatContactService } from './chat/services/chat-contact-service.js';
-import { createChatAutoReplyService } from './chat/services/chat-auto-reply.js';
-import { createOfflineDeliveryService } from './chat/services/chat-offline-delivery.js';
-import { createChatSender } from './chat/services/chat-sender.js';
-import { createChatMessageRecorder } from './chat/services/chat-message-recorder.js';
-import { createChatPresenceService } from './chat/services/chat-presence.js';
-import { createChatRoomStateService } from './chat/services/chat-room-state.js';
-import { createProfileSuggestionController } from './chat/controllers/chat-profile-suggest.js';
-import { createChatReplyController } from './chat/controllers/chat-reply.js';
-import { createChatContactCardController } from './chat/controllers/chat-contact-card.js';
-import { createChatHistoryViewportController } from './chat/controllers/chat-history-viewport.js';
-import { createChatMessageSelectionController } from './chat/controllers/chat-message-selection.js';
-import { createChatForwardTargetsController } from './chat/controllers/chat-forward-targets.js';
-import { createChatSelectedActions } from './chat/services/chat-selected-actions.js';
-import { createChatOwnProfileService } from './chat/services/chat-own-profile.js';
-import { createChatDialogs } from './chat/controllers/chat-dialogs.js';
-import { createChatRoomActions } from './chat/services/chat-room-actions.js';
-import { createChatConversationActions } from './chat/services/chat-conversation-actions.js';
-import { createChatMessageImagesController } from './chat/controllers/chat-message-images.js';
-import { createChatProfileViewer } from './chat/services/chat-profile-viewer.js';
-import { createChatComposer } from './chat/controllers/chat-composer.js';
-import { createChatTransportHandler } from './chat/services/chat-transport-handler.js';
-import { createChatListPresenter } from './chat/views/chat-list-presenter.js';
-import { createChatConversationPresenter } from './chat/views/chat-conversation-presenter.js';
-import { createChatConversationPresence } from './chat/controllers/chat-conversation-presence.js';
-import { createChatMessageAppender } from './chat/controllers/chat-message-appender.js';
-import { createChatListController } from './chat/controllers/chat-list-controller.js';
-import { createChatListNavigation } from './chat/controllers/chat-list-navigation.js';
-import { createChatMemberSelection } from './chat/controllers/chat-member-selection.js';
-import { chatShellHtml } from './chat/views/chat-shell-view.js';
-import { createChatPanelControls } from './chat/controllers/chat-panel-controls.js';
-import { createChatConversationEvents } from './chat/controllers/chat-conversation-events.js';
-import { createChatShellEvents } from './chat/controllers/chat-shell-events.js';
-import { createChatRenderer } from './chat/controllers/chat-renderer.js';
-import { createChatLifecycle } from './chat/controllers/chat-lifecycle.js';
-import { createChatRuntime } from './chat/controllers/chat-runtime.js';
-import { createChatMessageActionsController } from './chat/controllers/chat-message-actions-controller.js';
-import { createChatSidebarView } from './chat/views/chat-sidebar-view.js';
+import {
+    ChatConversationController, chatPanelSession, createChatBalloonController, createChatComposer,
+    createChatContactCardController, createChatConversationEvents, createChatConversationPresence,
+    createChatDialogs, createChatForwardTargetsController, createChatHistoryViewportController,
+    createChatLifecycle, createChatListController, createChatListNavigation, createChatMemberSelection,
+    createChatMessageAppender, createChatMessageImagesController,
+    createChatMessageSelectionController, createChatPanelControls, createChatRenderer,
+    createChatReplyController, createChatRuntime, createChatShellEvents, createProfileSuggestionController,
+    resetBalloonInteraction,
+} from './chat/controllers/index.js';
+import {
+    balloonPreviewText, cleanMessage, createChatAutoReplyService, createChatContactService,
+    createChatConversationActions, createChatMessageRecorder, createChatOwnProfileService,
+    createChatPresenceService, createChatProfileViewer, createChatRoomActions, createChatRoomStateService,
+    createChatSelectedActions, createChatSender, createChatTransportHandler, createOfflineDeliveryService,
+    exportConversation as exportConversationFile, normalizeMessage as normalizeTransportMessage,
+} from './chat/services/index.js';
+import {
+    chatShellHtml, conversationMessagesHtml, createChatConversationPresenter, createChatListPresenter,
+    createChatSidebarView, injectChatStyles, updateMultiSelectUi as syncMultiSelectUi,
+} from './chat/views/index.js';
+import { bindChatProfileEvents, bindChatSettingsEvents, createChatMessageActionsController } from './chat/events/index.js';
 import { WATER_ICON } from '../ui/icons.js';
 
 let root = null;

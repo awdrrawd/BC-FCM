@@ -1,5 +1,19 @@
 import { esc } from '../services/chat-content.js';
-import { CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON, LAYOUT_ICON, SETTINGS_ICON, MAXIMIZE_ICON } from '../../../ui/icons.js';
+import { profileHtml } from './chat-profile-view.js';
+import { settingsHtml } from './chat-settings-view.js';
+import { CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON, LAYOUT_ICON, SETTINGS_ICON, MAXIMIZE_ICON, EDIT_ICON } from '../../../ui/icons.js';
+
+function createChatSidebarView({ getActiveView, getPlayer, getConfig, text, htmlText, avatarHtml, forwardTargets, listPresenter }) {
+    function html() {
+        const activeView = getActiveView();
+        if (forwardTargets.isActive()) return forwardTargets.html();
+        if (activeView === 'profile') return profileHtml({ Player: getPlayer(), cfg: getConfig(), T: text, TH: htmlText, esc, avatarHtml, editIcon: EDIT_ICON });
+        if (activeView === 'settings') return settingsHtml();
+        return listPresenter.viewHtml() || '';
+    }
+
+    return { html };
+}
 
 function chatShellHtml(model) {
     const stacked = model.layout === 'stacked';
@@ -24,4 +38,4 @@ function chatShellHtml(model) {
     </div>`;
 }
 
-export { chatShellHtml };
+export { chatShellHtml, createChatSidebarView };
