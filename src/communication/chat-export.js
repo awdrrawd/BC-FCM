@@ -63,7 +63,7 @@ function conversationExportHtml(storedMessages, peerAvatar, context) {
 async function exportConversation(format, context) {
     const memberNumber = Number(context.memberNumber);
     if (!memberNumber) return;
-    const storedMessages = await ChatStore.memberAll(memberNumber);
+    const storedMessages = Array.isArray(context.messages) ? context.messages : await ChatStore.memberAll(memberNumber);
     if (format === 'json') {
         const payload = {
             format: 'FCM_CHAT_EXPORT', version: 1, exportedAt: new Date().toISOString(),

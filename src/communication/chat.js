@@ -56,6 +56,12 @@ let replyTarget = null;
 let contactCardOpen = false;
 let bcxNoticeTimer = 0;
 let closeContextMenuListener = null;
+let multiSelectMode = false;
+let forwardTargetMode = false;
+let forwardTargetTab = 'room';
+let forwardListSnapshot = null;
+const selectedMessageIds = new Set();
+let suppressMessageClickUntil = 0;
 const pendingReplyTags = new Map();
 const pendingMessageIds = new Map();
 let onlinePresenceSignature = '';
@@ -369,6 +375,10 @@ async function openChat(memberNumber = null) {
     if (Number(memberNumber) === Number(Player?.MemberNumber)) memberNumber = null;
     if (memberNumber) {
         selectedMember = Number(memberNumber);
+        multiSelectMode = false;
+        forwardTargetMode = false;
+        forwardListSnapshot = null;
+        selectedMessageIds.clear();
         replyTarget = null;
         channel = inRoomFn(selectedMember) ? 'whisper' : 'beep';
         stackedDetail = true;
@@ -412,6 +422,10 @@ function filteredNotificationRows(rows) {
 function closeChat() {
     const memberToClose = selectedMember;
     selectedMember = null;
+    multiSelectMode = false;
+    forwardTargetMode = false;
+    forwardListSnapshot = null;
+    selectedMessageIds.clear();
     replyTarget = null;
     stackedDetail = false;
     if (root) root.style.display = 'none';
@@ -525,7 +539,32 @@ function chatListHtml() {
         <div class="fcm-chat-scroll">${contactRows(filteredContacts()) || `<div class="fcm-chat-empty">${TH('chatEmptyCategory')}</div>`}</div>`;
 }
 
+function forwardTargetRows(memberNumbers) {
+    return memberNumbers.map(memberNumber => `<button class="fcm-chat-row fcm-chat-forward-target" data-forward-member="${memberNumber}">
+        ${avatarHtml(memberNumber)}
+        <span class="fcm-chat-row-meta"><b>${esc(getDisplayName(memberNumber))} (${memberNumber})</b></span>
+    </button>`).join('');
+}
+
+function forwardTargetsHtml() {
+    const self = Number(Player?.MemberNumber);
+    const excluded = new Set([self, Number(selectedMember)]);
+    const room = [...new Set((ChatRoomCharacter || []).map(character => Number(character.MemberNumber)))]
+        .filter(memberNumber => memberNumber && !excluded.has(memberNumber));
+    const roomSet = new Set(room);
+    const friends = [...new Set(buildFriendList().map(friend => Number(friend.mn)))]
+        .filter(memberNumber => memberNumber && !excluded.has(memberNumber) && !roomSet.has(memberNumber) && isFriendOf(memberNumber));
+    const online = friends.filter(isOnline);
+    const offline = friends.filter(memberNumber => !isOnline(memberNumber));
+    const groups = { room, friends: online, offline };
+    const rows = groups[forwardTargetTab] || room;
+    return `<div class="fcm-chat-forward-header"><b>${TH('chatForwardContact')}</b><button data-forward-cancel>${TH('chatCancel')}</button></div>
+        <div class="fcm-chat-subtabs fcm-chat-forward-tabs"><button class="${forwardTargetTab === 'room' ? 'active' : ''}" data-forward-tab="room">${TH('chatRoom')}</button><button class="${forwardTargetTab === 'friends' ? 'active' : ''}" data-forward-tab="friends">${TH('chatFriends')}</button><button class="${forwardTargetTab === 'offline' ? 'active' : ''}" data-forward-tab="offline">${TH('chatPresenceOffline')}</button></div>
+        <div class="fcm-chat-scroll fcm-chat-forward-targets">${forwardTargetRows(rows) || `<div class="fcm-chat-empty">${TH('chatNoRecord')}</div>`}</div>`;
+}
+
 function listHtml() {
+    if (forwardTargetMode) return forwardTargetsHtml();
     if (activeView === 'profile') return profileHtml();
     if (activeView === 'notifications') return notificationsHtml();
     if (activeView === 'groups') return groupsHtml();
@@ -579,13 +618,14 @@ function conversationHtml() {
     <div class="fcm-chat-messages">${conversationMessagesHtml(rows) || `<div class="fcm-chat-empty">${TH('chatNoMessages')}</div>`}</div>
     <div class="fcm-chat-history-date" data-history-date hidden></div>
     <button class="fcm-chat-new-messages" data-new-messages ${conversationUnread ? '' : 'hidden'}>${TH('chatNewUnread', conversationUnread)}</button>
-    <div class="fcm-chat-actions"><button class="fcm-chat-icon-action" data-invite ${available === 'none' || inRoomFn(selectedMember) ? 'disabled' : ''} title="${TH('chatInviteRoom')}" aria-label="${TH('chatInviteRoom')}">${INVITE_ICON}</button><span></span><div class="fcm-chat-tools"><div class="fcm-chat-tools-menu"><button class="fcm-chat-icon-action" data-export="html" title="${TH('chatExportHtml')}">${DOWNLOAD_ICON}<span>${TH('chatExportHtml')}</span></button><button class="fcm-chat-icon-action" data-export="json" title="${TH('chatExportJson')}">${DOWNLOAD_ICON}<span>${TH('chatExportJson')}</span></button><button class="fcm-chat-icon-action" data-delete title="${TH('chatDeleteAll')}">${TRASH_ICON}<span>${TH('chatDeleteAll')}</span></button></div><button class="fcm-chat-icon-action" data-toggle-tools title="${TH('chatMessageTools')}">${FOLDER_ICON}</button></div></div>
-    <div class="fcm-chat-compose">
+    <div class="fcm-chat-actions" ${multiSelectMode ? 'hidden' : ''}><button class="fcm-chat-icon-action" data-invite ${available === 'none' || inRoomFn(selectedMember) ? 'disabled' : ''} title="${TH('chatInviteRoom')}" aria-label="${TH('chatInviteRoom')}">${INVITE_ICON}</button><span></span><div class="fcm-chat-tools"><div class="fcm-chat-tools-menu"><button class="fcm-chat-icon-action" data-export="html" title="${TH('chatExportHtml')}">${DOWNLOAD_ICON}<span>${TH('chatExportHtml')}</span></button><button class="fcm-chat-icon-action" data-export="json" title="${TH('chatExportJson')}">${DOWNLOAD_ICON}<span>${TH('chatExportJson')}</span></button><button class="fcm-chat-icon-action" data-delete title="${TH('chatDeleteAll')}">${TRASH_ICON}<span>${TH('chatDeleteAll')}</span></button></div><button class="fcm-chat-icon-action" data-toggle-tools title="${TH('chatMessageTools')}">${FOLDER_ICON}</button></div></div>
+    <div class="fcm-chat-compose" ${multiSelectMode ? 'hidden' : ''}>
         <div class="fcm-chat-compose-notice" data-bcx-compose-notice hidden></div>
         <div class="fcm-chat-channels ${online ? '' : 'offline'}"><button class="${available === 'whisper' ? 'active' : ''}" data-channel="whisper" ${available !== 'whisper' ? 'disabled' : ''}>${TH('btnWhisper')}</button><button class="${available === 'beep' ? 'active' : ''}" data-channel="beep" ${available !== 'beep' ? 'disabled' : ''}>${TH('btnBeep')}</button></div>
         <div class="fcm-chat-input-wrap">${replyTarget ? `<div class="fcm-chat-reply-indicator"><span>${TH('chatReply')}: ${esc(replyTarget.preview)}</span><button data-cancel-reply title="${TH('chatCancel')}">×</button></div>` : ''}<div class="fcm-chat-profile-suggest" data-profile-suggest hidden></div><textarea data-input rows="2" placeholder="${esc(inputPlaceholder)}"></textarea></div>
         <button data-send ${unavailable ? 'disabled' : ''}>${online ? TH('chatSend') : TH('chatQueueSend')}</button>
-    </div>`;
+    </div>
+    <div class="fcm-chat-multi-actions" data-multi-actions ${multiSelectMode ? '' : 'hidden'}><b data-multi-count>${TH('chatSelectedCount', selectedMessageIds.size)}</b><div><button data-multi-forward-contact>${TH('chatForwardContact')}</button><button data-multi-forward-room ${!ChatRoomData ? 'disabled' : ''}>${TH('chatForwardRoom')}</button><button data-multi-export="json">${TH('chatExportJson')}</button><button data-multi-export="html">${TH('chatExportHtml')}</button><button data-multi-cancel>${TH('chatCancel')}</button></div></div>`;
 }
 
 function messageHtml(message) {
@@ -742,6 +782,7 @@ async function loadOlderConversation(log) {
         conversationMessages = [...older, ...conversationMessages];
         log.innerHTML = conversationMessagesHtml(conversationMessages);
         bindMessageImages(log, log);
+        updateMultiSelectUi();
         log.querySelectorAll('[data-join-room]').forEach(button => button.addEventListener('click', () => {
             if (button.dataset.joinRoom) showRoomJoinConfirm({ room: button.dataset.joinRoom });
         }));
@@ -843,7 +884,7 @@ function renderChat() {
     const sessionSizeStyle = chatPanelSession.inlineSizeStyle();
     root.innerHTML = `<div id="fcm-chat-panel" class="${maximized ? 'maximized' : ''}" data-layout-mode="${esc(cfg.chatLayout || 'split')}" data-theme="${esc(cfg.chatThemeMode === 'preset' ? cfg.chatThemePreset : cfg.chatThemeMode === 'custom' ? 'custom' : cfg.themePreset || 'violet')}" style="${sessionSizeStyle}--s:${esc(chatPanel)};--tx:${esc(chatText)};--ac:${esc(chatAccent)};--chat-font-size:${Number(cfg.chatFontSize) || 13}px;--chat-font-family:${esc(chatFontFamily())}">
         <div class="fcm-chat-titlebar"><b>FCM-Chat</b><span></span><button class="fcm-chat-icon-action ${cfg.chatLayout === 'stacked' ? 'active' : ''}" data-layout title="${TH('chatToggleLayout')}">${cfg.chatLayout === 'stacked' ? SPLIT_ICON : MERGE_ICON}<i>${cfg.chatLayout === 'stacked' ? TH('chatLayoutSplit') : TH('chatLayoutMerged')}</i></button><button class="fcm-chat-icon-action ${maximized ? 'active' : ''}" data-max title="${TH('chatToggleMax')}">${MAXIMIZE_ICON}<i>${maximized ? TH('chatRestore') : TH('chatMaximize')}</i></button><button class="fcm-chat-icon-action" data-min title="${TH('chatMinimize')}">—</button><button class="fcm-chat-icon-action" data-close title="${TH('chatClose')}">×</button></div>
-        <div class="fcm-chat-body view-${esc(activeView)} ${cfg.chatLayout === 'stacked' ? 'stacked' : ''} ${activeView === 'profile' || activeView === 'settings' ? 'wide-view' : ''}">
+        <div class="fcm-chat-body view-${esc(activeView)} ${cfg.chatLayout === 'stacked' ? 'stacked' : ''} ${activeView === 'profile' || activeView === 'settings' ? 'wide-view' : ''} ${forwardTargetMode ? 'forward-target-mode' : ''}">
             <nav class="fcm-chat-rail">
                 <button class="fcm-chat-rail-button fcm-chat-self ${activeView === 'profile' ? 'active' : ''}" data-view="profile" title="${TH('chatProfileTab')}">${avatarHtml(Player?.MemberNumber || 0, 34, 'toolbar')}</button>
                 <button class="fcm-chat-rail-button ${activeView === 'notifications' ? 'active' : ''}" data-view="notifications" title="${TH('chatNotificationsTab')}">${NOTIFICATION_ICON}${unreadBadge()}</button>
@@ -853,11 +894,11 @@ function renderChat() {
                 <button class="fcm-chat-rail-button" data-status title="${TH('chatStatusTab')}"><i class="fcm-status-dot ${esc(cfg.chatStatus || 'online')}"></i></button>
                 <button class="fcm-chat-rail-button ${activeView === 'settings' ? 'active' : ''}" data-view="settings" title="${TH('chatSettingsTab')}">${SETTINGS_ICON}</button>
             </nav>
-            <aside class="fcm-chat-list ${stackedDetail ? 'slide-out' : ''}">${listHtml()}</aside>
-            <main class="fcm-chat-main ${stackedDetail ? 'slide-in' : ''}">${conversationHtml()}</main>
+            <aside class="fcm-chat-list ${stackedDetail && !forwardTargetMode ? 'slide-out' : ''}">${listHtml()}</aside>
+            <main class="fcm-chat-main ${stackedDetail && !forwardTargetMode ? 'slide-in' : ''}">${conversationHtml()}</main>
         </div>
         <div class="fcm-chat-status-menu"><button data-status-value="online"><i class="online"></i>${TH('chatStatusOnline')}</button><button data-status-value="busy"><i class="busy"></i>${TH('chatStatusBusy')}</button><button data-status-value="afk"><i class="afk"></i>${TH('chatStatusAFK')}</button></div>
-        <div class="fcm-chat-context-menu" hidden><button data-context-reply>${TH('chatReply')}</button><button data-context-select>${TH('chatSelectMessage')}</button><button data-context-copy>${TH('chatCopy')}</button><button data-context-cancel>${TH('chatCancel')}</button></div>
+        <div class="fcm-chat-context-menu" hidden><button data-context-select>${TH('chatSelectMessage')}</button><button data-context-copy>${TH('chatCopy')}</button><button data-context-multi>${TH('chatMultiSelect')}</button><button data-context-reply>${TH('chatReply')}</button><button data-context-cancel>${TH('chatCancel')}</button></div>
     </div>`;
     positionPanel();
     chatBalloons.syncVisibility();
@@ -931,6 +972,10 @@ function animatePanelSize(panel, before) {
 function bindMemberRows(scope = root) {
     scope?.querySelectorAll('[data-member]').forEach(button => button.addEventListener('click', async () => {
         selectedMember = Number(button.dataset.member);
+        multiSelectMode = false;
+        forwardTargetMode = false;
+        forwardListSnapshot = null;
+        selectedMessageIds.clear();
         replyTarget = null;
         contactCardOpen = false;
         justOpenedMember = selectedMember;
@@ -981,7 +1026,7 @@ function bindEvents() {
         syncConversationBackButton(main, stacked);
         if (beforeList && beforeMain) animateLayoutChange(list, main, beforeList, beforeMain, stacked, stackedDetail);
     });
-    root.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { activeView = button.dataset.view; stackedDetail = false; renderChat(); }));
+    root.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { activeView = button.dataset.view; forwardTargetMode = false; forwardListSnapshot = null; stackedDetail = false; renderChat(); }));
     root.querySelectorAll('[data-notification-tab]').forEach(button => button.addEventListener('click', () => { notificationTab = button.dataset.notificationTab; renderChat(); }));
     root.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => { selectedGroup = button.dataset.group; renderChat(); }));
     root.querySelector('[data-add-group]')?.addEventListener('click', async () => {
@@ -1015,6 +1060,12 @@ function bindEvents() {
         conversationUnread = 0;
         updateConversationUnreadNotice();
     });
+    root.querySelector('[data-multi-forward-contact]')?.addEventListener('click', showForwardTargetList);
+    bindForwardTargetRows();
+    root.querySelector('[data-multi-forward-room]')?.addEventListener('click', forwardSelectedToRoom);
+    root.querySelectorAll('[data-multi-export]').forEach(button => button.addEventListener('click', () => exportSelectedMessages(button.dataset.multiExport)));
+    root.querySelector('[data-multi-cancel]')?.addEventListener('click', exitMultiSelect);
+    if (multiSelectMode) updateMultiSelectUi();
     bindMessageActions();
     root.querySelector('[data-cancel-reply]')?.addEventListener('click', clearReplyTarget);
     root.querySelector('[data-input]')?.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendCurrentMessage(); } });
@@ -1339,16 +1390,159 @@ function selectMessageText(messageElement) {
     selection.addRange(range);
 }
 
+function selectedMessageRecords() {
+    return conversationMessages.filter(message => selectedMessageIds.has(String(message.id)));
+}
+
+function updateMultiSelectUi() {
+    const panel = root?.querySelector('#fcm-chat-panel');
+    panel?.querySelector('.fcm-chat-messages')?.classList.toggle('multi-selecting', multiSelectMode);
+    panel?.querySelectorAll('.fcm-chat-message').forEach(message => message.classList.toggle('multi-selected', selectedMessageIds.has(String(message.dataset.msgId))));
+    const actions = panel?.querySelector('.fcm-chat-actions');
+    const compose = panel?.querySelector('.fcm-chat-compose');
+    const multi = panel?.querySelector('[data-multi-actions]');
+    if (actions) actions.hidden = multiSelectMode;
+    if (compose) compose.hidden = multiSelectMode;
+    if (multi) multi.hidden = !multiSelectMode;
+    const count = multi?.querySelector('[data-multi-count]');
+    if (count) count.textContent = TH('chatSelectedCount', selectedMessageIds.size);
+    multi?.querySelectorAll('button:not([data-multi-cancel])').forEach(button => { button.disabled = !selectedMessageIds.size || (button.hasAttribute('data-multi-forward-room') && !ChatRoomData); });
+}
+
+function enterMultiSelect(messageElement) {
+    multiSelectMode = true;
+    if (messageElement?.dataset.msgId) selectedMessageIds.add(String(messageElement.dataset.msgId));
+    root?.querySelectorAll('.fcm-chat-message.selected').forEach(message => message.classList.remove('selected'));
+    updateMultiSelectUi();
+}
+
+function exitMultiSelect() {
+    closeForwardTargetList();
+    multiSelectMode = false;
+    selectedMessageIds.clear();
+    updateMultiSelectUi();
+}
+
+function forwardedMessageText(message) {
+    const sender = message.direction === 'out'
+        ? `${Player?.Nickname || Player?.Name || getDisplayName(Player?.MemberNumber)} (${Player?.MemberNumber})`
+        : `${getDisplayName(selectedMember)} (${selectedMember})`;
+    return `↪ ${sender} · ${new Date(message.timestamp).toLocaleString()}\n${cleanMessage(message.content)}`;
+}
+
+async function forwardSelectedTo(memberNumber) {
+    const target = Number(memberNumber);
+    const available = capability(target);
+    if (!target || (available === 'none' && !isFriendOf(target))) return;
+    const selected = selectedMessageRecords();
+    for (const [index, message] of selected.entries()) {
+        const content = forwardedMessageText(message);
+        if (available === 'none') {
+            const queued = OfflineQueue.add(target, content);
+            await recordMessage({ memberNumber: target, direction: 'out', channel: 'beep', content, queued: true, queueId: queued.id }, { notify: false });
+            if (index < selected.length - 1) await new Promise(resolve => setTimeout(resolve, 350));
+            continue;
+        }
+        suppressOutgoing++;
+        let sent = false;
+        try {
+            sent = available === 'whisper'
+                ? sendBcxAwareWhisper({ Type: 'Whisper', Target: target, Content: content })
+                : sendBcxAwareBeep({ MemberNumber: target, BeepType: '', Message: content });
+        } finally { suppressOutgoing--; }
+        if (sent) await recordMessage({ memberNumber: target, direction: 'out', channel: available, content }, { notify: false });
+        if (index < selected.length - 1) await new Promise(resolve => setTimeout(resolve, 350));
+    }
+    exitMultiSelect();
+}
+
+function showForwardTargetList() {
+    if (!selectedMessageIds.size) return;
+    const list = root?.querySelector('.fcm-chat-list');
+    if (!list || forwardTargetMode) return;
+    forwardListSnapshot = document.createDocumentFragment();
+    while (list.firstChild) forwardListSnapshot.appendChild(list.firstChild);
+    forwardTargetMode = true;
+    forwardTargetTab = 'room';
+    refreshForwardTargetList();
+    root.querySelector('.fcm-chat-body')?.classList.add('forward-target-mode');
+    list.classList.remove('slide-out');
+    root.querySelector('.fcm-chat-main')?.classList.remove('slide-in');
+}
+
+function closeForwardTargetList() {
+    if (!forwardTargetMode) return;
+    const list = root?.querySelector('.fcm-chat-list');
+    forwardTargetMode = false;
+    root?.querySelector('.fcm-chat-body')?.classList.remove('forward-target-mode');
+    if (list && forwardListSnapshot) {
+        list.replaceChildren(forwardListSnapshot);
+        if (stackedDetail) {
+            list.classList.add('slide-out');
+            root?.querySelector('.fcm-chat-main')?.classList.add('slide-in');
+        }
+    }
+    forwardListSnapshot = null;
+}
+
+function bindForwardTargetRows() {
+    root?.querySelector('[data-forward-cancel]')?.addEventListener('click', closeForwardTargetList);
+    root?.querySelectorAll('[data-forward-member]').forEach(button => button.addEventListener('click', () => forwardSelectedTo(button.dataset.forwardMember)));
+    root?.querySelectorAll('[data-forward-tab]').forEach(button => button.addEventListener('click', () => {
+        forwardTargetTab = button.dataset.forwardTab;
+        refreshForwardTargetList();
+    }));
+}
+
+function refreshForwardTargetList() {
+    const list = root?.querySelector('.fcm-chat-list');
+    if (!list || !forwardTargetMode) return;
+    list.innerHTML = forwardTargetsHtml();
+    hydrateChatAvatars();
+    bindForwardTargetRows();
+}
+
+async function forwardSelectedToRoom() {
+    if (!ChatRoomData || !selectedMessageIds.size) return;
+    const selected = selectedMessageRecords();
+    for (const [index, message] of selected.entries()) {
+        ServerSend('ChatRoomChat', { Type: 'Chat', Content: forwardedMessageText(message) });
+        if (index < selected.length - 1) await new Promise(resolve => setTimeout(resolve, 350));
+    }
+    exitMultiSelect();
+}
+
+function exportSelectedMessages(format) {
+    const selected = selectedMessageRecords();
+    if (!selected.length) return;
+    exportConversationFile(format, { memberNumber: selectedMember, messages: selected, getDisplayName, biography, avatarUrl, chatColors });
+}
+
 function bindMessageActions() {
     const log = root?.querySelector('.fcm-chat-messages');
     const menu = root?.querySelector('.fcm-chat-context-menu');
     if (!log || !menu) return;
     let target = null;
     const hide = () => { menu.hidden = true; target = null; };
+    const show = (message, clientX, clientY) => {
+        target = message;
+        menu.hidden = false;
+        const panelRect = root.querySelector('#fcm-chat-panel').getBoundingClientRect();
+        menu.style.left = `${Math.max(8, Math.min(clientX - panelRect.left, panelRect.width - menu.offsetWidth - 8))}px`;
+        menu.style.top = `${Math.max(8, Math.min(clientY - panelRect.top, panelRect.height - menu.offsetHeight - 8))}px`;
+    };
     if (closeContextMenuListener) document.removeEventListener('pointerdown', closeContextMenuListener, true);
     closeContextMenuListener = event => { if (!event.target.closest('.fcm-chat-context-menu')) hide(); };
     document.addEventListener('pointerdown', closeContextMenuListener, true);
     log.addEventListener('click', event => {
+        if (Date.now() < suppressMessageClickUntil) { event.preventDefault(); return; }
+        const multiMessage = event.target.closest('.fcm-chat-message');
+        if (multiSelectMode && multiMessage) {
+            const id = String(multiMessage.dataset.msgId);
+            if (selectedMessageIds.has(id)) selectedMessageIds.delete(id); else selectedMessageIds.add(id);
+            updateMultiSelectUi();
+            return;
+        }
         const profile = event.target.closest('[data-profile-member]');
         if (profile) { openSharedProfile(profile.dataset.profileMember); return; }
         const jump = event.target.closest('[data-reply-jump]');
@@ -1374,12 +1568,27 @@ function bindMessageActions() {
         const message = event.target.closest('.fcm-chat-message');
         if (!message) return;
         event.preventDefault();
-        target = message;
-        menu.hidden = false;
-        const panelRect = root.querySelector('#fcm-chat-panel').getBoundingClientRect();
-        menu.style.left = `${Math.max(8, Math.min(event.clientX - panelRect.left, panelRect.width - menu.offsetWidth - 8))}px`;
-        menu.style.top = `${Math.max(8, Math.min(event.clientY - panelRect.top, panelRect.height - menu.offsetHeight - 8))}px`;
+        show(message, event.clientX, event.clientY);
     });
+    if (typeof globalThis.CommonIsMobile === 'function' && globalThis.CommonIsMobile()) {
+        let holdTimer = 0;
+        let startX = 0;
+        let startY = 0;
+        log.addEventListener('pointerdown', event => {
+            const message = event.target.closest('.fcm-chat-message');
+            if (!message || event.button !== 0) return;
+            startX = event.clientX; startY = event.clientY;
+            holdTimer = window.setTimeout(() => {
+                suppressMessageClickUntil = Date.now() + 500;
+                navigator.vibrate?.(25);
+                show(message, startX, startY);
+            }, 550);
+        });
+        const cancelHold = () => { clearTimeout(holdTimer); holdTimer = 0; };
+        log.addEventListener('pointerup', cancelHold);
+        log.addEventListener('pointercancel', cancelHold);
+        log.addEventListener('pointermove', event => { if (Math.hypot(event.clientX - startX, event.clientY - startY) > 10) cancelHold(); });
+    }
     menu.querySelector('[data-context-reply]').onclick = () => { const message = target; hide(); replyToMessage(message); };
     menu.querySelector('[data-context-select]').onclick = () => { const message = target; hide(); selectMessageText(message); };
     menu.querySelector('[data-context-copy]').onclick = async () => {
@@ -1387,6 +1596,7 @@ function bindMessageActions() {
         hide();
         if (parts.length) await navigator.clipboard.writeText(parts.join('\n'));
     };
+    menu.querySelector('[data-context-multi]').onclick = () => { const message = target; hide(); enterMultiSelect(message); };
     menu.querySelector('[data-context-cancel]').onclick = hide;
 }
 
