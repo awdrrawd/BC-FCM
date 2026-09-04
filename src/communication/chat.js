@@ -48,6 +48,7 @@ import { createChatForwardTargetsController } from './chat/controllers/chat-forw
 import { createChatSelectedActions } from './chat/services/chat-selected-actions.js';
 import { createChatOwnProfileService } from './chat/services/chat-own-profile.js';
 import { createChatDialogs } from './chat/controllers/chat-dialogs.js';
+import { createChatRoomActions } from './chat/services/chat-room-actions.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -184,6 +185,11 @@ const ownProfile = createChatOwnProfileService({
     text: T, queueAccountUpdate: data => ServerAccountUpdate.QueueData(data), warn: warnLimited, onSaved: renderChat,
 });
 const chatDialogs = createChatDialogs({ colors: () => [cfg.panelColor, cfg.fontColor, cfg.accentColor], text: T, htmlText: TH });
+const roomActions = createChatRoomActions({
+    getMemberNumber: () => selectedMember, getRoom: () => ChatRoomData, getRoomCharacters: () => ChatRoomCharacter,
+    capability, confirm: chatDialogs.confirm, text: T, runWithoutOutgoingCapture, sendBeep: sendBcxAwareBeep,
+    recordMessage: (...args) => recordMessage(...args),
+});
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
 const chatBalloons = createChatBalloonController({
@@ -749,8 +755,8 @@ function bindConversationEvents() {
     main.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => exportConversationFile(button.dataset.export, {
         memberNumber: selectedMember, getDisplayName, biography, avatarUrl, chatColors,
     })));
-    main.querySelector('[data-invite]')?.addEventListener('click', inviteCurrent);
-    main.querySelector('[data-summon]')?.addEventListener('click', summonCurrent);
+    main.querySelector('[data-invite]')?.addEventListener('click', roomActions.inviteCurrent);
+    main.querySelector('[data-summon]')?.addEventListener('click', roomActions.summonCurrent);
     main.querySelector('[data-toggle-tools]')?.addEventListener('click', event => { event.stopPropagation(); event.currentTarget.closest('.fcm-chat-tools')?.classList.toggle('open'); });
     main.querySelectorAll('[data-join-room]').forEach(button => button.addEventListener('click', () => {
         if (button.dataset.joinRoom) showRoomJoinConfirm({ room: button.dataset.joinRoom });
@@ -906,26 +912,6 @@ async function deleteConversation() {
     messages = messages.filter(message => message.memberNumber !== selectedMember);
     conversation.reset();
     renderChat();
-}
-
-function inviteCurrent() {
-    if (!selectedMember || capability(selectedMember) !== 'beep' || !ChatRoomData?.Name) return;
-    const room = ChatRoomData;
-    const count = ChatRoomCharacter?.length ?? room.MemberCount ?? null;
-    const limit = room.MemberLimit ?? null;
-    const description = String(room.Description || '').trim();
-    const message = `|${room.Name}| - ${room.Creator || '?'} ＜${count ?? 0}/${limit ?? 0}＞${description ? `\n${description}` : ''}`;
-    const sent = runWithoutOutgoingCapture(() => sendBcxAwareBeep({ MemberNumber: selectedMember, BeepType: '', IsSecret: false, Message: message }));
-    if (!sent) return;
-    recordMessage({ memberNumber: selectedMember, direction: 'out', channel: 'beep', content: room.Name, roomName: room.Name }, { notify: false });
-}
-
-async function summonCurrent() {
-    if (!selectedMember || capability(selectedMember) !== 'beep' || !ChatRoomData?.Name) return;
-    if (!await chatDialogs.confirm(T('beepSummonTitle'), T('beepSummon'))) return;
-    const sent = runWithoutOutgoingCapture(() => sendBcxAwareBeep({ MemberNumber: selectedMember, BeepType: '', Message: 'summon', ChatRoomName: ChatRoomData.Name, ChatRoomSpace: ChatRoomData.Space }));
-    if (!sent) return;
-    recordMessage({ memberNumber: selectedMember, direction: 'out', channel: 'beep', content: 'summon', roomName: ChatRoomData.Name }, { notify: false });
 }
 
 async function handleOnlineFriendsUpdate(result) {
