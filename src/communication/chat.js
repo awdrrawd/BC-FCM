@@ -45,6 +45,7 @@ import { buildGroupDefinitions, filterContactRows, filterGroupRows, filterNotifi
 import { createProfileSuggestionController } from './chat/controllers/chat-profile-suggest.js';
 import { createChatReplyController } from './chat/controllers/chat-reply.js';
 import { createChatContactCardController } from './chat/controllers/chat-contact-card.js';
+import { createChatHistoryViewportController } from './chat/controllers/chat-history-viewport.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -54,7 +55,6 @@ import {
 let root = null;
 let selectedMember = null;
 let messages = [];
-let historyDateFrame = 0;
 const conversation = new ChatConversationController(50, 40);
 let search = '';
 let presenceFilter = 'online';
@@ -157,6 +157,11 @@ const contactCard = createChatContactCardController({
     createFaceSnapshot: (characterValue, size) => PDB._face(characterValue, size),
     saveSnapshot: (...args) => Snapshot.save(...args), loadAvatarFromBundle,
     addFriend: showAddFriendConfirm, displayName: getDisplayName, openProfile: openSharedProfile,
+});
+const historyViewport = createChatHistoryViewportController({
+    getRoot: () => root, getMemberNumber: () => selectedMember, conversation, store: ChatStore,
+    renderMessages: conversationMessagesHtml, bindImages: bindMessageImages, syncSelection: updateMultiSelectUi,
+    joinRoom: showRoomJoinConfirm, text: T,
 });
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
@@ -550,61 +555,15 @@ function appendConversationMessage(message) {
     if (shouldFollowLatest) {
         conversation.viewport.follow();
         conversation.unread = 0;
-        requestAnimationFrame(() => { conversation.viewport.scrollToLatest(log); updateConversationUnreadNotice(); });
+        requestAnimationFrame(() => { conversation.viewport.scrollToLatest(log); historyViewport.updateUnreadNotice(); });
     } else {
         conversation.unread++;
-        updateConversationUnreadNotice();
+        historyViewport.updateUnreadNotice();
     }
 }
 
 async function loadConversation(memberNumber) {
     await conversation.load(ChatStore, memberNumber, target => Number(selectedMember) === target);
-}
-
-async function loadOlderConversation(log) {
-    if (!selectedMember) return;
-    const oldHeight = log.scrollHeight;
-    const oldTop = log.scrollTop;
-    const loaded = await conversation.loadOlder(ChatStore, selectedMember, target => Number(selectedMember) === target);
-    if (loaded) {
-        log.innerHTML = conversationMessagesHtml(conversation.messages);
-        bindMessageImages(log, log);
-        updateMultiSelectUi();
-        log.querySelectorAll('[data-join-room]').forEach(button => button.addEventListener('click', () => {
-            if (button.dataset.joinRoom) showRoomJoinConfirm({ room: button.dataset.joinRoom });
-        }));
-        log.scrollTop = oldTop + (log.scrollHeight - oldHeight);
-        updateHistoryDateBubble(log);
-    }
-}
-
-function updateConversationUnreadNotice() {
-    const button = root?.querySelector('[data-new-messages]');
-    if (!button) return;
-    button.hidden = !conversation.unread;
-    button.textContent = T('chatNewUnread', conversation.unread);
-}
-
-function updateHistoryDateBubble(log) {
-    const bubble = root?.querySelector('[data-history-date]');
-    if (!log || !bubble) return;
-    cancelAnimationFrame(historyDateFrame);
-    historyDateFrame = requestAnimationFrame(() => {
-        const distanceFromLatest = log.scrollHeight - log.scrollTop - log.clientHeight;
-        if (distanceFromLatest <= 24) {
-            bubble.hidden = true;
-            return;
-        }
-        const logTop = log.getBoundingClientRect().top;
-        const current = [...log.querySelectorAll(':scope > .fcm-chat-message')].find(message => message.getBoundingClientRect().bottom > logTop + 4);
-        if (!current?.dataset.messageDate) {
-            bubble.hidden = true;
-            return;
-        }
-        const [year, month, day] = current.dataset.messageDate.split('-');
-        bubble.textContent = `${year}/${month}/${day}`;
-        bubble.hidden = false;
-    });
 }
 
 function refreshConversationRoomMeta() {
@@ -665,6 +624,7 @@ function refreshConversationPresence() {
 function renderChat() {
     if (!root) return;
     profileSuggestion.reset();
+    historyViewport.reset();
     const settingsScrollTop = activeView === 'settings' ? root.querySelector('.fcm-chat-list')?.scrollTop : null;
     const [chatPanel, chatText, chatAccent] = chatColors();
     const sessionSizeStyle = chatPanelSession.inlineSizeStyle();
@@ -766,20 +726,7 @@ function bindConversationEvents() {
     }));
     main.querySelector('[data-send]')?.addEventListener('click', sendCurrentMessage);
     const conversationLog = main.querySelector('.fcm-chat-messages');
-    conversationLog?.addEventListener('scroll', () => {
-        if (conversationLog.scrollTop < 80) loadOlderConversation(conversationLog);
-        if (conversation.viewport.updateFromScroll(conversationLog) && conversation.unread) {
-            conversation.unread = 0;
-            updateConversationUnreadNotice();
-        }
-        updateHistoryDateBubble(conversationLog);
-    });
-    main.querySelector('[data-new-messages]')?.addEventListener('click', () => {
-        conversation.viewport.follow();
-        conversation.viewport.scrollToLatest(conversationLog);
-        conversation.unread = 0;
-        updateConversationUnreadNotice();
-    });
+    historyViewport.bind(conversationLog, main.querySelector('[data-new-messages]'));
     main.querySelector('[data-multi-forward-contact]')?.addEventListener('click', showForwardTargetList);
     main.querySelector('[data-multi-forward-room]')?.addEventListener('click', forwardSelectedToRoom);
     main.querySelectorAll('[data-multi-export]').forEach(button => button.addEventListener('click', () => exportSelectedMessages(button.dataset.multiExport)));
@@ -828,6 +775,7 @@ function refreshConversationMain({ scrollToLatest = true } = {}) {
     const main = root?.querySelector('.fcm-chat-main');
     if (!main) return;
     profileSuggestion.reset();
+    historyViewport.reset();
     main.innerHTML = conversationHtml();
     bindConversationEvents();
     installDragScroll(main, '.fcm-chat-messages');
