@@ -26,6 +26,7 @@ import { bindForwardTargetEvents, forwardTargetsHtml as renderForwardTargetsHtml
 import { installMessageActions } from './chat-message-actions.js';
 import { bindChatSettingsEvents } from './chat-settings-events.js';
 import { bindChatProfileEvents } from './chat-profile-events.js';
+import { chatListHtml as renderChatListHtml, contactRowsHtml, groupsHtml as renderGroupsHtml, notificationsHtml as renderNotificationsHtml } from './chat-list-view.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     ALARM_MUTED_ICON, ALARM_ACTIVE_ICON, EXIT_ICON, DOWNLOAD_ICON,
@@ -463,27 +464,12 @@ function filteredContacts() {
 }
 
 function contactRows(rows, { history = false } = {}) {
-    return rows.map(row => {
-        const memberNumber = Number(row.memberNumber);
-        const direction = row.direction === 'out' ? T('chatSent') : T('chatReceived');
-        const subtitle = history ? `${direction}: ${cleanMessage(row.content)}` : biography(memberNumber);
-        return `<button class="fcm-chat-row ${selectedMember === memberNumber ? 'selected' : ''} ${justOpenedMember === memberNumber ? 'just-opened' : ''}" data-member="${memberNumber}">
-            ${avatarHtml(memberNumber)}
-            <span class="fcm-chat-row-meta"><b>${esc(getDisplayName(memberNumber))}</b><small>${esc(subtitle)}</small></span>
-            ${history || row.timestamp ? `<time>${row.timestamp ? new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</time>` : ''}
-            ${row.unread ? `<em>${row.unread}</em>` : ''}
-        </button>`;
-    }).join('');
+    return contactRowsHtml(rows, { history, selectedMember, justOpenedMember, avatarHtml, displayName: getDisplayName, biography, cleanMessage, esc, text: T });
 }
 
 function notificationsHtml() {
     const rows = filteredNotificationRows(notificationTab === 'recent' ? recentConversations() : historyMessages());
-    return `<div class="fcm-chat-search"><input data-notification-search value="${esc(notificationSearch)}" placeholder="${TH('chatSearchPlayers')}"></div>
-    <div class="fcm-chat-subtabs">
-        <button class="${notificationTab === 'recent' ? 'active' : ''}" data-notification-tab="recent">${TH('chatRecent')}</button>
-        <button class="${notificationTab === 'history' ? 'active' : ''}" data-notification-tab="history">${TH('chatHistory')}</button>
-    </div>
-    <div class="fcm-chat-scroll">${contactRows(rows, { history: true }) || `<div class="fcm-chat-empty">${TH('chatNoRecord')}</div>`}</div>`;
+    return renderNotificationsHtml({ rowsHtml: contactRows(rows, { history: true }), notificationTab, notificationSearch, esc, text: TH });
 }
 
 function groupDefinitions() {
@@ -503,10 +489,7 @@ function groupsHtml() {
     const definitions = groupDefinitions();
     const group = groupMode === 'room' ? definitions.room : (definitions.groups.find(item => item.id === selectedGroup) || definitions.groups[0]);
     const rows = filteredGroupRows(group);
-    return `<div class="fcm-chat-search"><input data-group-search value="${esc(groupSearch)}" placeholder="${TH('chatSearchPlayers')}"></div>
-        <div class="fcm-chat-subtabs"><button class="${groupMode === 'room' ? 'active' : ''}" data-group-mode="room">${TH('chatRoom')}</button><button class="${groupMode === 'groups' ? 'active' : ''}" data-group-mode="groups">${TH('chatGroupsTab')}</button></div>
-        ${groupMode === 'groups' ? `<div class="fcm-chat-group-tabs"><button class="fcm-chat-group-add" data-add-group>＋</button>${definitions.groups.map(item => `<button class="${item.id === group.id ? 'active' : ''}" data-group="${item.id}">${esc(item.label)}</button>`).join('')}</div>` : ''}
-        <div class="fcm-chat-scroll">${contactRows(rows) || `<div class="fcm-chat-empty">${TH('chatGroupEmpty')}</div>`}</div>`;
+    return renderGroupsHtml({ definitions, group, rowsHtml: contactRows(rows), groupMode, groupSearch, esc, text: TH });
 }
 
 function settingsHtml() {
@@ -541,10 +524,7 @@ function profileHtml() {
 }
 
 function chatListHtml() {
-    return `<div class="fcm-chat-search"><input data-search value="${esc(search)}" placeholder="${TH('chatSearchPlayers')}"></div>
-        <div class="fcm-chat-subtabs"><button class="${presenceFilter === 'online' ? 'active' : ''}" data-presence="online">${TH('chatPresenceOnline')}</button><button class="${presenceFilter === 'offline' ? 'active' : ''}" data-presence="offline">${TH('chatPresenceOffline')}</button></div>
-        <div class="fcm-chat-tags"><button class="${relationFilter === 'owner' ? 'active' : ''}" data-rel="owner">${TH('chatRelOwnerLover')}</button><button class="${relationFilter === 'sub' ? 'active' : ''}" data-rel="sub">${TH('chatRelSub')}</button><button class="${relationFilter === 'follow' ? 'active' : ''}" data-rel="follow">${TH('chatRelFollow')}</button></div>
-        <div class="fcm-chat-scroll">${contactRows(filteredContacts()) || `<div class="fcm-chat-empty">${TH('chatEmptyCategory')}</div>`}</div>`;
+    return renderChatListHtml({ rowsHtml: contactRows(filteredContacts()), search, presenceFilter, relationFilter, esc, text: TH });
 }
 
 function forwardTargetsHtml() {
