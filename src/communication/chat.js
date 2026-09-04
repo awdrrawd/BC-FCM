@@ -40,6 +40,7 @@ import { createOfflineDeliveryService } from './chat/services/chat-offline-deliv
 import { createChatSender } from './chat/services/chat-sender.js';
 import { createChatMessageRecorder } from './chat/services/chat-message-recorder.js';
 import { createChatPresenceService } from './chat/services/chat-presence.js';
+import { createChatRoomStateService } from './chat/services/chat-room-state.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -134,6 +135,10 @@ const presence = createChatPresenceService({
     config: cfg, saveConfig: saveCfg, getPlayer: () => Player,
     syncSharedSettings: () => globalThis.ServerPlayerOnlineSharedSettingsSync?.(),
     onError: error => warnLimited('chat presence sync failed', error),
+});
+const roomState = createChatRoomStateService({
+    getRoomInfo, inRoom: inRoomFn, isFriend: isFriendOf, isOnline,
+    getCurrentRoom: () => ChatRoomData, text: T,
 });
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
@@ -423,32 +428,10 @@ function listHtml() {
     return chatListHtml();
 }
 
-function conversationRoomState(memberNumber) {
-    const roomInfo = getRoomInfo(memberNumber);
-    const sameRoom = inRoomFn(Number(memberNumber));
-    const friend = isFriendOf(memberNumber);
-    const privateRoom = friend && !!roomInfo?.isPrivate && !roomInfo?.isCurrent;
-    const roomText = sameRoom
-        ? (roomInfo?.name || ChatRoomData?.Name || T('chatMainHall'))
-        : !friend
-            ? T('chatNotFriend')
-            : privateRoom
-                ? T('roomPrivateLabel')
-                : roomInfo?.name || (isOnline(memberNumber) ? T('chatMainHall') : T('chatOffline'));
-    return {
-        roomInfo,
-        roomText,
-        friend,
-        sameRoom,
-        unavailable: !sameRoom && !friend,
-        canOpenRoom: friend && !!roomInfo?.name && !privateRoom,
-    };
-}
-
 function conversationHtml() {
     if (!selectedMember) return renderConversationHtml({ memberNumber: null });
     const available = capability(selectedMember);
-    const { roomInfo, roomText: baseRoomText, canOpenRoom, unavailable } = conversationRoomState(selectedMember);
+    const { roomInfo, roomText: baseRoomText, canOpenRoom, unavailable } = roomState.get(selectedMember);
     const cachedRoom = roomInfo?.name ? getCachedRoomInfo(roomInfo.name) : null;
     const memberCount = roomInfo?.isCurrent ? (ChatRoomCharacter?.length ?? null) : (roomInfo?.memberCount ?? cachedRoom?.MemberCount ?? null);
     const memberLimit = roomInfo?.isCurrent ? (ChatRoomData?.MemberLimit ?? null) : (roomInfo?.memberLimit ?? cachedRoom?.MemberLimit ?? null);
@@ -627,7 +610,7 @@ function updateHistoryDateBubble(log) {
 
 function refreshConversationRoomMeta() {
     if (!selectedMember) return;
-    const { roomInfo, canOpenRoom } = conversationRoomState(selectedMember);
+    const { roomInfo, canOpenRoom } = roomState.get(selectedMember);
     if (!canOpenRoom || roomInfo.isCurrent || roomInfo.isPrivate) return;
     const friend = onlineFriends.find(item => Number(item.MemberNumber) === selectedMember);
     queryRoomInfo(roomInfo.name, friend?.ChatRoomSpace, data => {
@@ -644,7 +627,7 @@ function refreshConversationRoomMeta() {
 function refreshConversationPresence() {
     if (!selectedMember) return;
     const available = capability(selectedMember);
-    const { roomInfo, roomText, canOpenRoom, unavailable } = conversationRoomState(selectedMember);
+    const { roomInfo, roomText, canOpenRoom, unavailable } = roomState.get(selectedMember);
     const meta = root?.querySelector(`[data-room-meta="${selectedMember}"]`);
     if (meta) {
         meta.textContent = roomText;
