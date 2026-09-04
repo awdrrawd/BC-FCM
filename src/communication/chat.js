@@ -5,7 +5,6 @@ import { PDB, _pc, Snapshot, loadAvatarFromBundle, syncRoomAvatar } from '../dat
 import { ChatStore, OfflineQueue } from './chat/data/chat-store.js';
 import { T, TH } from '../i18n/i18n.js';
 import { chatFontFamily } from './chat-font.js';
-import { profileHtml as renderProfileHtml } from './chat/views/chat-profile-view.js';
 import { chatPanelSession } from './chat/controllers/chat-panel-session.js';
 import { installDragScroll } from '../ui/drag-scroll.js';
 import { themeColors } from '../core/themes.js';
@@ -13,16 +12,14 @@ import { showAddFriendConfirm, showRoomJoinConfirm, showIncomingRoomInvite } fro
 import { canSendBcxWhisper, sendBcxAwareBeep, sendBcxAwareWhisper } from './bcx-compat.js';
 import { injectChatStyles } from './chat/views/chat-styles.js';
 import { warnLimited } from '../core/logger.js';
-import { balloonPreviewText, cleanMessage, esc } from './chat/services/chat-content.js';
+import { balloonPreviewText, cleanMessage } from './chat/services/chat-content.js';
 import { exportConversation as exportConversationFile } from './chat/services/chat-export.js';
 import { initChatAudio, playNotificationSound } from './chat-audio.js';
 import { resetBalloonInteraction } from './chat/controllers/chat-drag.js';
 import { createChatBalloonController } from './chat/controllers/chat-balloon.js';
 import { updateMultiSelectUi as syncMultiSelectUi } from './chat/views/chat-selection-view.js';
-import { installMessageActions } from './chat/events/chat-message-actions.js';
 import { bindChatSettingsEvents } from './chat/events/chat-settings-events.js';
 import { bindChatProfileEvents } from './chat/events/chat-profile-events.js';
-import { settingsHtml as renderSettingsHtml } from './chat/views/chat-settings-view.js';
 import { conversationMessagesHtml } from './chat/views/chat-message-view.js';
 import { normalizeMessage as normalizeTransportMessage } from './chat/services/chat-transport.js';
 import { ChatConversationController } from './chat/controllers/chat-conversation-controller.js';
@@ -62,7 +59,9 @@ import { createChatShellEvents } from './chat/controllers/chat-shell-events.js';
 import { createChatRenderer } from './chat/controllers/chat-renderer.js';
 import { createChatLifecycle } from './chat/controllers/chat-lifecycle.js';
 import { createChatRuntime } from './chat/controllers/chat-runtime.js';
-import { EDIT_ICON, WATER_ICON } from '../ui/icons.js';
+import { createChatMessageActionsController } from './chat/controllers/chat-message-actions-controller.js';
+import { createChatSidebarView } from './chat/views/chat-sidebar-view.js';
+import { WATER_ICON } from '../ui/icons.js';
 
 let root = null;
 let selectedMember = null;
@@ -72,7 +71,6 @@ let activeView = 'chat';
 let maximized = false;
 let stackedDetail = false;
 let suppressOutgoing = 0;
-let cleanupMessageActions = null;
 const remoteProfiles = new Map();
 
 function resetMessageSelectionState() {
@@ -179,6 +177,11 @@ const messageSelection = createChatMessageSelectionController({
     canForwardToRoom: () => !!ChatRoomData, renderUi: syncMultiSelectUi,
     selectedCountText: count => TH('chatSelectedCount', count), onExit: forwardTargets.close,
 });
+const messageActions = createChatMessageActionsController({
+    getRoot: () => root, messageSelection, openProfile: profileViewer.open,
+    replyToMessage: replyController.select,
+    isMobile: () => typeof globalThis.CommonIsMobile === 'function' && globalThis.CommonIsMobile(),
+});
 const conversationPresenter = createChatConversationPresenter({
     getMemberNumber: () => selectedMember, getConfig: () => cfg, getRoom: () => ChatRoomData,
     getRoomCharacters: () => ChatRoomCharacter, getCachedRoomInfo, capability, roomState,
@@ -253,8 +256,12 @@ const listPresenter = createChatListPresenter({
     avatarHtml, displayName: getDisplayName, biography, cleanMessage, isOnline, isFavorite: isFav,
     getRelations: getAllRels, text: T, htmlText: TH,
 });
+const sidebarView = createChatSidebarView({
+    getActiveView: () => activeView, getPlayer: () => Player, getConfig: () => cfg,
+    text: T, htmlText: TH, avatarHtml, forwardTargets, listPresenter,
+});
 const chatList = createChatListController({
-    getRoot: () => root, renderListHtml: listHtml, renderVisibleScrollHtml: listPresenter.visibleScrollHtml,
+    getRoot: () => root, renderListHtml: sidebarView.html, renderVisibleScrollHtml: listPresenter.visibleScrollHtml,
     isForwardTargetsActive: forwardTargets.isActive, bindForwardTargets: forwardTargets.bind,
     bindListEvents: listNavigation.bind, bindMemberRows: memberSelection.bind, hydrateAvatars: hydrateChatAvatars, installDragScroll,
 });
@@ -289,7 +296,7 @@ const panelControls = createChatPanelControls({
 const conversationEvents = createChatConversationEvents({
     getRoot: () => root, getMemberNumber: () => selectedMember, config: cfg, saveConfig: saveCfg,
     closeStackedDetail: panelControls.closeStackedDetail, composer, historyViewport, forwardTargets,
-    selectedActions, messageSelection, bindMessageActions, replyController, profileSuggestion,
+    selectedActions, messageSelection, bindMessageActions: messageActions.bind, replyController, profileSuggestion,
     conversationActions, roomActions, showRoomJoin: showRoomJoinConfirm, getCachedRoomInfo, contactCard,
     promptGroupName: chatDialogs.promptGroupName, createGroup: listNavigation.createGroup, rerender: renderChat,
 });
@@ -305,7 +312,7 @@ const chatRenderer = createChatRenderer({
     getStackedDetail: () => stackedDetail, getConfig: () => cfg, getPlayer: () => Player,
     colors: chatColors, fontFamily: chatFontFamily, panelSession: chatPanelSession,
     profileSuggestion, historyViewport, forwardTargets, avatarHtml, unreadBadgeHtml: unreadBadge,
-    listHtml, conversationHtml: conversationPresenter.html, shellHtml: chatShellHtml,
+    listHtml: sidebarView.html, conversationHtml: conversationPresenter.html, shellHtml: chatShellHtml,
     bindShellEvents: shellEvents.bind, bindConversationEvents: conversationEvents.bind, installDragScroll,
     conversationPresence, hydrateAvatars: hydrateChatAvatars, messageImages, conversation,
     syncBalloonVisibility: chatBalloons.syncVisibility, text: TH,
@@ -316,7 +323,7 @@ const chatLifecycle = createChatLifecycle({
     getPlayerMemberNumber: () => Player?.MemberNumber, setActiveView: value => { activeView = value; },
     setStackedDetail: value => { stackedDetail = value; }, resetSelection: resetMessageSelectionState,
     clearReply: replyController.clear, closeContactCard: contactCard.close,
-    cleanupMessageActions: () => { cleanupMessageActions?.(); cleanupMessageActions = null; },
+    cleanupMessageActions: messageActions.destroy,
     requestOnlineFriends, chatStore: ChatStore, setMessageIndex: value => { messages = value; }, loadConversation,
     refreshBadges: chatBalloons.refreshBadges, render: chatRenderer.render,
     syncBalloonVisibility: chatBalloons.syncVisibility, ensureBalloons: chatBalloons.ensure,
@@ -365,21 +372,6 @@ function closeChat() {
     chatLifecycle.close();
 }
 
-function settingsHtml() {
-    return renderSettingsHtml();
-}
-
-function profileHtml() {
-    return renderProfileHtml({ Player, cfg, T, TH, esc, avatarHtml, editIcon: EDIT_ICON });
-}
-
-function listHtml() {
-    if (forwardTargets.isActive()) return forwardTargets.html();
-    if (activeView === 'profile') return profileHtml();
-    if (activeView === 'settings') return settingsHtml();
-    return listPresenter.viewHtml() || '';
-}
-
 async function loadConversation(memberNumber) {
     await conversation.load(ChatStore, memberNumber, target => Number(selectedMember) === target);
 }
@@ -390,24 +382,6 @@ function renderChat() {
 
 function refreshConversationMain({ scrollToLatest = true } = {}) {
     chatRenderer.refreshConversation({ scrollToLatest });
-}
-
-function bindMessageActions() {
-    const log = root?.querySelector('.fcm-chat-messages');
-    const menu = root?.querySelector('.fcm-chat-context-menu');
-    cleanupMessageActions?.();
-    cleanupMessageActions = installMessageActions({
-        root,
-        log,
-        menu,
-        isMultiSelectActive: messageSelection.isActive,
-        selectedIds: messageSelection.ids,
-        updateMultiSelectUi: messageSelection.updateUi,
-        openProfile: profileViewer.open,
-        replyToMessage: replyController.select,
-        enterMultiSelect: messageSelection.enter,
-        isMobile: () => typeof globalThis.CommonIsMobile === 'function' && globalThis.CommonIsMobile(),
-    });
 }
 
 async function handleOnlineFriendsUpdate(result) {
