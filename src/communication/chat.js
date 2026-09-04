@@ -698,6 +698,21 @@ function refreshVisibleChatScroll() {
     hydrateChatAvatars();
 }
 
+function refreshChatList({ preserveScroll = false } = {}) {
+    const list = root?.querySelector('.fcm-chat-list');
+    if (!list) return;
+    const scrollTop = preserveScroll ? list.querySelector('.fcm-chat-scroll')?.scrollTop || 0 : 0;
+    list.innerHTML = listHtml();
+    if (forwardTargetMode) bindForwardTargetRows();
+    else bindChatListEvents(list);
+    hydrateChatAvatars();
+    installDragScroll(list, '.fcm-chat-scroll');
+    if (preserveScroll) {
+        const scroll = list.querySelector('.fcm-chat-scroll');
+        if (scroll) scroll.scrollTop = scrollTop;
+    }
+}
+
 function bindMessageImages(scope, log) {
     scope?.querySelectorAll?.('.fcm-chat-image').forEach(image => {
         image.addEventListener('load', () => {
@@ -983,18 +998,18 @@ function bindMemberRows(scope = root) {
 }
 
 function bindChatListEvents(scope = root) {
-    scope?.querySelectorAll('[data-notification-tab]').forEach(button => button.addEventListener('click', () => { notificationTab = button.dataset.notificationTab; renderChat(); }));
-    scope?.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => { selectedGroup = button.dataset.group; renderChat(); }));
+    scope?.querySelectorAll('[data-notification-tab]').forEach(button => button.addEventListener('click', () => { notificationTab = button.dataset.notificationTab; refreshChatList(); }));
+    scope?.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => { selectedGroup = button.dataset.group; refreshChatList(); }));
     scope?.querySelector('[data-add-group]')?.addEventListener('click', async () => {
         const label = await showGroupNameDialog(); if (!label) return;
-        const id = `group-${Date.now().toString(36)}`; cfg.chatGroups ||= {}; cfg.chatGroups[id] = label; selectedGroup = id; saveCfg(); renderChat();
+        const id = `group-${Date.now().toString(36)}`; cfg.chatGroups ||= {}; cfg.chatGroups[id] = label; selectedGroup = id; saveCfg(); refreshChatList();
     });
-    scope?.querySelectorAll('[data-group-mode]').forEach(button => button.addEventListener('click', () => { groupMode = button.dataset.groupMode; renderChat(); }));
+    scope?.querySelectorAll('[data-group-mode]').forEach(button => button.addEventListener('click', () => { groupMode = button.dataset.groupMode; refreshChatList(); }));
     scope?.querySelector('[data-group-search]')?.addEventListener('input', event => { groupSearch = event.target.value; refreshVisibleChatScroll(); });
     scope?.querySelector('[data-notification-search]')?.addEventListener('input', event => { notificationSearch = event.target.value; refreshVisibleChatScroll(); });
     scope?.querySelector('[data-search]')?.addEventListener('input', event => { search = event.target.value; refreshVisibleChatScroll(); });
-    scope?.querySelectorAll('[data-presence]').forEach(button => button.addEventListener('click', () => { presenceFilter = button.dataset.presence; renderChat(); }));
-    scope?.querySelectorAll('[data-rel]').forEach(button => button.addEventListener('click', () => { relationFilter = relationFilter === button.dataset.rel ? '' : button.dataset.rel; renderChat(); }));
+    scope?.querySelectorAll('[data-presence]').forEach(button => button.addEventListener('click', () => { presenceFilter = button.dataset.presence; refreshChatList(); }));
+    scope?.querySelectorAll('[data-rel]').forEach(button => button.addEventListener('click', () => { relationFilter = relationFilter === button.dataset.rel ? '' : button.dataset.rel; refreshChatList({ preserveScroll: true }); }));
     bindMemberRows(scope);
 }
 
@@ -1444,10 +1459,7 @@ function closeForwardTargetList() {
     forwardTargetMode = false;
     root?.querySelector('.fcm-chat-body')?.classList.remove('forward-target-mode');
     if (list) {
-        list.innerHTML = listHtml();
-        bindChatListEvents(list);
-        hydrateChatAvatars();
-        installDragScroll(list, '.fcm-chat-scroll');
+        refreshChatList();
         if (stackedDetail) {
             list.classList.add('slide-out');
             root?.querySelector('.fcm-chat-main')?.classList.add('slide-in');
