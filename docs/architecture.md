@@ -7,8 +7,8 @@
 ## 啟動與公開邊界
 
 - `main.js`：防止重複載入並建立 `window.Liko.FCM`。
-- `app.js`：組合面板、FCM CHAT 與公開 API。
-- `api/public-api.js`：穩定的頭像與 Profiles 整合介面；資料庫、HTML 和封包細節不對外暴露。
+- `app.js`：組合面板與 FCM CHAT，並直接公開兩者的開關。
+- `api/public-api.js`：建立穩定的頭像與 Profiles 整合介面。它與 `app.js` 共同組成 `window.Liko.FCM`；資料庫、HTML、封包與氣球互動細節不對外暴露。
 
 ## 模組邊界
 
