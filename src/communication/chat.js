@@ -54,6 +54,8 @@ import { createChatConversationPresenter } from './chat/views/chat-conversation-
 import { createChatConversationPresence } from './chat/controllers/chat-conversation-presence.js';
 import { createChatMessageAppender } from './chat/controllers/chat-message-appender.js';
 import { createChatListController } from './chat/controllers/chat-list-controller.js';
+import { createChatListNavigation } from './chat/controllers/chat-list-navigation.js';
+import { createChatMemberSelection } from './chat/controllers/chat-member-selection.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -64,19 +66,10 @@ let root = null;
 let selectedMember = null;
 let messages = [];
 const conversation = new ChatConversationController(50, 40);
-let search = '';
-let presenceFilter = 'online';
-let relationFilter = '';
 let activeView = 'chat';
-let notificationTab = 'recent';
-let notificationSearch = '';
-let selectedGroup = 'room';
-let groupMode = 'room';
-let groupSearch = '';
 let maximized = false;
 let stackedDetail = false;
 let suppressOutgoing = 0;
-let justOpenedMember = null;
 let bcxNoticeTimer = 0;
 let cleanupMessageActions = null;
 const remoteProfiles = new Map();
@@ -238,18 +231,31 @@ const transportHandler = createChatTransportHandler({
     showRoomInvite: showIncomingRoomInvite, htmlText: TH, warn: warnLimited,
     isEnabled: () => cfg.communicationEnabled, isOutgoingSuppressed: () => suppressOutgoing > 0,
 });
+const memberSelection = createChatMemberSelection({
+    getRoot: () => root, getMemberNumber: () => selectedMember, setMemberNumber: value => { selectedMember = value; },
+    resetSelection: resetMessageSelectionState, clearReply: replyController.clear, closeContactCard: contactCard.close,
+    setStackedDetail: value => { stackedDetail = value; }, chatStore: ChatStore,
+    setMessageIndex: value => { messages = value; }, loadConversation,
+    refreshBadges: () => chatBalloons.refreshBadges(), getLayout: () => cfg.chatLayout,
+    refreshConversation: refreshConversationMain, unreadCount: () => listPresenter.unreadCount(),
+});
+const listNavigation = createChatListNavigation({
+    config: cfg, saveConfig: saveCfg, promptGroupName: chatDialogs.promptGroupName,
+    refreshList: options => chatList.refresh(options), refreshVisible: () => chatList.refreshVisible(),
+    bindMemberRows: memberSelection.bind,
+});
 const listPresenter = createChatListPresenter({
     getMessages: () => messages, getFriendRows: buildFriendList, getPlayerMemberNumber: () => Player?.MemberNumber,
-    getSelectedMember: () => selectedMember, getJustOpenedMember: () => justOpenedMember,
+    getSelectedMember: () => selectedMember, getJustOpenedMember: memberSelection.getJustOpenedMember,
     getRoomCharacters: () => ChatRoomCharacter, getConfig: () => cfg,
-    getState: () => ({ activeView, notificationTab, notificationSearch, presenceFilter, relationFilter, search, selectedGroup, groupMode, groupSearch }),
+    getState: () => ({ activeView, ...listNavigation.getState() }),
     avatarHtml, displayName: getDisplayName, biography, cleanMessage, isOnline, isFavorite: isFav,
     getRelations: getAllRels, text: T, htmlText: TH,
 });
 const chatList = createChatListController({
     getRoot: () => root, renderListHtml: listHtml, renderVisibleScrollHtml: listPresenter.visibleScrollHtml,
     isForwardTargetsActive: forwardTargets.isActive, bindForwardTargets: forwardTargets.bind,
-    bindListEvents: bindChatListEvents, bindMemberRows, hydrateAvatars: hydrateChatAvatars, installDragScroll,
+    bindListEvents: listNavigation.bind, bindMemberRows: memberSelection.bind, hydrateAvatars: hydrateChatAvatars, installDragScroll,
 });
 const handleIncomingBeep = transportHandler.incomingBeep;
 const handleIncomingWhisper = transportHandler.incomingWhisper;
@@ -445,50 +451,6 @@ function renderChat() {
     requestAnimationFrame(() => { const bio = root?.querySelector('.fcm-chat-bio'); if (bio) bio.classList.toggle('marquee', bio.scrollWidth > bio.clientWidth); });
 }
 
-function bindMemberRows(scope = root) {
-    scope?.querySelectorAll('[data-member]').forEach(button => button.addEventListener('click', async () => {
-        selectedMember = Number(button.dataset.member);
-        resetMessageSelectionState();
-        replyController.clear({ focus: false });
-        contactCard.close();
-        justOpenedMember = selectedMember;
-        stackedDetail = true;
-        await ChatStore.markRead(selectedMember);
-        messages = await ChatStore.recentIndex();
-        await loadConversation(selectedMember);
-        chatBalloons.refreshBadges();
-        root?.querySelectorAll('[data-member]').forEach(row => row.classList.toggle('selected', Number(row.dataset.member) === selectedMember));
-        const list = root?.querySelector('.fcm-chat-list');
-        const main = root?.querySelector('.fcm-chat-main');
-        list?.classList.toggle('slide-out', cfg.chatLayout === 'stacked');
-        main?.classList.toggle('slide-in', cfg.chatLayout === 'stacked');
-        refreshConversationMain();
-        const unread = root?.querySelector('[data-view="notifications"] .fcm-chat-unread');
-        const count = listPresenter.unreadCount();
-        if (unread) {
-            unread.textContent = Math.min(count, 99);
-            unread.classList.toggle('hidden', !count);
-        }
-        setTimeout(() => { justOpenedMember = null; }, 350);
-    }));
-}
-
-function bindChatListEvents(scope = root) {
-    scope?.querySelectorAll('[data-notification-tab]').forEach(button => button.addEventListener('click', () => { notificationTab = button.dataset.notificationTab; chatList.refresh(); }));
-    scope?.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => { selectedGroup = button.dataset.group; chatList.refresh(); }));
-    scope?.querySelector('[data-add-group]')?.addEventListener('click', async () => {
-        const label = await chatDialogs.promptGroupName(); if (!label) return;
-        const id = `group-${Date.now().toString(36)}`; cfg.chatGroups ||= {}; cfg.chatGroups[id] = label; selectedGroup = id; saveCfg(); chatList.refresh();
-    });
-    scope?.querySelectorAll('[data-group-mode]').forEach(button => button.addEventListener('click', () => { groupMode = button.dataset.groupMode; chatList.refresh(); }));
-    scope?.querySelector('[data-group-search]')?.addEventListener('input', event => { groupSearch = event.target.value; chatList.refreshVisible(); });
-    scope?.querySelector('[data-notification-search]')?.addEventListener('input', event => { notificationSearch = event.target.value; chatList.refreshVisible(); });
-    scope?.querySelector('[data-search]')?.addEventListener('input', event => { search = event.target.value; chatList.refreshVisible(); });
-    scope?.querySelectorAll('[data-presence]').forEach(button => button.addEventListener('click', () => { presenceFilter = button.dataset.presence; chatList.refresh(); }));
-    scope?.querySelectorAll('[data-rel]').forEach(button => button.addEventListener('click', () => { relationFilter = relationFilter === button.dataset.rel ? '' : button.dataset.rel; chatList.refresh({ preserveScroll: true }); }));
-    bindMemberRows(scope);
-}
-
 function bindConversationEvents() {
     const main = root?.querySelector('.fcm-chat-main');
     if (!main) return;
@@ -538,7 +500,8 @@ function bindConversationEvents() {
     }));
     main.querySelector('[data-create-group-from-chat]')?.addEventListener('click', async () => {
         const label = await chatDialogs.promptGroupName(); if (!label) return;
-        const id = `group-${Date.now().toString(36)}`; cfg.chatGroups ||= {}; cfg.chatGroups[id] = label; selectedGroup = id; groupMode = 'groups'; saveCfg(); renderChat();
+        listNavigation.createGroup(label, 'groups');
+        renderChat();
     });
 }
 
@@ -607,7 +570,7 @@ function bindEvents() {
         if (beforeList && beforeMain) animateLayoutChange(list, main, beforeList, beforeMain, stacked, stackedDetail);
     });
     root.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { activeView = button.dataset.view; resetMessageSelectionState(); stackedDetail = false; renderChat(); }));
-    bindChatListEvents();
+    listNavigation.bind(root);
     bindConversationEvents();
     forwardTargets.bind();
     panel.addEventListener('click', event => {
