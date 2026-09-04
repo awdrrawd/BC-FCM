@@ -989,10 +989,21 @@ function bindMemberRows(scope = root) {
         channel = inRoomFn(selectedMember) ? 'whisper' : 'beep';
         stackedDetail = true;
         await ChatStore.markRead(selectedMember);
-    messages = await ChatStore.recentIndex();
+        messages = await ChatStore.recentIndex();
         await loadConversation(selectedMember);
         chatBalloons.refreshBadges();
-        renderChat();
+        root?.querySelectorAll('[data-member]').forEach(row => row.classList.toggle('selected', Number(row.dataset.member) === selectedMember));
+        const list = root?.querySelector('.fcm-chat-list');
+        const main = root?.querySelector('.fcm-chat-main');
+        list?.classList.toggle('slide-out', cfg.chatLayout === 'stacked');
+        main?.classList.toggle('slide-in', cfg.chatLayout === 'stacked');
+        refreshConversationMain();
+        const unread = root?.querySelector('[data-view="notifications"] .fcm-chat-unread');
+        const count = unreadCount();
+        if (unread) {
+            unread.textContent = Math.min(count, 99);
+            unread.classList.toggle('hidden', !count);
+        }
         setTimeout(() => { justOpenedMember = null; }, 350);
     }));
 }
@@ -1011,6 +1022,99 @@ function bindChatListEvents(scope = root) {
     scope?.querySelectorAll('[data-presence]').forEach(button => button.addEventListener('click', () => { presenceFilter = button.dataset.presence; refreshChatList(); }));
     scope?.querySelectorAll('[data-rel]').forEach(button => button.addEventListener('click', () => { relationFilter = relationFilter === button.dataset.rel ? '' : button.dataset.rel; refreshChatList({ preserveScroll: true }); }));
     bindMemberRows(scope);
+}
+
+function bindConversationEvents() {
+    const main = root?.querySelector('.fcm-chat-main');
+    if (!main) return;
+    main.querySelector('[data-back]')?.addEventListener('click', () => {
+        stackedDetail = false;
+        root.querySelector('.fcm-chat-list')?.classList.remove('slide-out');
+        main.classList.remove('slide-in');
+    });
+    main.querySelectorAll('[data-channel]').forEach(button => button.addEventListener('click', () => {
+        if (!button.disabled) {
+            channel = button.dataset.channel;
+            refreshConversationPresence();
+        }
+    }));
+    main.querySelector('[data-send]')?.addEventListener('click', sendCurrentMessage);
+    const conversationLog = main.querySelector('.fcm-chat-messages');
+    conversationLog?.addEventListener('scroll', () => {
+        if (conversationLog.scrollTop < 80) loadOlderConversation(conversationLog);
+        if (conversationViewport.updateFromScroll(conversationLog) && conversationUnread) {
+            conversationUnread = 0;
+            updateConversationUnreadNotice();
+        }
+        updateHistoryDateBubble(conversationLog);
+    });
+    main.querySelector('[data-new-messages]')?.addEventListener('click', () => {
+        conversationViewport.follow();
+        conversationViewport.scrollToLatest(conversationLog);
+        conversationUnread = 0;
+        updateConversationUnreadNotice();
+    });
+    main.querySelector('[data-multi-forward-contact]')?.addEventListener('click', showForwardTargetList);
+    main.querySelector('[data-multi-forward-room]')?.addEventListener('click', forwardSelectedToRoom);
+    main.querySelectorAll('[data-multi-export]').forEach(button => button.addEventListener('click', () => exportSelectedMessages(button.dataset.multiExport)));
+    main.querySelector('[data-multi-cancel]')?.addEventListener('click', exitMultiSelect);
+    if (multiSelectMode) updateMultiSelectUi();
+    bindMessageActions();
+    main.querySelector('[data-cancel-reply]')?.addEventListener('click', clearReplyTarget);
+    main.querySelector('[data-input]')?.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendCurrentMessage(); } });
+    main.querySelector('[data-input]')?.addEventListener('input', updateProfileSuggestion);
+    main.querySelector('[data-delete]')?.addEventListener('click', deleteConversation);
+    main.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => exportConversationFile(button.dataset.export, {
+        memberNumber: selectedMember, getDisplayName, biography, avatarUrl, chatColors,
+    })));
+    main.querySelector('[data-invite]')?.addEventListener('click', inviteCurrent);
+    main.querySelector('[data-summon]')?.addEventListener('click', summonCurrent);
+    main.querySelector('[data-toggle-tools]')?.addEventListener('click', event => { event.stopPropagation(); event.currentTarget.closest('.fcm-chat-tools')?.classList.toggle('open'); });
+    main.querySelectorAll('[data-join-room]').forEach(button => button.addEventListener('click', () => {
+        if (button.dataset.joinRoom) showRoomJoinConfirm({ room: button.dataset.joinRoom });
+    }));
+    const openHeaderRoom = element => {
+        if (!element?.dataset.roomName) return;
+        const cached = getCachedRoomInfo(element.dataset.roomName);
+        showRoomJoinConfirm({ room: element.dataset.roomName, creator: cached?.Creator || '', count: cached?.MemberCount ?? null, limit: cached?.MemberLimit ?? null, desc: cached?.Description || '', priv: !!cached?.Private });
+    };
+    main.querySelector('[data-room-meta]')?.addEventListener('click', event => openHeaderRoom(event.currentTarget));
+    main.querySelector('[data-room-meta]')?.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openHeaderRoom(event.currentTarget); } });
+    main.querySelector('.fcm-chat-conversation-header > [data-avatar-member]')?.addEventListener('click', toggleContactCard);
+    bindContactCardEvents();
+    const assign = main.querySelector('.fcm-chat-assign');
+    assign?.addEventListener('pointerdown', event => event.stopPropagation());
+    assign?.addEventListener('click', event => event.stopPropagation());
+    main.querySelector('[data-toggle-assign]')?.addEventListener('click', event => { event.stopPropagation(); main.querySelector('[data-assign-menu]')?.classList.toggle('open'); });
+    main.querySelectorAll('button[data-assign-group]').forEach(button => button.addEventListener('click', () => {
+        if (!selectedMember || !button.dataset.assignGroup) return;
+        cfg.chatMemberGroups ||= {}; cfg.chatMemberGroups[selectedMember] ||= [];
+        if (!cfg.chatMemberGroups[selectedMember].includes(button.dataset.assignGroup)) cfg.chatMemberGroups[selectedMember].push(button.dataset.assignGroup);
+        saveCfg(); main.querySelector('[data-assign-menu]')?.classList.remove('open');
+    }));
+    main.querySelector('[data-create-group-from-chat]')?.addEventListener('click', async () => {
+        const label = await showGroupNameDialog(); if (!label) return;
+        const id = `group-${Date.now().toString(36)}`; cfg.chatGroups ||= {}; cfg.chatGroups[id] = label; selectedGroup = id; groupMode = 'groups'; saveCfg(); renderChat();
+    });
+}
+
+function refreshConversationMain({ scrollToLatest = true } = {}) {
+    const main = root?.querySelector('.fcm-chat-main');
+    if (!main) return;
+    main.innerHTML = conversationHtml();
+    bindConversationEvents();
+    installDragScroll(main, '.fcm-chat-messages');
+    refreshConversationRoomMeta();
+    hydrateChatAvatars();
+    const log = main.querySelector('.fcm-chat-messages');
+    if (log) {
+        bindMessageImages(log, log);
+        if (scrollToLatest) {
+            conversationViewport.follow();
+            conversationViewport.scrollToLatest(log);
+        }
+    }
+    requestAnimationFrame(() => { const bio = main.querySelector('.fcm-chat-bio'); if (bio) bio.classList.toggle('marquee', bio.scrollWidth > bio.clientWidth); });
 }
 
 function bindEvents() {
@@ -1051,77 +1155,14 @@ function bindEvents() {
     });
     root.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { activeView = button.dataset.view; resetMessageSelectionState(); stackedDetail = false; renderChat(); }));
     bindChatListEvents();
-    root.querySelector('[data-back]')?.addEventListener('click', () => { stackedDetail = false; renderChat(); });
-    root.querySelectorAll('[data-channel]').forEach(button => button.addEventListener('click', () => { if (!button.disabled) { channel = button.dataset.channel; renderChat(); } }));
-    root.querySelector('[data-send]')?.addEventListener('click', sendCurrentMessage);
-    const conversationLog = root.querySelector('.fcm-chat-messages');
-    conversationLog?.addEventListener('scroll', () => {
-        if (conversationLog.scrollTop < 80) loadOlderConversation(conversationLog);
-        if (conversationViewport.updateFromScroll(conversationLog) && conversationUnread) {
-            conversationUnread = 0;
-            updateConversationUnreadNotice();
-        }
-        updateHistoryDateBubble(conversationLog);
-    });
-    root.querySelector('[data-new-messages]')?.addEventListener('click', () => {
-        conversationViewport.follow();
-        conversationViewport.scrollToLatest(conversationLog);
-        conversationUnread = 0;
-        updateConversationUnreadNotice();
-    });
-    root.querySelector('[data-multi-forward-contact]')?.addEventListener('click', showForwardTargetList);
+    bindConversationEvents();
     bindForwardTargetRows();
-    root.querySelector('[data-multi-forward-room]')?.addEventListener('click', forwardSelectedToRoom);
-    root.querySelectorAll('[data-multi-export]').forEach(button => button.addEventListener('click', () => exportSelectedMessages(button.dataset.multiExport)));
-    root.querySelector('[data-multi-cancel]')?.addEventListener('click', exitMultiSelect);
-    if (multiSelectMode) updateMultiSelectUi();
-    bindMessageActions();
-    root.querySelector('[data-cancel-reply]')?.addEventListener('click', clearReplyTarget);
-    root.querySelector('[data-input]')?.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendCurrentMessage(); } });
-    root.querySelector('[data-input]')?.addEventListener('input', updateProfileSuggestion);
-    root.querySelector('[data-delete]')?.addEventListener('click', deleteConversation);
-    root.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => exportConversationFile(button.dataset.export, {
-        memberNumber: selectedMember,
-        getDisplayName,
-        biography,
-        avatarUrl,
-        chatColors,
-    })));
-    root.querySelector('[data-invite]')?.addEventListener('click', inviteCurrent);
-    root.querySelector('[data-summon]')?.addEventListener('click', summonCurrent);
-    root.querySelector('[data-toggle-tools]')?.addEventListener('click', event => { event.stopPropagation(); event.currentTarget.closest('.fcm-chat-tools')?.classList.toggle('open'); });
-    root.querySelectorAll('[data-join-room]').forEach(button => button.addEventListener('click', () => {
-        if (button.dataset.joinRoom) showRoomJoinConfirm({ room: button.dataset.joinRoom });
-    }));
-    const openHeaderRoom = element => {
-        if (!element?.dataset.roomName) return;
-        const cached = getCachedRoomInfo(element.dataset.roomName);
-        showRoomJoinConfirm({ room: element.dataset.roomName, creator: cached?.Creator || '', count: cached?.MemberCount ?? null, limit: cached?.MemberLimit ?? null, desc: cached?.Description || '', priv: !!cached?.Private });
-    };
-    root.querySelector('[data-room-meta]')?.addEventListener('click', event => openHeaderRoom(event.currentTarget));
-    root.querySelector('[data-room-meta]')?.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openHeaderRoom(event.currentTarget); } });
-    root.querySelector('.fcm-chat-conversation-header > [data-avatar-member]')?.addEventListener('click', toggleContactCard);
-    bindContactCardEvents();
     panel.addEventListener('click', event => {
         if (contactCardOpen && !event.target.closest('.fcm-chat-contact-card') && !event.target.closest('.fcm-chat-conversation-header > [data-avatar-member]')) {
             contactCardOpen = false;
             root.querySelector('.fcm-chat-contact-card')?.remove();
         }
         if (!event.target.closest('.fcm-chat-message')) panel.querySelectorAll('.fcm-chat-message.selected').forEach(element => element.classList.remove('selected'));
-    });
-    const assign = root.querySelector('.fcm-chat-assign');
-    assign?.addEventListener('pointerdown', event => event.stopPropagation());
-    assign?.addEventListener('click', event => event.stopPropagation());
-    root.querySelector('[data-toggle-assign]')?.addEventListener('click', event => { event.stopPropagation(); root.querySelector('[data-assign-menu]')?.classList.toggle('open'); });
-    root.querySelectorAll('button[data-assign-group]').forEach(button => button.addEventListener('click', () => {
-        if (!selectedMember || !button.dataset.assignGroup) return;
-        cfg.chatMemberGroups ||= {}; cfg.chatMemberGroups[selectedMember] ||= [];
-        if (!cfg.chatMemberGroups[selectedMember].includes(button.dataset.assignGroup)) cfg.chatMemberGroups[selectedMember].push(button.dataset.assignGroup);
-        saveCfg(); root.querySelector('[data-assign-menu]')?.classList.remove('open');
-    }));
-    root.querySelector('[data-create-group-from-chat]')?.addEventListener('click', async () => {
-        const label = await showGroupNameDialog(); if (!label) return;
-        const id = `group-${Date.now().toString(36)}`; cfg.chatGroups ||= {}; cfg.chatGroups[id] = label; selectedGroup = id; groupMode = 'groups'; saveCfg(); renderChat();
     });
     root.querySelector('[data-status]')?.addEventListener('click', () => root.querySelector('.fcm-chat-status-menu')?.classList.toggle('open'));
     root.querySelectorAll('[data-status-value]').forEach(button => button.addEventListener('click', () => setStatus(button.dataset.statusValue)));
