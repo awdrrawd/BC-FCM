@@ -27,7 +27,6 @@ import { conversationMessagesHtml } from './chat/views/chat-message-view.js';
 import { normalizeMessage as normalizeTransportMessage } from './chat/services/chat-transport.js';
 import { ChatConversationController } from './chat/controllers/chat-conversation-controller.js';
 import { createChatContactService } from './chat/services/chat-contact-service.js';
-import { positionPanel as applyPanelPosition } from './chat/controllers/chat-panel-layout.js';
 import { createChatAutoReplyService } from './chat/services/chat-auto-reply.js';
 import { createOfflineDeliveryService } from './chat/services/chat-offline-delivery.js';
 import { createChatSender } from './chat/services/chat-sender.js';
@@ -60,6 +59,8 @@ import { chatShellHtml } from './chat/views/chat-shell-view.js';
 import { createChatPanelControls } from './chat/controllers/chat-panel-controls.js';
 import { createChatConversationEvents } from './chat/controllers/chat-conversation-events.js';
 import { createChatShellEvents } from './chat/controllers/chat-shell-events.js';
+import { createChatRenderer } from './chat/controllers/chat-renderer.js';
+import { createChatLifecycle } from './chat/controllers/chat-lifecycle.js';
 import { EDIT_ICON, WATER_ICON } from '../ui/icons.js';
 
 let root = null;
@@ -300,6 +301,28 @@ const shellEvents = createChatShellEvents({
     setStatus, bindSettings: () => bindChatSettingsEvents({ root, renderChat, refreshChatSettings, chatColors }),
     bindProfile: () => bindChatProfileEvents({ root, getPlayer: () => Player, renderChat, saveProfile: ownProfile.save, setStatus }),
 });
+const chatRenderer = createChatRenderer({
+    getRoot: () => root, getActiveView: () => activeView, getMaximized: () => maximized,
+    getStackedDetail: () => stackedDetail, getConfig: () => cfg, getPlayer: () => Player,
+    colors: chatColors, fontFamily: chatFontFamily, panelSession: chatPanelSession,
+    profileSuggestion, historyViewport, forwardTargets, avatarHtml, unreadBadgeHtml: unreadBadge,
+    listHtml, conversationHtml: conversationPresenter.html, shellHtml: chatShellHtml,
+    bindShellEvents: shellEvents.bind, bindConversationEvents: conversationEvents.bind, installDragScroll,
+    conversationPresence, hydrateAvatars: hydrateChatAvatars, messageImages, conversation,
+    syncBalloonVisibility: chatBalloons.syncVisibility, text: TH,
+});
+const chatLifecycle = createChatLifecycle({
+    config: cfg, getRoot: () => root, setRoot: value => { root = value; },
+    getSelectedMember: () => selectedMember, setSelectedMember: value => { selectedMember = value; },
+    getPlayerMemberNumber: () => Player?.MemberNumber, setActiveView: value => { activeView = value; },
+    setStackedDetail: value => { stackedDetail = value; }, resetSelection: resetMessageSelectionState,
+    clearReply: replyController.clear, closeContactCard: contactCard.close,
+    cleanupMessageActions: () => { cleanupMessageActions?.(); cleanupMessageActions = null; },
+    requestOnlineFriends, chatStore: ChatStore, setMessageIndex: value => { messages = value; }, loadConversation,
+    refreshBadges: chatBalloons.refreshBadges, render: chatRenderer.render,
+    syncBalloonVisibility: chatBalloons.syncVisibility, ensureBalloons: chatBalloons.ensure,
+    resetBalloonInteraction, paintBalloon: chatBalloons.paint,
+});
 
 function chatColors() {
     if (cfg.chatThemeMode === 'custom') return [cfg.chatPanelColor, cfg.chatFontColor, cfg.chatAccentColor];
@@ -345,68 +368,19 @@ function unreadBadge(memberNumber = null) {
 }
 
 async function openChat(memberNumber = null) {
-    if (!cfg.communicationEnabled) return false;
-    if (Number(memberNumber) === Number(Player?.MemberNumber)) memberNumber = null;
-    if (memberNumber) {
-        selectedMember = Number(memberNumber);
-        resetMessageSelectionState();
-        replyController.clear({ focus: false });
-        contactCard.close();
-        stackedDetail = true;
-    }
-    if (!root?.isConnected) {
-        root = document.createElement('div');
-        root.id = 'fcm-chat-root';
-        document.body.appendChild(root);
-    }
-    root.style.display = 'block';
-    requestOnlineFriends();
-    if (selectedMember) await ChatStore.markRead(selectedMember);
-    messages = await ChatStore.recentIndex();
-    if (selectedMember) await loadConversation(selectedMember);
-    chatBalloons.refreshBadges();
-    renderChat();
-    return true;
+    return chatLifecycle.open(memberNumber);
 }
 
 function toggleChat(memberNumber = null) {
-    if (root?.isConnected && root.style.display !== 'none') minimizeChat();
-    else {
-        if (memberNumber) activeView = 'chat';
-        else { activeView = 'notifications'; stackedDetail = false; }
-        openChat(memberNumber);
-    }
+    chatLifecycle.toggle(memberNumber);
 }
 
 function minimizeChat() {
-    cleanupMessageActions?.();
-    cleanupMessageActions = null;
-    if (root) root.style.display = 'none';
-    chatBalloons.syncVisibility();
-    chatBalloons.ensure(true);
+    chatLifecycle.minimize();
 }
 
 function closeChat() {
-    const memberToClose = selectedMember;
-    selectedMember = null;
-    resetMessageSelectionState();
-    replyController.clear({ focus: false });
-    contactCard.close();
-    stackedDetail = false;
-    cleanupMessageActions?.();
-    cleanupMessageActions = null;
-    if (root) root.style.display = 'none';
-    chatBalloons.syncVisibility();
-    document.querySelectorAll('#fcm-chat-balloon,.fcm-chat-user-balloon').forEach(resetBalloonInteraction);
-    if (memberToClose) document.getElementById(`fcm-chat-user-${memberToClose}`)?.remove();
-    const balloon = document.getElementById('fcm-chat-balloon');
-    if (!cfg.persistentBalloon) balloon?.remove();
-    else if (!balloon) chatBalloons.ensure();
-    else {
-        // 關閉視窗只恢復外觀，不重新套用儲存座標或執行貼邊落位。
-        chatBalloons.paint(balloon);
-        balloon.classList.toggle('persistent', !!cfg.communicationEnabled);
-    }
+    chatLifecycle.close();
 }
 
 function settingsHtml() {
@@ -429,58 +403,11 @@ async function loadConversation(memberNumber) {
 }
 
 function renderChat() {
-    if (!root) return;
-    profileSuggestion.reset();
-    historyViewport.reset();
-    const settingsScrollTop = activeView === 'settings' ? root.querySelector('.fcm-chat-list')?.scrollTop : null;
-    const [chatPanel, chatText, chatAccent] = chatColors();
-    const sessionSizeStyle = chatPanelSession.inlineSizeStyle();
-    root.innerHTML = chatShellHtml({
-        maximized, layout: cfg.chatLayout, theme: cfg.chatThemeMode === 'preset' ? cfg.chatThemePreset : cfg.chatThemeMode === 'custom' ? 'custom' : cfg.themePreset || 'violet',
-        sizeStyle: sessionSizeStyle, panelColor: chatPanel, textColor: chatText, accentColor: chatAccent,
-        fontSize: cfg.chatFontSize, fontFamily: chatFontFamily(), activeView, stackedDetail,
-        forwardTargetMode: forwardTargets.isActive(), selfAvatarHtml: avatarHtml(Player?.MemberNumber || 0, 34, 'toolbar'),
-        unreadBadgeHtml: unreadBadge(), status: cfg.chatStatus, listHtml: listHtml(),
-        conversationHtml: conversationPresenter.html(), text: TH,
-    });
-    applyPanelPosition(root.querySelector('#fcm-chat-panel'), maximized, cfg.chatPanelPosition);
-    chatBalloons.syncVisibility();
-    shellEvents.bind();
-    installDragScroll(root, '.fcm-chat-scroll,.fcm-chat-messages,.fcm-chat-profile,.fcm-chat-body.view-settings .fcm-chat-list');
-    conversationPresence.refreshRoomMeta();
-    hydrateChatAvatars();
-    const log = root.querySelector('.fcm-chat-messages');
-    if (log) {
-        messageImages.bind(log, log);
-        conversation.viewport.follow();
-        conversation.viewport.scrollToLatest(log);
-    }
-    if (settingsScrollTop !== null && settingsScrollTop !== undefined) {
-        const settingsList = root.querySelector('.fcm-chat-list');
-        if (settingsList) settingsList.scrollTop = settingsScrollTop;
-    }
-    requestAnimationFrame(() => { const bio = root?.querySelector('.fcm-chat-bio'); if (bio) bio.classList.toggle('marquee', bio.scrollWidth > bio.clientWidth); });
+    chatRenderer.render();
 }
 
 function refreshConversationMain({ scrollToLatest = true } = {}) {
-    const main = root?.querySelector('.fcm-chat-main');
-    if (!main) return;
-    profileSuggestion.reset();
-    historyViewport.reset();
-    main.innerHTML = conversationPresenter.html();
-    conversationEvents.bind();
-    installDragScroll(main, '.fcm-chat-messages');
-    conversationPresence.refreshRoomMeta();
-    hydrateChatAvatars();
-    const log = main.querySelector('.fcm-chat-messages');
-    if (log) {
-        messageImages.bind(log, log);
-        if (scrollToLatest) {
-            conversation.viewport.follow();
-            conversation.viewport.scrollToLatest(log);
-        }
-    }
-    requestAnimationFrame(() => { const bio = main.querySelector('.fcm-chat-bio'); if (bio) bio.classList.toggle('marquee', bio.scrollWidth > bio.clientWidth); });
+    chatRenderer.refreshConversation({ scrollToLatest });
 }
 
 function bindMessageActions() {
