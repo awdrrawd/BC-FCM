@@ -23,6 +23,7 @@ import { ConversationViewport } from './chat-viewport.js';
 import { createChatBalloonController } from './chat-balloon.js';
 import { createDialogHost } from '../ui/dialog.js';
 import { buildForwardTargetGroups, forEachForwardedMessage, forwardedMessageText, selectedMessages } from './chat-selection.js';
+import { bindForwardTargetEvents, forwardTargetsHtml as renderForwardTargetsHtml, updateMultiSelectUi as syncMultiSelectUi } from './chat-selection-view.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     ALARM_MUTED_ICON, ALARM_ACTIVE_ICON, EXIT_ICON, DOWNLOAD_ICON,
@@ -541,13 +542,6 @@ function chatListHtml() {
         <div class="fcm-chat-scroll">${contactRows(filteredContacts()) || `<div class="fcm-chat-empty">${TH('chatEmptyCategory')}</div>`}</div>`;
 }
 
-function forwardTargetRows(memberNumbers) {
-    return memberNumbers.map(memberNumber => `<button class="fcm-chat-row fcm-chat-forward-target" data-forward-member="${memberNumber}">
-        ${avatarHtml(memberNumber)}
-        <span class="fcm-chat-row-meta"><b>${esc(getDisplayName(memberNumber))} (${memberNumber})</b></span>
-    </button>`).join('');
-}
-
 function forwardTargetsHtml() {
     const groups = buildForwardTargetGroups({
         roomCharacters: ChatRoomCharacter,
@@ -557,10 +551,7 @@ function forwardTargetsHtml() {
         isFriend: isFriendOf,
         isOnline,
     });
-    const rows = groups[forwardTargetTab] || groups.room;
-    return `<div class="fcm-chat-forward-header"><b>${TH('chatForwardContact')}</b><button data-forward-cancel>${TH('chatCancel')}</button></div>
-        <div class="fcm-chat-subtabs fcm-chat-forward-tabs"><button class="${forwardTargetTab === 'room' ? 'active' : ''}" data-forward-tab="room">${TH('chatRoom')}</button><button class="${forwardTargetTab === 'friends' ? 'active' : ''}" data-forward-tab="friends">${TH('chatFriends')}</button><button class="${forwardTargetTab === 'offline' ? 'active' : ''}" data-forward-tab="offline">${TH('chatPresenceOffline')}</button></div>
-        <div class="fcm-chat-scroll fcm-chat-forward-targets">${forwardTargetRows(rows) || `<div class="fcm-chat-empty">${TH('chatNoRecord')}</div>`}</div>`;
+    return renderForwardTargetsHtml({ groups, activeTab: forwardTargetTab, avatarHtml, displayName: getDisplayName, esc, text: TH });
 }
 
 function listHtml() {
@@ -1394,18 +1385,12 @@ function selectedMessageRecords() {
 }
 
 function updateMultiSelectUi() {
-    const panel = root?.querySelector('#fcm-chat-panel');
-    panel?.querySelector('.fcm-chat-messages')?.classList.toggle('multi-selecting', multiSelectMode);
-    panel?.querySelectorAll('.fcm-chat-message').forEach(message => message.classList.toggle('multi-selected', selectedMessageIds.has(String(message.dataset.msgId))));
-    const actions = panel?.querySelector('.fcm-chat-actions');
-    const compose = panel?.querySelector('.fcm-chat-compose');
-    const multi = panel?.querySelector('[data-multi-actions]');
-    if (actions) actions.hidden = multiSelectMode;
-    if (compose) compose.hidden = multiSelectMode;
-    if (multi) multi.hidden = !multiSelectMode;
-    const count = multi?.querySelector('[data-multi-count]');
-    if (count) count.textContent = TH('chatSelectedCount', selectedMessageIds.size);
-    multi?.querySelectorAll('button:not([data-multi-cancel])').forEach(button => { button.disabled = !selectedMessageIds.size || (button.hasAttribute('data-multi-forward-room') && !ChatRoomData); });
+    syncMultiSelectUi(root?.querySelector('#fcm-chat-panel'), {
+        active: multiSelectMode,
+        selectedIds: selectedMessageIds,
+        canForwardToRoom: !!ChatRoomData,
+        selectedCountText: count => TH('chatSelectedCount', count),
+    });
 }
 
 function enterMultiSelect(messageElement) {
@@ -1479,12 +1464,14 @@ function closeForwardTargetList() {
 }
 
 function bindForwardTargetRows() {
-    root?.querySelector('[data-forward-cancel]')?.addEventListener('click', closeForwardTargetList);
-    root?.querySelectorAll('[data-forward-member]').forEach(button => button.addEventListener('click', () => forwardSelectedTo(button.dataset.forwardMember)));
-    root?.querySelectorAll('[data-forward-tab]').forEach(button => button.addEventListener('click', () => {
-        forwardTargetTab = button.dataset.forwardTab;
-        refreshForwardTargetList();
-    }));
+    bindForwardTargetEvents(root, {
+        onCancel: closeForwardTargetList,
+        onSelect: forwardSelectedTo,
+        onTab: tab => {
+            forwardTargetTab = tab;
+            refreshForwardTargetList();
+        },
+    });
 }
 
 function refreshForwardTargetList() {
