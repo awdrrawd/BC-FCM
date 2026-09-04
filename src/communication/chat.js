@@ -43,6 +43,7 @@ import { createChatPresenceService } from './chat/services/chat-presence.js';
 import { createChatRoomStateService } from './chat/services/chat-room-state.js';
 import { buildGroupDefinitions, filterContactRows, filterGroupRows, filterNotificationRows, selectedGroupDefinition } from './chat/data/chat-list-data.js';
 import { createProfileSuggestionController } from './chat/controllers/chat-profile-suggest.js';
+import { createChatReplyController } from './chat/controllers/chat-reply.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -68,7 +69,6 @@ let maximized = false;
 let stackedDetail = false;
 let suppressOutgoing = 0;
 let justOpenedMember = null;
-let replyTarget = null;
 let contactCardOpen = false;
 let bcxNoticeTimer = 0;
 let cleanupMessageActions = null;
@@ -147,6 +147,7 @@ const profileSuggestion = createProfileSuggestionController({
     findLiveCharacter: character, loadProfile: memberNumber => PDB.get(memberNumber), displayName: getDisplayName,
     avatarHtml, text: TH,
 });
+const replyController = createChatReplyController({ getRoot: () => root, cleanMessage, text: TH });
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
 const chatBalloons = createChatBalloonController({
@@ -297,7 +298,7 @@ async function openChat(memberNumber = null) {
     if (memberNumber) {
         selectedMember = Number(memberNumber);
         resetMessageSelectionState();
-        replyTarget = null;
+        replyController.clear({ focus: false });
         channel = inRoomFn(selectedMember) ? 'whisper' : 'beep';
         stackedDetail = true;
     }
@@ -341,7 +342,7 @@ function closeChat() {
     const memberToClose = selectedMember;
     selectedMember = null;
     resetMessageSelectionState();
-    replyTarget = null;
+    replyController.clear({ focus: false });
     stackedDetail = false;
     cleanupMessageActions?.();
     cleanupMessageActions = null;
@@ -438,7 +439,7 @@ function conversationHtml() {
         contactCardHtml: contactCardOpen ? contactCardHtml() : '', messagesHtml: conversationMessagesHtml(conversation.messages),
         unread: conversation.unread, multiSelect: multiSelectMode, available, online,
         canInvite: available !== 'none' && !inRoomFn(selectedMember), inputPlaceholder, unavailable,
-        replyTarget, selectedCount: selectedMessageIds.size, canForwardToRoom: !!ChatRoomData,
+        replyTarget: replyController.get(), selectedCount: selectedMessageIds.size, canForwardToRoom: !!ChatRoomData,
     });
 }
 
@@ -700,7 +701,7 @@ function bindMemberRows(scope = root) {
     scope?.querySelectorAll('[data-member]').forEach(button => button.addEventListener('click', async () => {
         selectedMember = Number(button.dataset.member);
         resetMessageSelectionState();
-        replyTarget = null;
+        replyController.clear({ focus: false });
         contactCardOpen = false;
         justOpenedMember = selectedMember;
         channel = inRoomFn(selectedMember) ? 'whisper' : 'beep';
@@ -777,7 +778,7 @@ function bindConversationEvents() {
     main.querySelector('[data-multi-cancel]')?.addEventListener('click', exitMultiSelect);
     if (multiSelectMode) updateMultiSelectUi();
     bindMessageActions();
-    main.querySelector('[data-cancel-reply]')?.addEventListener('click', clearReplyTarget);
+    main.querySelector('[data-cancel-reply]')?.addEventListener('click', replyController.clear);
     main.querySelector('[data-input]')?.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendCurrentMessage(); } });
     main.querySelector('[data-input]')?.addEventListener('input', profileSuggestion.update);
     main.querySelector('[data-delete]')?.addEventListener('click', deleteConversation);
@@ -913,38 +914,10 @@ function sendCurrentMessage() {
     if (!content || !selectedMember) return;
     const available = capability(selectedMember);
     if (available === 'none' && !isFriendOf(selectedMember)) return;
-    const sent = chatSender.send({ memberNumber: selectedMember, content, channel: available, replyTarget });
+    const sent = chatSender.send({ memberNumber: selectedMember, content, channel: available, replyTarget: replyController.get() });
     if (!sent) return;
-    replyTarget = null;
+    replyController.clear({ focus: false });
     input.value = '';
-    root?.querySelector('.fcm-chat-reply-indicator')?.remove();
-}
-
-function clearReplyTarget() {
-    replyTarget = null;
-    root?.querySelector('.fcm-chat-reply-indicator')?.remove();
-    root?.querySelector('[data-input]')?.focus();
-}
-
-function showReplyIndicator() {
-    const wrap = root?.querySelector('.fcm-chat-input-wrap');
-    if (!wrap || !replyTarget) return;
-    let indicator = wrap.querySelector('.fcm-chat-reply-indicator');
-    if (!indicator) {
-        indicator = document.createElement('div');
-        indicator.className = 'fcm-chat-reply-indicator';
-        wrap.prepend(indicator);
-    }
-    indicator.innerHTML = `<span>${TH('chatReply')}: ${esc(replyTarget.preview)}</span><button data-cancel-reply title="${TH('chatCancel')}">×</button>`;
-    indicator.querySelector('[data-cancel-reply]').addEventListener('click', clearReplyTarget);
-}
-
-function replyToMessage(messageElement) {
-    const nativeMsgId = messageElement?.dataset.nativeMsgId;
-    replyTarget = { nativeMsgId, sharedMsgId: messageElement?.dataset.sharedMsgId || messageElement?.dataset.msgId || '', preview: cleanMessage(messageElement.querySelector('.fcm-chat-content')?.textContent || '').slice(0, 80) };
-    showReplyIndicator();
-    const input = root?.querySelector('[data-input]');
-    if (input) { input.focus(); input.setSelectionRange(input.value.length, input.value.length); }
 }
 
 async function toggleContactCard() {
@@ -1114,7 +1087,7 @@ function bindMessageActions() {
         selectedIds: selectedMessageIds,
         updateMultiSelectUi,
         openProfile: openSharedProfile,
-        replyToMessage,
+        replyToMessage: replyController.select,
         enterMultiSelect,
         isMobile: () => typeof globalThis.CommonIsMobile === 'function' && globalThis.CommonIsMobile(),
     });
