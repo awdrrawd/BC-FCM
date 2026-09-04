@@ -73,7 +73,7 @@ async function renderRoomSearch(container) {
     tb.appendChild(rBtn);
     wrap.appendChild(tb);
 
-    const scroll = document.createElement('div'); scroll.className = 'fcm-roomsearch-scroll'; scroll.style.cssText = 'flex:1;overflow-y:auto;';
+    const scroll = document.createElement('div'); scroll.className = 'fcm-scroll fcm-roomsearch-scroll'; scroll.style.cssText = 'flex:1;overflow-y:auto;';
     const countEl = document.createElement('div'); countEl.className = 'fcm-count'; countEl.style.textAlign = 'center';
     wrap.appendChild(scroll); wrap.appendChild(countEl);
     container.appendChild(wrap);

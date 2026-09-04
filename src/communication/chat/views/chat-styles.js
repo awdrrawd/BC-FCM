@@ -92,6 +92,7 @@ body>.fcm-chat-user-balloon{border:0!important;box-shadow:0 0 15px color-mix(in 
 @media(max-width:650px){#fcm-chat-panel{width:96vw}.fcm-chat-body{grid-template-columns:48px 210px minmax(0,1fr)}}
 .fcm-chat-message:not(.selected):hover .fcm-chat-message-reply{opacity:0;visibility:hidden;pointer-events:none}
 .fcm-chat-message.emote .fcm-chat-content{font-style:italic}.fcm-chat-message.ooc .fcm-chat-content{font-style:normal;opacity:.92}.fcm-chat-message.emote .fcm-chat-content,.fcm-chat-message.ooc .fcm-chat-content{white-space:pre-wrap}
+.fcm-chat-tools-menu button{color:var(--tx)}.fcm-chat-tools-menu button:hover{background:color-mix(in srgb,var(--ac) 18%,transparent);color:var(--ac)}
 `;
 
 function injectChatStyles() {
