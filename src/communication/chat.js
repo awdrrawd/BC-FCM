@@ -1,7 +1,7 @@
 import { cfg, saveCfg } from '../core/config.js';
 import { getDisplayName as getSharedDisplayName, getRoomInfo, inRoomFn, onlineFriends, requestOnlineFriends, buildFriendList, getAllRels, isFav, isFriendOf } from '../data/data.js';
 import { getCachedRoomInfo, queryRoomInfo } from '../panel/panel-rooms-data.js';
-import { PDB, _pc, Snapshot, loadAvatarFromBundle, syncRoomAvatar, updateOwnAvatarSnapshot, updateOwnAvatarProfile } from '../data/profile-db.js';
+import { PDB, _pc, Snapshot, loadAvatarFromBundle, syncRoomAvatar } from '../data/profile-db.js';
 import { ChatStore, OfflineQueue } from './chat-store.js';
 import { T, TH, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS } from '../i18n/i18n.js';
 import { chatFontFamily, availableFontChoices } from './chat-font.js';
@@ -25,6 +25,7 @@ import { buildForwardTargetGroups, forEachForwardedMessage, forwardedMessageText
 import { bindForwardTargetEvents, forwardTargetsHtml as renderForwardTargetsHtml, updateMultiSelectUi as syncMultiSelectUi } from './chat-selection-view.js';
 import { installMessageActions } from './chat-message-actions.js';
 import { bindChatSettingsEvents } from './chat-settings-events.js';
+import { bindChatProfileEvents } from './chat-profile-events.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     ALARM_MUTED_ICON, ALARM_ACTIVE_ICON, EXIT_ICON, DOWNLOAD_ICON,
@@ -1117,58 +1118,6 @@ function refreshConversationMain({ scrollToLatest = true } = {}) {
     requestAnimationFrame(() => { const bio = main.querySelector('.fcm-chat-bio'); if (bio) bio.classList.toggle('marquee', bio.scrollWidth > bio.clientWidth); });
 }
 
-function bindProfileEvents() {
-    root.querySelector('[data-save-profile]')?.addEventListener('click', saveOwnProfile);
-    root.querySelector('[data-profile-nickname-edit]')?.addEventListener('click', () => {
-        const editor = root.querySelector('[data-profile-nickname-editor]'); const text = root.querySelector('[data-profile-nickname-text]');
-        editor.hidden = false; text.hidden = true; root.querySelector('[data-profile-nickname-edit]').hidden = true; editor.querySelector('input')?.focus();
-    });
-    root.querySelector('[data-profile-nickname-cancel]')?.addEventListener('click', () => renderChat());
-    root.querySelector('[data-profile-nickname]')?.addEventListener('input', event => {
-        const value = event.target.value.trim();
-        const status = value && typeof globalThis.CharacterValidateNickname === 'function' ? globalThis.CharacterValidateNickname(Player, value, false) : null;
-        event.target.setCustomValidity(status ? (typeof globalThis.TextGet === 'function' ? globalThis.TextGet(status) : status) : '');
-    });
-    root.querySelector('[data-profile-nickname-confirm]')?.addEventListener('click', () => {
-        const input = root.querySelector('[data-profile-nickname]'); const nickname = input?.value.trim() || '';
-        const status = typeof globalThis.CharacterSetNickname === 'function' ? globalThis.CharacterSetNickname(Player, nickname) : null;
-        if (status && status !== 'NicknameLocked') { input.setCustomValidity(typeof globalThis.TextGet === 'function' ? globalThis.TextGet(status) : status); input.reportValidity(); return; }
-        cfg.profileNickname = Player?.Nickname || nickname; saveCfg(); renderChat();
-    });
-    root.querySelector('[data-profile-snapshot]')?.addEventListener('click', async event => {
-        const button = event.currentTarget; button.disabled = true;
-        const updated = await updateOwnAvatarSnapshot();
-        if (updated) {
-            const snapshot = Player?.OnlineSharedSettings?.FCM?.avatarSnapshot || '';
-            const avatar = root.querySelector(`.fcm-chat-profile [data-avatar-member="${Number(Player?.MemberNumber)}"]`);
-            if (snapshot && avatar) {
-                let img = avatar.querySelector('img');
-                if (!img) { img = document.createElement('img'); img.draggable = false; avatar.insertBefore(img, avatar.firstChild); }
-                img.src = snapshot;
-                [...avatar.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).forEach(node => node.remove());
-            }
-        }
-        button.textContent = updated ? T('chatProfileSnapshotDone') : T('ownAvatarUpdateFailed');
-        setTimeout(() => { if (button.isConnected) { button.disabled = false; button.textContent = T('chatProfileSnapshot'); } }, 1800);
-    });
-    root.querySelector('[data-profile-avatar-url]')?.addEventListener('change', async event => {
-        const value = event.target.value.trim();
-        event.target.setCustomValidity(isSupportedAvatarUrl(value) ? '' : T('chatAvatarUrlUnsupported'));
-        if (!event.target.reportValidity()) return;
-        cfg.avatarUrl = cfg.chatAvatarUrl = value; saveCfg();
-        if (cfg.chatAvatarMode === 'url') { await updateOwnAvatarProfile('url', value); renderChat(); }
-    });
-    root.querySelectorAll('[data-profile-status]').forEach(button => button.addEventListener('click', () => {
-        const box = root.querySelector('[data-profile-statuses]'); box.dataset.value = button.dataset.profileStatus;
-        box.querySelectorAll('button').forEach(item => item.classList.toggle('active', item === button));
-        setStatus(button.dataset.profileStatus, false);
-    }));
-    root.querySelectorAll('[data-profile-reply]').forEach(button => button.addEventListener('click', () => {
-        const key = button.dataset.profileReply === 'busy' ? 'busyAutoReply' : 'afkAutoReply';
-        cfg[key] = !cfg[key]; saveCfg(); button.classList.toggle('on', cfg[key]);
-    }));
-}
-
 function bindEvents() {
     const panel = root.querySelector('#fcm-chat-panel');
     chatPanelSession.observe(panel, () => maximized);
@@ -1219,7 +1168,7 @@ function bindEvents() {
     root.querySelector('[data-status]')?.addEventListener('click', () => root.querySelector('.fcm-chat-status-menu')?.classList.toggle('open'));
     root.querySelectorAll('[data-status-value]').forEach(button => button.addEventListener('click', () => setStatus(button.dataset.statusValue)));
     bindChatSettingsEvents({ root, renderChat, refreshChatSettings, chatColors });
-    bindProfileEvents();
+    bindChatProfileEvents({ root, getPlayer: () => Player, renderChat, saveOwnProfile, setStatus });
 }
 
 function syncConversationBackButton(main, stacked) {
