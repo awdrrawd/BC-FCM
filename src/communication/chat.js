@@ -24,7 +24,6 @@ import { bindChatSettingsEvents } from './chat/events/chat-settings-events.js';
 import { bindChatProfileEvents } from './chat/events/chat-profile-events.js';
 import { settingsHtml as renderSettingsHtml } from './chat/views/chat-settings-view.js';
 import { conversationMessagesHtml, messageDateKey, messageDateLabel, messageHtml } from './chat/views/chat-message-view.js';
-import { contactCardHtml as renderContactCardHtml, conversationHtml as renderConversationHtml } from './chat/views/chat-conversation-view.js';
 import { normalizeMessage as normalizeTransportMessage } from './chat/services/chat-transport.js';
 import { ChatConversationController } from './chat/controllers/chat-conversation-controller.js';
 import { createChatContactService } from './chat/services/chat-contact-service.js';
@@ -51,6 +50,8 @@ import { createChatProfileViewer } from './chat/services/chat-profile-viewer.js'
 import { createChatComposer } from './chat/controllers/chat-composer.js';
 import { createChatTransportHandler } from './chat/services/chat-transport-handler.js';
 import { createChatListPresenter } from './chat/views/chat-list-presenter.js';
+import { createChatConversationPresenter } from './chat/views/chat-conversation-presenter.js';
+import { createChatConversationPresence } from './chat/controllers/chat-conversation-presence.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -70,7 +71,6 @@ let notificationSearch = '';
 let selectedGroup = 'room';
 let groupMode = 'room';
 let groupSearch = '';
-let channel = 'beep';
 let maximized = false;
 let stackedDetail = false;
 let suppressOutgoing = 0;
@@ -158,7 +158,7 @@ const profileViewer = createChatProfileViewer({
 });
 const contactCard = createChatContactCardController({
     getRoot: () => root, getMemberNumber: () => selectedMember, loadProfile: memberNumber => PDB.get(memberNumber),
-    renderHtml: contactCardHtml, hydrateAvatars: hydrateChatAvatars, findLiveCharacter: character,
+    renderHtml: () => conversationPresenter.contactCardHtml(), hydrateAvatars: hydrateChatAvatars, findLiveCharacter: character,
     deleteSnapshot: memberNumber => Snapshot.delete(memberNumber),
     loadCharacterCanvas: characterValue => globalThis.CharacterLoadCanvas?.(characterValue),
     nextPaint: () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))),
@@ -182,6 +182,20 @@ const messageSelection = createChatMessageSelectionController({
     getPanel: () => root?.querySelector('#fcm-chat-panel'), getMessages: () => conversation.messages,
     canForwardToRoom: () => !!ChatRoomData, renderUi: syncMultiSelectUi,
     selectedCountText: count => TH('chatSelectedCount', count), onExit: forwardTargets.close,
+});
+const conversationPresenter = createChatConversationPresenter({
+    getMemberNumber: () => selectedMember, getConfig: () => cfg, getRoom: () => ChatRoomData,
+    getRoomCharacters: () => ChatRoomCharacter, getCachedRoomInfo, capability, roomState,
+    isFriend: isFriendOf, inRoom: inRoomFn, avatarHtml, displayName: getDisplayName, biography,
+    hasSavedProfile: memberNumber => !!_pc[memberNumber]?.characterBundle,
+    isContactCardOpen: contactCard.isOpen, getMessages: () => conversation.messages,
+    getUnread: () => conversation.unread, isMultiSelect: messageSelection.isActive,
+    getReplyTarget: replyController.get, getSelectedCount: messageSelection.size, text: T,
+});
+const conversationPresence = createChatConversationPresence({
+    getRoot: () => root, getMemberNumber: () => selectedMember, getRoom: () => ChatRoomData,
+    getOnlineFriends: () => onlineFriends, roomState, capability, inRoom: inRoomFn, sharedProfile,
+    text: T, queryRoomInfo,
 });
 const selectedActions = createChatSelectedActions({
     selection: messageSelection, getPlayer: () => Player, getConversationMemberNumber: () => selectedMember,
@@ -300,7 +314,6 @@ async function openChat(memberNumber = null) {
         resetMessageSelectionState();
         replyController.clear({ focus: false });
         contactCard.close();
-        channel = inRoomFn(selectedMember) ? 'whisper' : 'beep';
         stackedDetail = true;
     }
     if (!root?.isConnected) {
@@ -373,35 +386,6 @@ function listHtml() {
     return listPresenter.viewHtml() || '';
 }
 
-function conversationHtml() {
-    if (!selectedMember) return renderConversationHtml({ memberNumber: null });
-    const available = capability(selectedMember);
-    const { roomInfo, roomText: baseRoomText, canOpenRoom, unavailable } = roomState.get(selectedMember);
-    const cachedRoom = roomInfo?.name ? getCachedRoomInfo(roomInfo.name) : null;
-    const memberCount = roomInfo?.isCurrent ? (ChatRoomCharacter?.length ?? null) : (roomInfo?.memberCount ?? cachedRoom?.MemberCount ?? null);
-    const memberLimit = roomInfo?.isCurrent ? (ChatRoomData?.MemberLimit ?? null) : (roomInfo?.memberLimit ?? cachedRoom?.MemberLimit ?? null);
-    const roomCount = memberCount !== null && memberCount !== undefined ? ` ＜${memberCount}${memberLimit !== null && memberLimit !== undefined ? `/${memberLimit}` : ''}＞` : '';
-    const roomText = canOpenRoom ? `${roomInfo.name}${roomCount}` : baseRoomText;
-    const online = available !== 'none';
-    const showNotFriendBadge = !isFriendOf(selectedMember) && !unavailable;
-    const inputPlaceholder = unavailable ? T('noBeepNotFriend') : !online ? T('chatOfflineQueuePlaceholder') : available === 'whisper' ? T('chatWhisperInputPlaceholder') : T('chatPrivateInputPlaceholder');
-    return renderConversationHtml({
-        memberNumber: selectedMember, stacked: cfg.chatLayout === 'stacked', avatarHtml,
-        displayName: getDisplayName(selectedMember), biography: biography(selectedMember), showNotFriendBadge,
-        roomText, roomName: roomInfo?.name || '', canOpenRoom,
-        canSummon: !!ChatRoomData && online && !inRoomFn(selectedMember), groups: Object.entries(cfg.chatGroups || {}),
-        contactCardHtml: contactCard.isOpen() ? contactCardHtml() : '', messagesHtml: conversationMessagesHtml(conversation.messages),
-        unread: conversation.unread, multiSelect: messageSelection.isActive(), available, online,
-        canInvite: available !== 'none' && !inRoomFn(selectedMember), inputPlaceholder, unavailable,
-        replyTarget: replyController.get(), selectedCount: messageSelection.size(), canForwardToRoom: !!ChatRoomData,
-    });
-}
-
-function contactCardHtml() {
-    const hasProfile = !!_pc[Number(selectedMember)]?.characterBundle;
-    return renderContactCardHtml({ memberNumber: selectedMember, avatarHtml, displayName: getDisplayName(selectedMember), biography: biography(selectedMember), hasProfile, isFriend: isFriendOf(selectedMember) });
-}
-
 function refreshVisibleChatScroll() {
     const html = listPresenter.visibleScrollHtml();
     const scroll = root?.querySelector('.fcm-chat-list .fcm-chat-scroll');
@@ -461,61 +445,6 @@ async function loadConversation(memberNumber) {
     await conversation.load(ChatStore, memberNumber, target => Number(selectedMember) === target);
 }
 
-function refreshConversationRoomMeta() {
-    if (!selectedMember) return;
-    const { roomInfo, canOpenRoom } = roomState.get(selectedMember);
-    if (!canOpenRoom || roomInfo.isCurrent || roomInfo.isPrivate) return;
-    const friend = onlineFriends.find(item => Number(item.MemberNumber) === selectedMember);
-    queryRoomInfo(roomInfo.name, friend?.ChatRoomSpace, data => {
-        const meta = root?.querySelector(`[data-room-meta="${selectedMember}"]`);
-        if (!meta || selectedMember !== Number(meta.dataset.roomMeta)) return;
-        const count = data?.MemberCount;
-        const limit = data?.MemberLimit;
-        const roomText = `${roomInfo.name}${count !== null && count !== undefined ? ` ＜${count}${limit !== null && limit !== undefined ? `/${limit}` : ''}＞` : ''}`;
-        meta.textContent = roomText;
-        meta.title = roomText;
-    });
-}
-
-function refreshConversationPresence() {
-    if (!selectedMember) return;
-    const available = capability(selectedMember);
-    const { roomInfo, roomText, canOpenRoom, unavailable } = roomState.get(selectedMember);
-    const meta = root?.querySelector(`[data-room-meta="${selectedMember}"]`);
-    if (meta) {
-        meta.textContent = roomText;
-        meta.title = roomText;
-        if (canOpenRoom) {
-            meta.dataset.roomName = roomInfo.name;
-            meta.setAttribute('role', 'button');
-            meta.tabIndex = 0;
-        } else {
-            delete meta.dataset.roomName;
-            meta.removeAttribute('role');
-            meta.removeAttribute('tabindex');
-        }
-    }
-    const online = available !== 'none';
-    if (available !== 'none') channel = available;
-    const status = online ? (sharedProfile(selectedMember).status || 'online') : 'offline';
-    const dot = root?.querySelector(`.fcm-chat-conversation-header [data-avatar-member="${selectedMember}"] i`);
-    if (dot) dot.className = status;
-    const summon = root?.querySelector('[data-summon]');
-    if (summon) summon.disabled = !ChatRoomData || !online || inRoomFn(selectedMember);
-    const whisper = root?.querySelector('[data-channel="whisper"]');
-    const beep = root?.querySelector('[data-channel="beep"]');
-    if (whisper) { whisper.disabled = available !== 'whisper'; whisper.classList.toggle('active', available === 'whisper'); }
-    if (beep) { beep.disabled = available !== 'beep'; beep.classList.toggle('active', available === 'beep'); }
-    const input = root?.querySelector('[data-input]');
-    if (input) input.placeholder = unavailable ? T('noBeepNotFriend') : !online ? T('chatOfflineQueuePlaceholder') : channel === 'whisper' && inRoomFn(selectedMember) ? T('chatWhisperInputPlaceholder') : T('chatPrivateInputPlaceholder');
-    const send = root?.querySelector('[data-send]');
-    if (send) {
-        send.textContent = online ? T('chatSend') : T('chatQueueSend');
-        send.disabled = unavailable;
-    }
-    refreshConversationRoomMeta();
-}
-
 function renderChat() {
     if (!root) return;
     profileSuggestion.reset();
@@ -536,7 +465,7 @@ function renderChat() {
                 <button class="fcm-chat-rail-button ${activeView === 'settings' ? 'active' : ''}" data-view="settings" title="${TH('chatSettingsTab')}">${SETTINGS_ICON}</button>
             </nav>
             <aside class="fcm-chat-list ${stackedDetail && !forwardTargets.isActive() ? 'slide-out' : ''}">${listHtml()}</aside>
-            <main class="fcm-chat-main ${stackedDetail && !forwardTargets.isActive() ? 'slide-in' : ''}">${conversationHtml()}</main>
+            <main class="fcm-chat-main ${stackedDetail && !forwardTargets.isActive() ? 'slide-in' : ''}">${conversationPresenter.html()}</main>
         </div>
         <div class="fcm-chat-status-menu"><button data-status-value="online"><i class="online"></i>${TH('chatStatusOnline')}</button><button data-status-value="busy"><i class="busy"></i>${TH('chatStatusBusy')}</button><button data-status-value="afk"><i class="afk"></i>${TH('chatStatusAFK')}</button></div>
         <div class="fcm-chat-context-menu" hidden><button data-context-select>${TH('chatSelectMessage')}</button><button data-context-copy>${TH('chatCopy')}</button><button data-context-multi>${TH('chatMultiSelect')}</button><button data-context-reply>${TH('chatReply')}</button><button data-context-cancel>${TH('chatCancel')}</button></div>
@@ -545,7 +474,7 @@ function renderChat() {
     chatBalloons.syncVisibility();
     bindEvents();
     installDragScroll(root, '.fcm-chat-scroll,.fcm-chat-messages,.fcm-chat-profile,.fcm-chat-body.view-settings .fcm-chat-list');
-    refreshConversationRoomMeta();
+    conversationPresence.refreshRoomMeta();
     hydrateChatAvatars();
     const log = root.querySelector('.fcm-chat-messages');
     if (log) {
@@ -567,7 +496,6 @@ function bindMemberRows(scope = root) {
         replyController.clear({ focus: false });
         contactCard.close();
         justOpenedMember = selectedMember;
-        channel = inRoomFn(selectedMember) ? 'whisper' : 'beep';
         stackedDetail = true;
         await ChatStore.markRead(selectedMember);
         messages = await ChatStore.recentIndex();
@@ -613,12 +541,6 @@ function bindConversationEvents() {
         root.querySelector('.fcm-chat-list')?.classList.remove('slide-out');
         main.classList.remove('slide-in');
     });
-    main.querySelectorAll('[data-channel]').forEach(button => button.addEventListener('click', () => {
-        if (!button.disabled) {
-            channel = button.dataset.channel;
-            refreshConversationPresence();
-        }
-    }));
     main.querySelector('[data-send]')?.addEventListener('click', composer.send);
     const conversationLog = main.querySelector('.fcm-chat-messages');
     historyViewport.bind(conversationLog, main.querySelector('[data-new-messages]'));
@@ -669,10 +591,10 @@ function refreshConversationMain({ scrollToLatest = true } = {}) {
     if (!main) return;
     profileSuggestion.reset();
     historyViewport.reset();
-    main.innerHTML = conversationHtml();
+    main.innerHTML = conversationPresenter.html();
     bindConversationEvents();
     installDragScroll(main, '.fcm-chat-messages');
-    refreshConversationRoomMeta();
+    conversationPresence.refreshRoomMeta();
     hydrateChatAvatars();
     const log = main.querySelector('.fcm-chat-messages');
     if (log) {
@@ -764,7 +686,7 @@ async function handleOnlineFriendsUpdate(result) {
     if (presence.updateOnlineRows(result)) {
         if (root?.isConnected && root.style.display !== 'none') {
             refreshVisibleChatScroll();
-            refreshConversationPresence();
+            conversationPresence.refresh();
         }
     }
     offlineDelivery.dispatch(result);
