@@ -3,8 +3,8 @@ import { updateOwnAvatarProfile, updateOwnAvatarSnapshot } from '../../../data/p
 import { T } from '../../../i18n/i18n.js';
 import { isSupportedAvatarUrl } from '../services/chat-avatar-url.js';
 
-function bindChatProfileEvents({ root, getPlayer, renderChat, saveOwnProfile, setStatus }) {
-    root.querySelector('[data-save-profile]')?.addEventListener('click', saveOwnProfile);
+function bindChatProfileEvents({ root, getPlayer, renderChat, saveProfile, setStatus }) {
+    root.querySelector('[data-save-profile]')?.addEventListener('click', saveProfile);
     root.querySelector('[data-profile-nickname-edit]')?.addEventListener('click', () => {
         const editor = root.querySelector('[data-profile-nickname-editor]');
         const text = root.querySelector('[data-profile-nickname-text]');

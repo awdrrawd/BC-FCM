@@ -5,7 +5,6 @@ import { PDB, _pc, Snapshot, loadAvatarFromBundle, syncRoomAvatar } from '../dat
 import { ChatStore, OfflineQueue } from './chat/data/chat-store.js';
 import { T, TH } from '../i18n/i18n.js';
 import { chatFontFamily } from './chat-font.js';
-import { isSupportedAvatarUrl } from './chat/services/chat-avatar-url.js';
 import { profileHtml as renderProfileHtml } from './chat/views/chat-profile-view.js';
 import { chatPanelSession } from './chat/controllers/chat-panel-session.js';
 import { installDragScroll } from '../ui/drag-scroll.js';
@@ -48,6 +47,7 @@ import { createChatHistoryViewportController } from './chat/controllers/chat-his
 import { createChatMessageSelectionController } from './chat/controllers/chat-message-selection.js';
 import { createChatForwardTargetsController } from './chat/controllers/chat-forward-targets.js';
 import { createChatSelectedActions } from './chat/services/chat-selected-actions.js';
+import { createChatOwnProfileService } from './chat/services/chat-own-profile.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -178,6 +178,10 @@ const selectedActions = createChatSelectedActions({
     sendWhisper: sendBcxAwareWhisper, sendBeep: sendBcxAwareBeep, getRoom: () => ChatRoomData,
     sendRoomMessage: (...args) => ServerSend(...args), exportConversation: exportConversationFile,
     biography, avatarUrl, chatColors,
+});
+const ownProfile = createChatOwnProfileService({
+    config: cfg, saveConfig: saveCfg, getRoot: () => root, getPlayer: () => Player,
+    text: T, queueAccountUpdate: data => ServerAccountUpdate.QueueData(data), warn: warnLimited, onSaved: renderChat,
 });
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
@@ -849,7 +853,7 @@ function bindEvents() {
     root.querySelector('[data-status]')?.addEventListener('click', () => root.querySelector('.fcm-chat-status-menu')?.classList.toggle('open'));
     root.querySelectorAll('[data-status-value]').forEach(button => button.addEventListener('click', () => setStatus(button.dataset.statusValue)));
     bindChatSettingsEvents({ root, renderChat, refreshChatSettings, chatColors });
-    bindChatProfileEvents({ root, getPlayer: () => Player, renderChat, saveOwnProfile, setStatus });
+    bindChatProfileEvents({ root, getPlayer: () => Player, renderChat, saveProfile: ownProfile.save, setStatus });
 }
 
 async function openSharedProfile(memberNumber) {
@@ -892,29 +896,6 @@ function bindMessageActions() {
         enterMultiSelect: messageSelection.enter,
         isMobile: () => typeof globalThis.CommonIsMobile === 'function' && globalThis.CommonIsMobile(),
     });
-}
-
-function saveOwnProfile() {
-    const signature = root.querySelector('[data-profile-signature]')?.value.trim() || '';
-    const avatarInput = root.querySelector('[data-profile-avatar-url]');
-    const avatarUrlValue = avatarInput?.value.trim() || '';
-    avatarInput?.setCustomValidity(isSupportedAvatarUrl(avatarUrlValue) ? '' : T('chatAvatarUrlUnsupported'));
-    if (avatarInput && !avatarInput.reportValidity()) return;
-    cfg.avatarUrl = cfg.chatAvatarUrl = avatarUrlValue;
-    cfg.busyMessage = root.querySelector('[data-profile-busy]')?.value.trim() || '';
-    cfg.afkMessage = root.querySelector('[data-profile-afk]')?.value.trim() || '';
-    cfg.chatStatus = root.querySelector('[data-profile-statuses]')?.dataset.value || 'online';
-    cfg.avatarMode = cfg.chatAvatarMode === 'url' ? 'url' : 'game';
-    saveCfg();
-    try {
-        Player.OnlineSharedSettings ??= {}; Player.OnlineSharedSettings.FCM ??= {};
-        Object.assign(Player.OnlineSharedSettings.FCM, { signature, nickname: Player?.Nickname || '', status: cfg.chatStatus, busyMessage: cfg.busyMessage, afkMessage: cfg.afkMessage,
-            avatarMode: cfg.avatarMode, avatarUrl: cfg.avatarMode === 'url' ? cfg.avatarUrl : '', profileUpdatedAt: Date.now(), updatedAt: Date.now() });
-        Player.OnlineSharedSettings.LCData ??= {}; Player.OnlineSharedSettings.LCData.MessageSetting ??= {};
-        Object.assign(Player.OnlineSharedSettings.LCData.MessageSetting, { Signature: signature, Avatar: cfg.avatarMode === 'url' ? cfg.avatarUrl : '' });
-        ServerAccountUpdate.QueueData({ OnlineSharedSettings: Player.OnlineSharedSettings });
-    } catch (error) { warnLimited('LianChat compatibility settings sync failed', error); }
-    renderChat();
 }
 
 function showFcmConfirm(message, confirmLabel = T('chatConfirmDelete')) {
