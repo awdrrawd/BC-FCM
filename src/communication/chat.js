@@ -19,7 +19,6 @@ import { exportConversation as exportConversationFile } from './chat/services/ch
 import { initChatAudio, playNotificationSound } from './chat-audio.js';
 import { installChatDrag, resetBalloonInteraction } from './chat/controllers/chat-drag.js';
 import { createChatBalloonController } from './chat/controllers/chat-balloon.js';
-import { createDialogHost } from '../ui/dialog.js';
 import { updateMultiSelectUi as syncMultiSelectUi } from './chat/views/chat-selection-view.js';
 import { installMessageActions } from './chat/events/chat-message-actions.js';
 import { bindChatSettingsEvents } from './chat/events/chat-settings-events.js';
@@ -48,6 +47,7 @@ import { createChatMessageSelectionController } from './chat/controllers/chat-me
 import { createChatForwardTargetsController } from './chat/controllers/chat-forward-targets.js';
 import { createChatSelectedActions } from './chat/services/chat-selected-actions.js';
 import { createChatOwnProfileService } from './chat/services/chat-own-profile.js';
+import { createChatDialogs } from './chat/controllers/chat-dialogs.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -183,6 +183,7 @@ const ownProfile = createChatOwnProfileService({
     config: cfg, saveConfig: saveCfg, getRoot: () => root, getPlayer: () => Player,
     text: T, queueAccountUpdate: data => ServerAccountUpdate.QueueData(data), warn: warnLimited, onSaved: renderChat,
 });
+const chatDialogs = createChatDialogs({ colors: () => [cfg.panelColor, cfg.fontColor, cfg.accentColor], text: T, htmlText: TH });
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
 const chatBalloons = createChatBalloonController({
@@ -534,7 +535,7 @@ function bindMessageImages(scope, log) {
     scope?.querySelectorAll?.('[data-trust-image-origin]').forEach(button => {
         button.addEventListener('click', async () => {
             const origin = normalizedImageOrigin(button.dataset.trustImageOrigin);
-            if (!origin || !await showFcmConfirm(T('chatTrustImagePrompt', origin), T('chatTrustImage'))) return;
+            if (!origin || !await chatDialogs.confirm(T('chatTrustImagePrompt', origin), T('chatTrustImage'))) return;
             trustImageOrigin(origin);
             renderChat();
         });
@@ -706,7 +707,7 @@ function bindChatListEvents(scope = root) {
     scope?.querySelectorAll('[data-notification-tab]').forEach(button => button.addEventListener('click', () => { notificationTab = button.dataset.notificationTab; refreshChatList(); }));
     scope?.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => { selectedGroup = button.dataset.group; refreshChatList(); }));
     scope?.querySelector('[data-add-group]')?.addEventListener('click', async () => {
-        const label = await showGroupNameDialog(); if (!label) return;
+        const label = await chatDialogs.promptGroupName(); if (!label) return;
         const id = `group-${Date.now().toString(36)}`; cfg.chatGroups ||= {}; cfg.chatGroups[id] = label; selectedGroup = id; saveCfg(); refreshChatList();
     });
     scope?.querySelectorAll('[data-group-mode]').forEach(button => button.addEventListener('click', () => { groupMode = button.dataset.groupMode; refreshChatList(); }));
@@ -774,7 +775,7 @@ function bindConversationEvents() {
         saveCfg(); main.querySelector('[data-assign-menu]')?.classList.remove('open');
     }));
     main.querySelector('[data-create-group-from-chat]')?.addEventListener('click', async () => {
-        const label = await showGroupNameDialog(); if (!label) return;
+        const label = await chatDialogs.promptGroupName(); if (!label) return;
         const id = `group-${Date.now().toString(36)}`; cfg.chatGroups ||= {}; cfg.chatGroups[id] = label; selectedGroup = id; groupMode = 'groups'; saveCfg(); renderChat();
     });
 }
@@ -898,18 +899,8 @@ function bindMessageActions() {
     });
 }
 
-function showFcmConfirm(message, confirmLabel = T('chatConfirmDelete')) {
-    return new Promise(resolve => {
-        const host = createDialogHost({ overlayClass: 'fcm-chat-modal-overlay', dialogClass: 'fcm-chat-modal', overlayStyle: `--s:${cfg.panelColor};--tx:${cfg.fontColor};--ac:${cfg.accentColor}`, onClose: value => resolve(!!value) });
-        host.dialog.innerHTML = `<div>${esc(message)}</div><div><button data-modal-cancel>${TH('chatCancel')}</button><button data-modal-ok>${esc(confirmLabel)}</button></div>`;
-        host.listen(host.dialog.querySelector('[data-modal-cancel]'), 'click', () => host.close(false));
-        host.listen(host.dialog.querySelector('[data-modal-ok]'), 'click', () => host.close(true));
-        host.mount();
-    });
-}
-
 async function deleteConversation() {
-    if (!selectedMember || !await showFcmConfirm(T('chatConfirmDeleteConv', getDisplayName(selectedMember)))) return;
+    if (!selectedMember || !await chatDialogs.confirm(T('chatConfirmDeleteConv', getDisplayName(selectedMember)))) return;
     await ChatStore.deleteMember(selectedMember);
     OfflineQueue.removeMember(selectedMember);
     messages = messages.filter(message => message.memberNumber !== selectedMember);
@@ -931,7 +922,7 @@ function inviteCurrent() {
 
 async function summonCurrent() {
     if (!selectedMember || capability(selectedMember) !== 'beep' || !ChatRoomData?.Name) return;
-    if (!await showFcmConfirm(T('beepSummonTitle'), T('beepSummon'))) return;
+    if (!await chatDialogs.confirm(T('beepSummonTitle'), T('beepSummon'))) return;
     const sent = runWithoutOutgoingCapture(() => sendBcxAwareBeep({ MemberNumber: selectedMember, BeepType: '', Message: 'summon', ChatRoomName: ChatRoomData.Name, ChatRoomSpace: ChatRoomData.Space }));
     if (!sent) return;
     recordMessage({ memberNumber: selectedMember, direction: 'out', channel: 'beep', content: 'summon', roomName: ChatRoomData.Name }, { notify: false });
@@ -953,18 +944,6 @@ function setStatus(status, rerender = true) {
     const dot = root?.querySelector('.fcm-chat-rail [data-status] .fcm-status-dot');
     if (dot) dot.className = `fcm-status-dot ${status}`;
     if (rerender) renderChat();
-}
-
-function showGroupNameDialog() {
-    return new Promise(resolve => {
-        const host = createDialogHost({ overlayClass: 'fcm-chat-modal-overlay', dialogClass: 'fcm-chat-modal fcm-chat-group-dialog', overlayStyle: `--s:${cfg.panelColor};--tx:${cfg.fontColor};--ac:${cfg.accentColor}`, onClose: value => resolve(value || '') });
-        host.dialog.innerHTML = `<div>${TH('chatNewGroup')}</div><input data-new-group-name maxlength="24" placeholder="${TH('chatNewGroup')}"><div><button data-modal-cancel>${TH('chatCancel')}</button><button data-modal-ok>${TH('btnConfirm')}</button></div>`;
-        const input = host.dialog.querySelector('[data-new-group-name]');
-        host.listen(host.dialog.querySelector('[data-modal-cancel]'), 'click', () => host.close(''));
-        host.listen(host.dialog.querySelector('[data-modal-ok]'), 'click', () => host.close(input.value.trim()));
-        host.listen(input, 'keydown', event => { event.stopPropagation(); if (event.key === 'Enter') host.close(input.value.trim()); else if (event.key === 'Escape') host.close(''); });
-        host.mount(); input.focus();
-    });
 }
 
 function refreshChatSettings() {
