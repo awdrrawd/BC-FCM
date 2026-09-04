@@ -55,7 +55,6 @@ function createChatBalloonController(context) {
         else if (placement.startsWith('middle')) element.style.top = `calc(50% - 27px + ${index * 58}px)`;
         else element.style.bottom = `${gap}px`;
         element.style.transform = 'none';
-        delete element.dataset.snapEdge;
     }
 
     function placeSaved(element, saved) {
@@ -108,7 +107,7 @@ function createChatBalloonController(context) {
                 balloon.className = 'fcm-chat-user-balloon';
                 balloon.addEventListener('click', () => { if (!balloon.dataset.dragMoved) context.toggleChat(message.memberNumber); });
                 document.body.appendChild(balloon);
-                installChatDrag(balloon, balloon, { configKey: 'chatUserBalloonPositions', memberNumber: String(message.memberNumber), isMaximized: context.isMaximized });
+                installChatDrag(balloon, balloon, { configKey: 'chatUserBalloonPositions', isMaximized: context.isMaximized });
             }
             paint(balloon);
             const saved = cfg.chatUserBalloonPositions?.[message.memberNumber];
