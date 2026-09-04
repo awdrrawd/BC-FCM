@@ -37,6 +37,7 @@ import { createChatContactService } from './chat/services/chat-contact-service.j
 import { animateLayoutChange, animatePanelSize, positionPanel as applyPanelPosition, syncConversationBackButton as syncBackButton } from './chat/controllers/chat-panel-layout.js';
 import { createChatAutoReplyService } from './chat/services/chat-auto-reply.js';
 import { createOfflineDeliveryService } from './chat/services/chat-offline-delivery.js';
+import { createChatSender } from './chat/services/chat-sender.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -107,6 +108,10 @@ const offlineDelivery = createOfflineDeliveryService({
         }
     },
     onError: error => console.warn('🐈‍⬛ [FCM] offline message delivery failed:', error),
+});
+const chatSender = createChatSender({
+    offlineQueue: OfflineQueue, canSendWhisper: canSendBcxWhisper, sendServer: (...args) => ServerSend(...args),
+    sendBeep: sendBcxAwareBeep, recordMessage: (...args) => recordMessage(...args), runWithoutOutgoingCapture,
 });
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
@@ -957,31 +962,8 @@ function sendCurrentMessage() {
     if (!content || !selectedMember) return;
     const available = capability(selectedMember);
     if (available === 'none' && !isFriendOf(selectedMember)) return;
-    if (available === 'none') {
-        const queued = OfflineQueue.add(selectedMember, content);
-        recordMessage({ memberNumber: selectedMember, direction: 'out', channel: 'beep', content, queued: true, queueId: queued.id }, { notify: false });
-        input.value = '';
-        return;
-    }
-    const selectedChannel = available;
-    const replyId = selectedChannel === 'whisper' ? replyTarget?.nativeMsgId : '';
-    const outgoingId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-    const sent = runWithoutOutgoingCapture(() => {
-        if (selectedChannel === 'whisper') {
-            if (!canSendBcxWhisper(selectedMember)) return false;
-            ServerSend('ChatRoomChat', { Type: 'Hidden', Target: selectedMember, Content: 'FCM::CHAT::MESSAGE', Dictionary: [{ Tag: 'FCM::CHAT::MESSAGE', MessageId: outgoingId }] });
-            if (replyTarget) ServerSend('ChatRoomChat', { Type: 'Hidden', Target: selectedMember, Content: 'FCM::CHAT::TAG', Dictionary: [{ Tag: 'FCM::CHAT::TAG', ReplyId: replyId, TargetSharedId: replyTarget.sharedMsgId, Preview: replyTarget.preview }] });
-            const data = typeof globalThis.ChatRoomGenerateChatRoomChatMessage === 'function'
-                ? globalThis.ChatRoomGenerateChatRoomChatMessage('Whisper', content, replyId)
-                : { Type: 'Whisper', Content: content, Dictionary: replyId ? [{ Tag: 'ReplyId', ReplyId: replyId }] : [] };
-            data.Target = selectedMember;
-            ServerSend('ChatRoomChat', data);
-            return true;
-        }
-        return sendBcxAwareBeep({ MemberNumber: selectedMember, BeepType: '', Message: content });
-    });
+    const sent = chatSender.send({ memberNumber: selectedMember, content, channel: available, replyTarget });
     if (!sent) return;
-    recordMessage({ id: outgoingId, sharedMsgId: outgoingId, memberNumber: selectedMember, direction: 'out', channel: selectedChannel, content, replyPreview: replyTarget?.preview || '', replyToId: replyTarget?.sharedMsgId || '' }, { notify: false });
     replyTarget = null;
     input.value = '';
     root?.querySelector('.fcm-chat-reply-indicator')?.remove();
