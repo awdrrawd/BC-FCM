@@ -39,6 +39,7 @@ import { createChatAutoReplyService } from './chat/services/chat-auto-reply.js';
 import { createOfflineDeliveryService } from './chat/services/chat-offline-delivery.js';
 import { createChatSender } from './chat/services/chat-sender.js';
 import { createChatMessageRecorder } from './chat/services/chat-message-recorder.js';
+import { createChatPresenceService } from './chat/services/chat-presence.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -73,7 +74,6 @@ let forwardTargetMode = false;
 let forwardTargetTab = 'room';
 const selectedMessageIds = new Set();
 const whisperMetadata = new WhisperMetadata();
-let onlinePresenceSignature = '';
 const remoteProfiles = new Map();
 
 function resetMessageSelectionState() {
@@ -129,6 +129,11 @@ const offlineDelivery = createOfflineDeliveryService({
 const chatSender = createChatSender({
     offlineQueue: OfflineQueue, canSendWhisper: canSendBcxWhisper, sendServer: (...args) => ServerSend(...args),
     sendBeep: sendBcxAwareBeep, recordMessage: (...args) => recordMessage(...args), runWithoutOutgoingCapture,
+});
+const presence = createChatPresenceService({
+    config: cfg, saveConfig: saveCfg, getPlayer: () => Player,
+    syncSharedSettings: () => globalThis.ServerPlayerOnlineSharedSettingsSync?.(),
+    onError: error => warnLimited('chat presence sync failed', error),
 });
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
@@ -1230,9 +1235,7 @@ async function summonCurrent() {
 
 async function handleOnlineFriendsUpdate(result) {
     if (!cfg.communicationEnabled || !Array.isArray(result)) return;
-    const signature = result.map(row => `${Number(row.MemberNumber)}:${row.ChatRoomName || ''}:${row.ChatRoomSpace || ''}:${row.Private ? 1 : 0}`).sort().join('|');
-    if (signature !== onlinePresenceSignature) {
-        onlinePresenceSignature = signature;
+    if (presence.updateOnlineRows(result)) {
         if (root?.isConnected && root.style.display !== 'none') {
             refreshVisibleChatScroll();
             refreshConversationPresence();
@@ -1242,15 +1245,7 @@ async function handleOnlineFriendsUpdate(result) {
 }
 
 function setStatus(status, rerender = true) {
-    cfg.chatStatus = status;
-    saveCfg();
-    try {
-        Player.OnlineSharedSettings ??= {};
-        Player.OnlineSharedSettings.FCM ??= {};
-        Player.OnlineSharedSettings.FCM.status = status;
-        Player.OnlineSharedSettings.FCM.updatedAt = Date.now();
-        globalThis.ServerPlayerOnlineSharedSettingsSync?.();
-    } catch (error) { warnLimited('chat presence sync failed', error); }
+    presence.setStatus(status);
     const dot = root?.querySelector('.fcm-chat-rail [data-status] .fcm-status-dot');
     if (dot) dot.className = `fcm-status-dot ${status}`;
     if (rerender) renderChat();
