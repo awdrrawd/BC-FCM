@@ -16,7 +16,7 @@ import { warnLimited } from '../core/logger.js';
 import { balloonPreviewText, cleanMessage, esc } from './chat/services/chat-content.js';
 import { exportConversation as exportConversationFile } from './chat/services/chat-export.js';
 import { initChatAudio, playNotificationSound } from './chat-audio.js';
-import { installChatDrag, resetBalloonInteraction } from './chat/controllers/chat-drag.js';
+import { resetBalloonInteraction } from './chat/controllers/chat-drag.js';
 import { createChatBalloonController } from './chat/controllers/chat-balloon.js';
 import { updateMultiSelectUi as syncMultiSelectUi } from './chat/views/chat-selection-view.js';
 import { installMessageActions } from './chat/events/chat-message-actions.js';
@@ -27,7 +27,7 @@ import { conversationMessagesHtml } from './chat/views/chat-message-view.js';
 import { normalizeMessage as normalizeTransportMessage } from './chat/services/chat-transport.js';
 import { ChatConversationController } from './chat/controllers/chat-conversation-controller.js';
 import { createChatContactService } from './chat/services/chat-contact-service.js';
-import { animateLayoutChange, animatePanelSize, positionPanel as applyPanelPosition, syncConversationBackButton as syncBackButton } from './chat/controllers/chat-panel-layout.js';
+import { positionPanel as applyPanelPosition } from './chat/controllers/chat-panel-layout.js';
 import { createChatAutoReplyService } from './chat/services/chat-auto-reply.js';
 import { createOfflineDeliveryService } from './chat/services/chat-offline-delivery.js';
 import { createChatSender } from './chat/services/chat-sender.js';
@@ -56,11 +56,9 @@ import { createChatMessageAppender } from './chat/controllers/chat-message-appen
 import { createChatListController } from './chat/controllers/chat-list-controller.js';
 import { createChatListNavigation } from './chat/controllers/chat-list-navigation.js';
 import { createChatMemberSelection } from './chat/controllers/chat-member-selection.js';
-import {
-    CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
-    EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
-    WATER_ICON, MAXIMIZE_ICON,
-} from '../ui/icons.js';
+import { chatShellHtml } from './chat/views/chat-shell-view.js';
+import { createChatPanelControls } from './chat/controllers/chat-panel-controls.js';
+import { EDIT_ICON, WATER_ICON } from '../ui/icons.js';
 
 let root = null;
 let selectedMember = null;
@@ -279,6 +277,13 @@ const chatBalloons = createChatBalloonController({
     unreadCount: memberNumber => listPresenter.unreadCount(memberNumber),
     waterShapeHtml,
 });
+const panelControls = createChatPanelControls({
+    getRoot: () => root, config: cfg, saveConfig: saveCfg, panelSession: chatPanelSession,
+    getMaximized: () => maximized, setMaximized: value => { maximized = value; },
+    setStackedDetail: value => { stackedDetail = value; },
+    getSelectedMember: () => selectedMember, closeChat, minimizeChat,
+    syncBalloonVisibility: chatBalloons.syncVisibility, text: T, htmlText: TH,
+});
 
 function chatColors() {
     if (cfg.chatThemeMode === 'custom') return [cfg.chatPanelColor, cfg.chatFontColor, cfg.chatAccentColor];
@@ -414,24 +419,14 @@ function renderChat() {
     const settingsScrollTop = activeView === 'settings' ? root.querySelector('.fcm-chat-list')?.scrollTop : null;
     const [chatPanel, chatText, chatAccent] = chatColors();
     const sessionSizeStyle = chatPanelSession.inlineSizeStyle();
-    root.innerHTML = `<div id="fcm-chat-panel" class="${maximized ? 'maximized' : ''}" data-layout-mode="${esc(cfg.chatLayout || 'split')}" data-theme="${esc(cfg.chatThemeMode === 'preset' ? cfg.chatThemePreset : cfg.chatThemeMode === 'custom' ? 'custom' : cfg.themePreset || 'violet')}" style="${sessionSizeStyle}--s:${esc(chatPanel)};--tx:${esc(chatText)};--ac:${esc(chatAccent)};--chat-font-size:${Number(cfg.chatFontSize) || 13}px;--chat-font-family:${esc(chatFontFamily())}">
-        <div class="fcm-chat-titlebar"><b>FCM-Chat</b><span></span><button class="fcm-chat-icon-action ${cfg.chatLayout === 'stacked' ? 'active' : ''}" data-layout title="${TH('chatToggleLayout')}">${LAYOUT_ICON}<i>${cfg.chatLayout === 'stacked' ? TH('chatLayoutSplit') : TH('chatLayoutMerged')}</i></button><button class="fcm-chat-icon-action ${maximized ? 'active' : ''}" data-max title="${TH('chatToggleMax')}">${MAXIMIZE_ICON}<i>${maximized ? TH('chatRestore') : TH('chatMaximize')}</i></button><button class="fcm-chat-icon-action" data-min title="${TH('chatMinimize')}">—</button><button class="fcm-chat-icon-action" data-close title="${TH('chatClose')}">×</button></div>
-        <div class="fcm-chat-body view-${esc(activeView)} ${cfg.chatLayout === 'stacked' ? 'stacked' : ''} ${activeView === 'profile' || activeView === 'settings' ? 'wide-view' : ''} ${forwardTargets.isActive() ? 'forward-target-mode' : ''}">
-            <nav class="fcm-chat-rail">
-                <button class="fcm-chat-rail-button fcm-chat-self ${activeView === 'profile' ? 'active' : ''}" data-view="profile" title="${TH('chatProfileTab')}">${avatarHtml(Player?.MemberNumber || 0, 34, 'toolbar')}</button>
-                <button class="fcm-chat-rail-button ${activeView === 'notifications' ? 'active' : ''}" data-view="notifications" title="${TH('chatNotificationsTab')}">${NOTIFICATION_ICON}${unreadBadge()}</button>
-                <button class="fcm-chat-rail-button ${activeView === 'chat' ? 'active' : ''}" data-view="chat" title="${TH('chatChatTab')}">${CHAT_ICON}</button>
-                <button class="fcm-chat-rail-button ${activeView === 'groups' ? 'active' : ''}" data-view="groups" title="${TH('chatGroupsTab')}">${GROUP_ICON}</button>
-                <span></span>
-                <button class="fcm-chat-rail-button" data-status title="${TH('chatStatusTab')}"><i class="fcm-status-dot ${esc(cfg.chatStatus || 'online')}"></i></button>
-                <button class="fcm-chat-rail-button ${activeView === 'settings' ? 'active' : ''}" data-view="settings" title="${TH('chatSettingsTab')}">${SETTINGS_ICON}</button>
-            </nav>
-            <aside class="fcm-chat-list ${stackedDetail && !forwardTargets.isActive() ? 'slide-out' : ''}">${listHtml()}</aside>
-            <main class="fcm-chat-main ${stackedDetail && !forwardTargets.isActive() ? 'slide-in' : ''}">${conversationPresenter.html()}</main>
-        </div>
-        <div class="fcm-chat-status-menu"><button data-status-value="online"><i class="online"></i>${TH('chatStatusOnline')}</button><button data-status-value="busy"><i class="busy"></i>${TH('chatStatusBusy')}</button><button data-status-value="afk"><i class="afk"></i>${TH('chatStatusAFK')}</button></div>
-        <div class="fcm-chat-context-menu" hidden><button data-context-select>${TH('chatSelectMessage')}</button><button data-context-copy>${TH('chatCopy')}</button><button data-context-multi>${TH('chatMultiSelect')}</button><button data-context-reply>${TH('chatReply')}</button><button data-context-cancel>${TH('chatCancel')}</button></div>
-    </div>`;
+    root.innerHTML = chatShellHtml({
+        maximized, layout: cfg.chatLayout, theme: cfg.chatThemeMode === 'preset' ? cfg.chatThemePreset : cfg.chatThemeMode === 'custom' ? 'custom' : cfg.themePreset || 'violet',
+        sizeStyle: sessionSizeStyle, panelColor: chatPanel, textColor: chatText, accentColor: chatAccent,
+        fontSize: cfg.chatFontSize, fontFamily: chatFontFamily(), activeView, stackedDetail,
+        forwardTargetMode: forwardTargets.isActive(), selfAvatarHtml: avatarHtml(Player?.MemberNumber || 0, 34, 'toolbar'),
+        unreadBadgeHtml: unreadBadge(), status: cfg.chatStatus, listHtml: listHtml(),
+        conversationHtml: conversationPresenter.html(), text: TH,
+    });
     applyPanelPosition(root.querySelector('#fcm-chat-panel'), maximized, cfg.chatPanelPosition);
     chatBalloons.syncVisibility();
     bindEvents();
@@ -528,47 +523,7 @@ function refreshConversationMain({ scrollToLatest = true } = {}) {
 
 function bindEvents() {
     const panel = root.querySelector('#fcm-chat-panel');
-    chatPanelSession.observe(panel, () => maximized);
-    installChatDrag(panel, panel.querySelector('.fcm-chat-titlebar'), { configKey: 'chatPanelPosition', isMaximized: () => maximized });
-    root.querySelector('[data-close]')?.addEventListener('click', closeChat);
-    root.querySelector('[data-min]')?.addEventListener('click', minimizeChat);
-    root.querySelector('[data-max]')?.addEventListener('click', event => {
-        event.stopPropagation();
-        const before = panel.getBoundingClientRect();
-        panel.classList.add('fcm-size-animating');
-        maximized = !maximized; panel.classList.toggle('maximized', maximized);
-        event.currentTarget.classList.toggle('active', maximized); const label=event.currentTarget.querySelector('i'); if(label) label.textContent=maximized?T('chatRestore'):T('chatMaximize');
-        chatBalloons.syncVisibility();
-        animatePanelSize(panel, before);
-    });
-    root.querySelector('button[data-layout]')?.addEventListener('click', event => {
-        event.stopPropagation();
-        const body = panel.querySelector('.fcm-chat-body');
-        const list = body?.querySelector('.fcm-chat-list');
-        const main = body?.querySelector('.fcm-chat-main');
-        const beforeList = list?.getBoundingClientRect();
-        const beforeMain = main?.getBoundingClientRect();
-        cfg.chatLayout = cfg.chatLayout === 'stacked' ? 'split' : 'stacked';
-        stackedDetail = cfg.chatLayout === 'stacked' && !!selectedMember;
-        saveCfg();
-        const stacked = cfg.chatLayout === 'stacked';
-        const button = event.currentTarget;
-        panel.dataset.layoutMode = cfg.chatLayout;
-        button.classList.toggle('active', stacked);
-        button.innerHTML = `${LAYOUT_ICON}<i>${stacked ? TH('chatLayoutSplit') : TH('chatLayoutMerged')}</i>`;
-        body?.classList.toggle('stacked', stacked);
-        list?.classList.toggle('slide-out', stackedDetail);
-        main?.classList.toggle('slide-in', stackedDetail);
-        syncBackButton(main, stacked, {
-            title: T('chatBack'), icon: EXIT_ICON,
-            onBack: () => {
-                stackedDetail = false;
-                root.querySelector('.fcm-chat-list')?.classList.remove('slide-out');
-                root.querySelector('.fcm-chat-main')?.classList.remove('slide-in');
-            },
-        });
-        if (beforeList && beforeMain) animateLayoutChange(list, main, beforeList, beforeMain, stacked, stackedDetail);
-    });
+    panelControls.bind(panel);
     root.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { activeView = button.dataset.view; resetMessageSelectionState(); stackedDetail = false; renderChat(); }));
     listNavigation.bind(root);
     bindConversationEvents();
