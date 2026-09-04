@@ -18,7 +18,6 @@ import { balloonPreviewText, cleanMessage, esc } from './chat-content.js';
 import { exportConversation as exportConversationFile } from './chat-export.js';
 import { initChatAudio, playNotificationSound } from './chat-audio.js';
 import { installChatDrag, resetBalloonInteraction } from './chat-drag.js';
-import { ConversationViewport } from './chat-viewport.js';
 import { createChatBalloonController } from './chat-balloon.js';
 import { createDialogHost } from '../ui/dialog.js';
 import { buildForwardTargetGroups, forEachForwardedMessage, forwardedMessageText, selectedMessages } from './chat-selection.js';
@@ -31,7 +30,8 @@ import { settingsHtml as renderSettingsHtml } from './chat-settings-view.js';
 import { conversationMessagesHtml, messageDateKey, messageDateLabel, messageHtml } from './chat-message-view.js';
 import { contactCardHtml as renderContactCardHtml, conversationHtml as renderConversationHtml } from './chat-conversation-view.js';
 import { WhisperMetadata, classifyIncomingBeep, findPendingOutgoingWhisper, normalizeMessage as normalizeTransportMessage } from './chat-transport.js';
-import { conversationRows, historyMessageRows, mergeOlderMessages, normalizeConversationPage, recentConversationRows, unreadMessageCount } from './chat-conversation-data.js';
+import { conversationRows, historyMessageRows, recentConversationRows, unreadMessageCount } from './chat-conversation-data.js';
+import { ChatConversationController } from './chat-conversation-controller.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -41,13 +41,8 @@ import {
 let root = null;
 let selectedMember = null;
 let messages = [];
-let conversationMessages = [];
-let conversationHasMore = false;
-let conversationLoading = false;
-let conversationUnread = 0;
 let historyDateFrame = 0;
-const conversationViewport = new ConversationViewport(40);
-const CONVERSATION_PAGE_SIZE = 50;
+const conversation = new ChatConversationController(50, 40);
 let search = '';
 let presenceFilter = 'online';
 let relationFilter = '';
@@ -222,7 +217,7 @@ async function recordMessage(data, { notify = true } = {}) {
             messages = await ChatStore.recentIndex();
     if (root?.isConnected && root.style.display !== 'none') {
         if (Number(message.memberNumber) === Number(selectedMember)) {
-            if (!conversationMessages.some(row => row.id === message.id)) conversationMessages.push(message);
+            conversation.add(message);
             appendConversationMessage(message);
         }
         refreshVisibleChatScroll();
@@ -517,8 +512,8 @@ function conversationHtml() {
         displayName: getDisplayName(selectedMember), biography: biography(selectedMember), showNotFriendBadge,
         roomText, roomName: roomInfo?.name || '', canOpenRoom,
         canSummon: !!ChatRoomData && online && !inRoomFn(selectedMember), groups: Object.entries(cfg.chatGroups || {}),
-        contactCardHtml: contactCardOpen ? contactCardHtml() : '', messagesHtml: conversationMessagesHtml(conversationMessages),
-        unread: conversationUnread, multiSelect: multiSelectMode, available, online,
+        contactCardHtml: contactCardOpen ? contactCardHtml() : '', messagesHtml: conversationMessagesHtml(conversation.messages),
+        unread: conversation.unread, multiSelect: multiSelectMode, available, online,
         canInvite: available !== 'none' && !inRoomFn(selectedMember), inputPlaceholder, unavailable,
         replyTarget, selectedCount: selectedMessageIds.size, canForwardToRoom: !!ChatRoomData,
     });
@@ -582,7 +577,7 @@ function bindMessageImages(scope, log) {
         image.addEventListener('load', () => {
             // Image decoding can increase the message height after the message was
             // appended. Keep following only while the user has not left the bottom.
-            if (log && conversationViewport.followingLatest) conversationViewport.scrollToLatest(log);
+            if (log && conversation.viewport.followingLatest) conversation.viewport.scrollToLatest(log);
         }, { once: true });
         image.addEventListener('error', () => {
             const link = image.closest('a');
@@ -606,10 +601,10 @@ function appendConversationMessage(message) {
     if (!log || log.querySelector(`[data-msg-id="${CSS.escape(String(message.id))}"]`)) return;
     // This must be captured before inserting the new row. Measuring afterwards
     // makes the new row itself look like the user scrolled away from the bottom.
-    const shouldFollowLatest = conversationViewport.shouldFollow(log, message.direction);
+    const shouldFollowLatest = conversation.viewport.shouldFollow(log, message.direction);
     log.querySelector(':scope > .fcm-chat-empty')?.remove();
     const previousElement = [...log.querySelectorAll(':scope > .fcm-chat-message')].at(-1);
-    const previousMessage = previousElement ? conversationMessages.find(row => String(row.id) === previousElement.dataset.msgId) : null;
+    const previousMessage = previousElement ? conversation.messages.find(row => String(row.id) === previousElement.dataset.msgId) : null;
     if (!previousMessage || messageDateKey(previousMessage.timestamp) !== messageDateKey(message.timestamp)) {
         log.insertAdjacentHTML('beforeend', `<div class="fcm-chat-date-separator" data-message-date="${esc(messageDateKey(message.timestamp))}"><span>${esc(messageDateLabel(message.timestamp))}</span></div>`);
     }
@@ -621,38 +616,26 @@ function appendConversationMessage(message) {
     });
     bindMessageImages(inserted, log);
     if (shouldFollowLatest) {
-        conversationViewport.follow();
-        conversationUnread = 0;
-        requestAnimationFrame(() => { conversationViewport.scrollToLatest(log); updateConversationUnreadNotice(); });
+        conversation.viewport.follow();
+        conversation.unread = 0;
+        requestAnimationFrame(() => { conversation.viewport.scrollToLatest(log); updateConversationUnreadNotice(); });
     } else {
-        conversationUnread++;
+        conversation.unread++;
         updateConversationUnreadNotice();
     }
 }
 
 async function loadConversation(memberNumber) {
-    const target = Number(memberNumber);
-    conversationLoading = true;
-    const page = await ChatStore.page(target, { limit: CONVERSATION_PAGE_SIZE });
-    if (Number(selectedMember) === target) {
-        conversationMessages = normalizeConversationPage(page.messages);
-        conversationHasMore = page.hasMore;
-        conversationUnread = 0;
-        conversationViewport.follow();
-    }
-    conversationLoading = false;
+    await conversation.load(ChatStore, memberNumber, target => Number(selectedMember) === target);
 }
 
 async function loadOlderConversation(log) {
-    if (!selectedMember || conversationLoading || !conversationHasMore || !conversationMessages.length) return;
-    conversationLoading = true;
-    const target = Number(selectedMember);
+    if (!selectedMember) return;
     const oldHeight = log.scrollHeight;
     const oldTop = log.scrollTop;
-    const page = await ChatStore.page(target, { before: conversationMessages[0].timestamp, limit: CONVERSATION_PAGE_SIZE });
-    if (Number(selectedMember) === target && page.messages.length) {
-        conversationMessages = mergeOlderMessages(conversationMessages, page.messages);
-        log.innerHTML = conversationMessagesHtml(conversationMessages);
+    const loaded = await conversation.loadOlder(ChatStore, selectedMember, target => Number(selectedMember) === target);
+    if (loaded) {
+        log.innerHTML = conversationMessagesHtml(conversation.messages);
         bindMessageImages(log, log);
         updateMultiSelectUi();
         log.querySelectorAll('[data-join-room]').forEach(button => button.addEventListener('click', () => {
@@ -660,16 +643,14 @@ async function loadOlderConversation(log) {
         }));
         log.scrollTop = oldTop + (log.scrollHeight - oldHeight);
         updateHistoryDateBubble(log);
-        conversationHasMore = page.hasMore;
-    } else if (Number(selectedMember) === target) conversationHasMore = false;
-    conversationLoading = false;
+    }
 }
 
 function updateConversationUnreadNotice() {
     const button = root?.querySelector('[data-new-messages]');
     if (!button) return;
-    button.hidden = !conversationUnread;
-    button.textContent = T('chatNewUnread', conversationUnread);
+    button.hidden = !conversation.unread;
+    button.textContent = T('chatNewUnread', conversation.unread);
 }
 
 function updateHistoryDateBubble(log) {
@@ -781,8 +762,8 @@ function renderChat() {
     const log = root.querySelector('.fcm-chat-messages');
     if (log) {
         bindMessageImages(log, log);
-        conversationViewport.follow();
-        conversationViewport.scrollToLatest(log);
+        conversation.viewport.follow();
+        conversation.viewport.scrollToLatest(log);
     }
     if (settingsScrollTop !== null && settingsScrollTop !== undefined) {
         const settingsList = root.querySelector('.fcm-chat-list');
@@ -904,16 +885,16 @@ function bindConversationEvents() {
     const conversationLog = main.querySelector('.fcm-chat-messages');
     conversationLog?.addEventListener('scroll', () => {
         if (conversationLog.scrollTop < 80) loadOlderConversation(conversationLog);
-        if (conversationViewport.updateFromScroll(conversationLog) && conversationUnread) {
-            conversationUnread = 0;
+        if (conversation.viewport.updateFromScroll(conversationLog) && conversation.unread) {
+            conversation.unread = 0;
             updateConversationUnreadNotice();
         }
         updateHistoryDateBubble(conversationLog);
     });
     main.querySelector('[data-new-messages]')?.addEventListener('click', () => {
-        conversationViewport.follow();
-        conversationViewport.scrollToLatest(conversationLog);
-        conversationUnread = 0;
+        conversation.viewport.follow();
+        conversation.viewport.scrollToLatest(conversationLog);
+        conversation.unread = 0;
         updateConversationUnreadNotice();
     });
     main.querySelector('[data-multi-forward-contact]')?.addEventListener('click', showForwardTargetList);
@@ -972,8 +953,8 @@ function refreshConversationMain({ scrollToLatest = true } = {}) {
     if (log) {
         bindMessageImages(log, log);
         if (scrollToLatest) {
-            conversationViewport.follow();
-            conversationViewport.scrollToLatest(log);
+            conversation.viewport.follow();
+            conversation.viewport.scrollToLatest(log);
         }
     }
     requestAnimationFrame(() => { const bio = main.querySelector('.fcm-chat-bio'); if (bio) bio.classList.toggle('marquee', bio.scrollWidth > bio.clientWidth); });
@@ -1208,7 +1189,7 @@ function bindContactCardEvents() {
 }
 
 function selectedMessageRecords() {
-    return selectedMessages(conversationMessages, selectedMessageIds);
+    return selectedMessages(conversation.messages, selectedMessageIds);
 }
 
 function updateMultiSelectUi() {
@@ -1375,9 +1356,7 @@ async function deleteConversation() {
     await ChatStore.deleteMember(selectedMember);
     OfflineQueue.removeMember(selectedMember);
     messages = messages.filter(message => message.memberNumber !== selectedMember);
-    conversationMessages = [];
-    conversationHasMore = false;
-    conversationUnread = 0;
+    conversation.reset();
     renderChat();
 }
 
