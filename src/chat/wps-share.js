@@ -46,10 +46,11 @@ import { warnLimited } from '../core/logger.js';
             && profile.characterBundle.length <= WPS_MAX_BYTES;
     }
     async function wpsShareProfile(memberNumber) {
-        if (!PDB.db) return;
+        if (!PDB.db || !globalThis.ChatRoomData || typeof globalThis.ServerSend !== 'function') return false;
         const mn = parseInt(memberNumber);
+        if (!Number.isSafeInteger(mn) || mn <= 0) return false;
         const prof = await PDB.get(mn);
-        if (!prof) return;
+        if (!prof?.characterBundle) return false;
         const payload = {
             sharedAt: Date.now(),
             from: { memberNumber: Player?.MemberNumber, name: Player?.Nickname || Player?.Name || String(Player?.MemberNumber) },
@@ -60,13 +61,14 @@ import { warnLimited } from '../core/logger.js';
         const total = Math.ceil(encoded.length / WPS_CHUNK);
         if (!total || total > WPS_MAX_CHUNKS || encoded.length > WPS_MAX_BYTES) {
             console.warn('🐈‍⬛ [FCM] WPS profile is too large to share safely');
-            return;
+            return false;
         }
         for (let i = 0; i < total; i++) {
             ServerSend('ChatRoomChat', { Type: 'Hidden', Content: `${WPS_PREFIX} ${shareId} ${i+1}/${total} ${encoded.slice(i*WPS_CHUNK, (i+1)*WPS_CHUNK)}` });
         }
         const displayName = prof.lastNick || prof.name || mn;
         if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('shareLocalMsg', displayName, mn), 0);
+        return true;
     }
 
     function wpsHandleMessage(data) {

@@ -1,10 +1,10 @@
 import { T } from '../i18n/i18n.js';
-import { PDB } from '../data/profile-db.js';
 import { amAdmin, inRoomFn, getDisplayName, isFriendOf } from '../data/data.js';
 import { renderCurrent, minimizePanel, closePanel } from '../panel/panel-controller.js';
 import { sendBcxAwareBeep } from '../communication/bcx-compat.js';
 import { warnLimited } from '../core/logger.js';
 import { closeDialog, createDialogHost } from '../ui/dialog.js';
+import { openProfile } from '../api/public-api.js';
 // ════════════════════════════════════════
 //  FCM module: actions.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -43,11 +43,7 @@ import { closeDialog, createDialogHost } from '../ui/dialog.js';
     //  INTERACTION HELPERS
     // ═══════════════════════════════════════════════════════════
     async function doView(mn) {
-        mn = parseInt(mn);
-        const C = ChatRoomCharacter && ChatRoomCharacter.find(c => c.MemberNumber === mn);
-        if (C && typeof InformationSheetLoadCharacter === 'function') { InformationSheetLoadCharacter(C); return; }
-        const p = await PDB.get(mn); if (!p || !p.characterBundle) { alert(T('noProfile')); return; }
-        try { const data = JSON.parse(p.characterBundle); if (typeof CharacterLoadOnline === 'function') { const loaded = CharacterLoadOnline(data, mn); if (typeof InformationSheetLoadCharacter === 'function') InformationSheetLoadCharacter(loaded); } } catch { alert(T('noProfile')); }
+        if (!await openProfile(mn)) alert(T('noProfile'));
     }
 
     function doBeep(mn) {
