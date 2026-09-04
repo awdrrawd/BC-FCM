@@ -8,9 +8,8 @@ export { default as ALARM_ACTIVE_ICON } from '../../assets/icons/alarm-active.sv
 export { default as EXIT_ICON } from '../../assets/icons/exit.svg?raw';
 export { default as DOWNLOAD_ICON } from '../../assets/icons/download.svg?raw';
 export { default as TRASH_ICON } from '../../assets/icons/trash.svg?raw';
-export { default as SPLIT_ICON } from '../../assets/icons/split.svg?raw';
-export { default as MERGE_ICON } from '../../assets/icons/split.svg?raw';
-export { default as MERGE_ASSET_ICON } from '../../assets/icons/merge.svg?raw';
+// 版面切換沿用同一圖示，由面板狀態以 CSS 翻轉方向。
+export { default as LAYOUT_ICON } from '../../assets/icons/split.svg?raw';
 export { default as ROOM_INVITE_ICON } from '../../assets/icons/invite.svg?raw';
 export { default as EDIT_ICON } from '../../assets/icons/edit.svg?raw';
 export { default as SETTINGS_ICON } from '../../assets/icons/settings.svg?raw';

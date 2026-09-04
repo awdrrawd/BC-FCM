@@ -24,7 +24,7 @@ import { createChatBalloonController } from './chat-balloon.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     ALARM_MUTED_ICON, ALARM_ACTIVE_ICON, EXIT_ICON, DOWNLOAD_ICON,
-    TRASH_ICON, SPLIT_ICON, MERGE_ICON, EDIT_ICON, SETTINGS_ICON,
+    TRASH_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
     SUMMON_ICON, INVITE_ICON, WATER_ICON, FOLDER_ICON, MAXIMIZE_ICON, REPLY_ICON, ADD_FRIEND_ICON, SEARCH_ICON,
 } from '../ui/icons.js';
 
@@ -174,7 +174,7 @@ async function initChat() {
     if (initialized) return;
     initialized = true;
     await ChatStore.init();
-    messages = await ChatStore.prune();
+    messages = await ChatStore.recentIndex();
     if (cfg.saveMode !== 'off') {
         await PDB.init();
         await PDB.batchGet([...new Set(messages.map(message => Number(message.memberNumber)).filter(Boolean))]);
@@ -229,7 +229,7 @@ async function recordMessage(data, { notify = true } = {}) {
     const message = normalizeMessage(data);
     if (!message.content) return;
     await ChatStore.put(message);
-    messages = await ChatStore.prune();
+            messages = await ChatStore.recentIndex();
     if (root?.isConnected && root.style.display !== 'none') {
         if (Number(message.memberNumber) === Number(selectedMember)) {
             if (!conversationMessages.some(row => row.id === message.id)) conversationMessages.push(message);
@@ -394,7 +394,7 @@ async function openChat(memberNumber = null) {
     root.style.display = 'block';
     requestOnlineFriends();
     if (selectedMember) await ChatStore.markRead(selectedMember);
-    messages = await ChatStore.prune();
+    messages = await ChatStore.recentIndex();
     if (selectedMember) await loadConversation(selectedMember);
     chatBalloons.refreshBadges();
     renderChat();
@@ -883,7 +883,7 @@ function renderChat() {
     const [chatPanel, chatText, chatAccent] = chatColors();
     const sessionSizeStyle = chatPanelSession.inlineSizeStyle();
     root.innerHTML = `<div id="fcm-chat-panel" class="${maximized ? 'maximized' : ''}" data-layout-mode="${esc(cfg.chatLayout || 'split')}" data-theme="${esc(cfg.chatThemeMode === 'preset' ? cfg.chatThemePreset : cfg.chatThemeMode === 'custom' ? 'custom' : cfg.themePreset || 'violet')}" style="${sessionSizeStyle}--s:${esc(chatPanel)};--tx:${esc(chatText)};--ac:${esc(chatAccent)};--chat-font-size:${Number(cfg.chatFontSize) || 13}px;--chat-font-family:${esc(chatFontFamily())}">
-        <div class="fcm-chat-titlebar"><b>FCM-Chat</b><span></span><button class="fcm-chat-icon-action ${cfg.chatLayout === 'stacked' ? 'active' : ''}" data-layout title="${TH('chatToggleLayout')}">${cfg.chatLayout === 'stacked' ? SPLIT_ICON : MERGE_ICON}<i>${cfg.chatLayout === 'stacked' ? TH('chatLayoutSplit') : TH('chatLayoutMerged')}</i></button><button class="fcm-chat-icon-action ${maximized ? 'active' : ''}" data-max title="${TH('chatToggleMax')}">${MAXIMIZE_ICON}<i>${maximized ? TH('chatRestore') : TH('chatMaximize')}</i></button><button class="fcm-chat-icon-action" data-min title="${TH('chatMinimize')}">—</button><button class="fcm-chat-icon-action" data-close title="${TH('chatClose')}">×</button></div>
+        <div class="fcm-chat-titlebar"><b>FCM-Chat</b><span></span><button class="fcm-chat-icon-action ${cfg.chatLayout === 'stacked' ? 'active' : ''}" data-layout title="${TH('chatToggleLayout')}">${LAYOUT_ICON}<i>${cfg.chatLayout === 'stacked' ? TH('chatLayoutSplit') : TH('chatLayoutMerged')}</i></button><button class="fcm-chat-icon-action ${maximized ? 'active' : ''}" data-max title="${TH('chatToggleMax')}">${MAXIMIZE_ICON}<i>${maximized ? TH('chatRestore') : TH('chatMaximize')}</i></button><button class="fcm-chat-icon-action" data-min title="${TH('chatMinimize')}">—</button><button class="fcm-chat-icon-action" data-close title="${TH('chatClose')}">×</button></div>
         <div class="fcm-chat-body view-${esc(activeView)} ${cfg.chatLayout === 'stacked' ? 'stacked' : ''} ${activeView === 'profile' || activeView === 'settings' ? 'wide-view' : ''} ${forwardTargetMode ? 'forward-target-mode' : ''}">
             <nav class="fcm-chat-rail">
                 <button class="fcm-chat-rail-button fcm-chat-self ${activeView === 'profile' ? 'active' : ''}" data-view="profile" title="${TH('chatProfileTab')}">${avatarHtml(Player?.MemberNumber || 0, 34, 'toolbar')}</button>
@@ -979,7 +979,7 @@ function bindMemberRows(scope = root) {
         channel = inRoomFn(selectedMember) ? 'whisper' : 'beep';
         stackedDetail = true;
         await ChatStore.markRead(selectedMember);
-        messages = await ChatStore.prune();
+    messages = await ChatStore.recentIndex();
         await loadConversation(selectedMember);
         chatBalloons.refreshBadges();
         renderChat();
@@ -1032,7 +1032,7 @@ function bindEvents() {
         const button = event.currentTarget;
         panel.dataset.layoutMode = cfg.chatLayout;
         button.classList.toggle('active', stacked);
-        button.innerHTML = `${stacked ? SPLIT_ICON : MERGE_ICON}<i>${stacked ? TH('chatLayoutSplit') : TH('chatLayoutMerged')}</i>`;
+        button.innerHTML = `${LAYOUT_ICON}<i>${stacked ? TH('chatLayoutSplit') : TH('chatLayoutMerged')}</i>`;
         body?.classList.toggle('stacked', stacked);
         list?.classList.toggle('slide-out', stackedDetail);
         main?.classList.toggle('slide-in', stackedDetail);
@@ -1692,7 +1692,7 @@ async function handleOnlineFriendsUpdate(result) {
             OfflineQueue.remove([row.id]);
             const stored = (await ChatStore.all()).find(message => message.queueId === row.id);
             if (stored) await ChatStore.put({ ...stored, queued: false, deliveredAt: Date.now() });
-            messages = await ChatStore.prune();
+        messages = await ChatStore.recentIndex();
             if (root?.isConnected && root.style.display !== 'none') {
                 const element = root.querySelector(`[data-msg-id="${CSS.escape(String(stored?.id || ''))}"]`);
                 element?.classList.remove('queued');
@@ -1743,4 +1743,4 @@ function refreshChatSettings() {
     } else if (root?.isConnected && root.style.display !== 'none') renderChat();
 }
 
-export { initChat, openChat, closeChat, refreshChatSettings, handleIncomingBeep, handleIncomingChatMessageId, handleIncomingChatTag, handleIncomingFriendRequestNotice, handleIncomingWhisper, handleIncomingWhisperDisplay, handleOutgoingServerSend, handleOnlineFriendsUpdate, playNotificationSound, saveCustomNotificationSound };
+export { initChat, openChat, closeChat, refreshChatSettings, handleIncomingBeep, handleIncomingChatMessageId, handleIncomingChatTag, handleIncomingFriendRequestNotice, handleIncomingWhisper, handleIncomingWhisperDisplay, handleOutgoingServerSend, handleOnlineFriendsUpdate };

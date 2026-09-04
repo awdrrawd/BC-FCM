@@ -1,7 +1,7 @@
 <h1 align="center">👥 Liko-FCM — Friends & ChatRoom Manager</h1>
 <div align="center">
    
-![Version](https://img.shields.io/badge/version-1.5.0-purple.svg)
+![Version](https://img.shields.io/badge/version-1.6.4-purple.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)
 ![BondageClub](https://img.shields.io/badge/BondageClub-Compatible-pink.svg)
 

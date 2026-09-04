@@ -85,9 +85,9 @@ const ChatStore = {
             } catch (error) { warnLimited('chat history read failed', error); resolve([]); }
         });
     },
-    // Returns a lightweight recent-message index for the UI. Despite the legacy
-    // name this must never delete history; deletion is an explicit user action.
-    async prune({ maxCount = 100 } = {}) {
+    // Returns a lightweight recent-message index for the UI. This never deletes
+    // history; deletion remains an explicit user action.
+    async recentIndex({ maxCount = 100 } = {}) {
         const ownerMemberNumber = accountNumber();
         if (!ownerMemberNumber || !this.db) await this.init();
         if (!ownerMemberNumber || !this.db || maxCount <= 0) return [];
