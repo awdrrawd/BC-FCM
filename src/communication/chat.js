@@ -29,11 +29,11 @@ import { bindChatProfileEvents } from './chat-profile-events.js';
 import { chatListHtml as renderChatListHtml, contactRowsHtml, groupsHtml as renderGroupsHtml, notificationsHtml as renderNotificationsHtml } from './chat-list-view.js';
 import { settingsHtml as renderSettingsHtml } from './chat-settings-view.js';
 import { conversationMessagesHtml, messageDateKey, messageDateLabel, messageHtml } from './chat-message-view.js';
+import { contactCardHtml as renderContactCardHtml, conversationHtml as renderConversationHtml } from './chat-conversation-view.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
-    EXIT_ICON, DOWNLOAD_ICON,
-    TRASH_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
-    SUMMON_ICON, INVITE_ICON, WATER_ICON, FOLDER_ICON, MAXIMIZE_ICON, ADD_FRIEND_ICON, SEARCH_ICON,
+    EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
+    WATER_ICON, MAXIMIZE_ICON,
 } from '../ui/icons.js';
 
 let root = null;
@@ -550,7 +550,7 @@ function conversationRoomState(memberNumber) {
 }
 
 function conversationHtml() {
-    if (!selectedMember) return `<div class="fcm-chat-empty">${TH('chatSelectPlayer')}</div>`;
+    if (!selectedMember) return renderConversationHtml({ memberNumber: null });
     const available = capability(selectedMember);
     const { roomInfo, roomText: baseRoomText, canOpenRoom, unavailable } = conversationRoomState(selectedMember);
     const cachedRoom = roomInfo?.name ? getCachedRoomInfo(roomInfo.name) : null;
@@ -558,34 +558,24 @@ function conversationHtml() {
     const memberLimit = roomInfo?.isCurrent ? (ChatRoomData?.MemberLimit ?? null) : (roomInfo?.memberLimit ?? cachedRoom?.MemberLimit ?? null);
     const roomCount = memberCount !== null && memberCount !== undefined ? ` ＜${memberCount}${memberLimit !== null && memberLimit !== undefined ? `/${memberLimit}` : ''}＞` : '';
     const roomText = canOpenRoom ? `${roomInfo.name}${roomCount}` : baseRoomText;
-    const rows = conversationMessages;
     const online = available !== 'none';
     const showNotFriendBadge = !isFriendOf(selectedMember) && !unavailable;
     const inputPlaceholder = unavailable ? T('noBeepNotFriend') : !online ? T('chatOfflineQueuePlaceholder') : available === 'whisper' ? T('chatWhisperInputPlaceholder') : T('chatPrivateInputPlaceholder');
-    return `<header class="fcm-chat-conversation-header">
-        ${cfg.chatLayout === 'stacked' ? `<button class="fcm-chat-back fcm-chat-icon-action" data-back title="${TH('chatBack')}">${EXIT_ICON}</button>` : ''}
-        ${avatarHtml(selectedMember, 38, 'conversation')}
-        <span class="fcm-chat-conversation-meta"><span class="fcm-chat-name-line"><b>${esc(getDisplayName(selectedMember))} (${selectedMember})${showNotFriendBadge ? `<i class="fcm-chat-not-friend">${TH('chatNotFriend')}</i>` : ''}</b><small data-room-meta="${selectedMember}" title="${esc(roomText)}" ${canOpenRoom ? `data-room-name="${esc(roomInfo.name)}" role="button" tabindex="0"` : ''}>${esc(roomText)}</small></span><small class="fcm-chat-bio"><i>${esc(biography(selectedMember) || '-')}</i></small></span>
-        <button class="fcm-chat-header-action fcm-chat-icon-action" data-summon ${!ChatRoomData || !online || inRoomFn(selectedMember) ? 'disabled' : ''} title="${TH('beepSummon')}">${SUMMON_ICON}</button>
-        <div class="fcm-chat-assign"><button class="fcm-chat-rail-button" data-toggle-assign title="${TH('chatAssignGroup')}">${GROUP_ICON}</button><div class="fcm-chat-assign-menu" data-assign-menu>${Object.entries(cfg.chatGroups || {}).map(([id,label]) => `<button data-assign-group="${esc(id)}">${esc(label)}</button>`).join('')}<button class="create" data-create-group-from-chat>＋ ${TH('chatNewGroup')}</button></div></div>
-    </header>
-    ${contactCardOpen ? contactCardHtml() : ''}
-    <div class="fcm-chat-messages">${conversationMessagesHtml(rows) || `<div class="fcm-chat-empty">${TH('chatNoMessages')}</div>`}</div>
-    <div class="fcm-chat-history-date" data-history-date hidden></div>
-    <button class="fcm-chat-new-messages" data-new-messages ${conversationUnread ? '' : 'hidden'}>${TH('chatNewUnread', conversationUnread)}</button>
-    <div class="fcm-chat-actions" ${multiSelectMode ? 'hidden' : ''}><button class="fcm-chat-icon-action" data-invite ${available === 'none' || inRoomFn(selectedMember) ? 'disabled' : ''} title="${TH('chatInviteRoom')}" aria-label="${TH('chatInviteRoom')}">${INVITE_ICON}</button><span></span><div class="fcm-chat-tools"><div class="fcm-chat-tools-menu"><button class="fcm-chat-icon-action" data-export="html" title="${TH('chatExportHtml')}">${DOWNLOAD_ICON}<span>${TH('chatExportHtml')}</span></button><button class="fcm-chat-icon-action" data-export="json" title="${TH('chatExportJson')}">${DOWNLOAD_ICON}<span>${TH('chatExportJson')}</span></button><button class="fcm-chat-icon-action" data-delete title="${TH('chatDeleteAll')}">${TRASH_ICON}<span>${TH('chatDeleteAll')}</span></button></div><button class="fcm-chat-icon-action" data-toggle-tools title="${TH('chatMessageTools')}">${FOLDER_ICON}</button></div></div>
-    <div class="fcm-chat-compose" ${multiSelectMode ? 'hidden' : ''}>
-        <div class="fcm-chat-compose-notice" data-bcx-compose-notice hidden></div>
-        <div class="fcm-chat-channels ${online ? '' : 'offline'}"><button class="${available === 'whisper' ? 'active' : ''}" data-channel="whisper" ${available !== 'whisper' ? 'disabled' : ''}>${TH('btnWhisper')}</button><button class="${available === 'beep' ? 'active' : ''}" data-channel="beep" ${available !== 'beep' ? 'disabled' : ''}>${TH('btnBeep')}</button></div>
-        <div class="fcm-chat-input-wrap">${replyTarget ? `<div class="fcm-chat-reply-indicator"><span>${TH('chatReply')}: ${esc(replyTarget.preview)}</span><button data-cancel-reply title="${TH('chatCancel')}">×</button></div>` : ''}<div class="fcm-chat-profile-suggest" data-profile-suggest hidden></div><textarea data-input rows="2" placeholder="${esc(inputPlaceholder)}"></textarea></div>
-        <button data-send ${unavailable ? 'disabled' : ''}>${online ? TH('chatSend') : TH('chatQueueSend')}</button>
-    </div>
-    <div class="fcm-chat-multi-actions" data-multi-actions ${multiSelectMode ? '' : 'hidden'}><b data-multi-count>${TH('chatSelectedCount', selectedMessageIds.size)}</b><div><button data-multi-forward-contact>${TH('chatForwardContact')}</button><button data-multi-forward-room ${!ChatRoomData ? 'disabled' : ''}>${TH('chatForwardRoom')}</button><button data-multi-export="json">${TH('chatExportJson')}</button><button data-multi-export="html">${TH('chatExportHtml')}</button><button data-multi-cancel>${TH('chatCancel')}</button></div></div>`;
+    return renderConversationHtml({
+        memberNumber: selectedMember, stacked: cfg.chatLayout === 'stacked', avatarHtml,
+        displayName: getDisplayName(selectedMember), biography: biography(selectedMember), showNotFriendBadge,
+        roomText, roomName: roomInfo?.name || '', canOpenRoom,
+        canSummon: !!ChatRoomData && online && !inRoomFn(selectedMember), groups: Object.entries(cfg.chatGroups || {}),
+        contactCardHtml: contactCardOpen ? contactCardHtml() : '', messagesHtml: conversationMessagesHtml(conversationMessages),
+        unread: conversationUnread, multiSelect: multiSelectMode, available, online,
+        canInvite: available !== 'none' && !inRoomFn(selectedMember), inputPlaceholder, unavailable,
+        replyTarget, selectedCount: selectedMessageIds.size, canForwardToRoom: !!ChatRoomData,
+    });
 }
 
 function contactCardHtml() {
     const hasProfile = !!_pc[Number(selectedMember)]?.characterBundle;
-    return `<section class="fcm-chat-contact-card">${avatarHtml(selectedMember, 100, 'card')}<div><b>${esc(getDisplayName(selectedMember))} (${selectedMember})</b><small>${esc(biography(selectedMember) || T('chatNoBiography'))}</small><span class="fcm-chat-card-actions"><button data-card-refresh>${TH('chatProfileSnapshot')}</button>${hasProfile ? `<button class="fcm-chat-card-search" data-card-profile title="${TH('btnViewProfile')}">${SEARCH_ICON}</button>` : ''}${isFriendOf(selectedMember) ? '' : `<button data-card-add-friend title="${TH('addFriend')}">${ADD_FRIEND_ICON}${TH('addFriend')}</button>`}</span></div></section>`;
+    return renderContactCardHtml({ memberNumber: selectedMember, avatarHtml, displayName: getDisplayName(selectedMember), biography: biography(selectedMember), hasProfile, isFriend: isFriendOf(selectedMember) });
 }
 
 function expandProfileMentions(content) {
