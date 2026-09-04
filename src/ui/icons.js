@@ -1,5 +1,5 @@
 // FCM 的 SVG 唯一引用入口。替換圖示時只需修改 assets/icons 下的檔案。
-export { FCM_ICON_SVG } from '../core/config.js';
+export { FCM_ICON_SVG } from './fcm-icon.js';
 export { default as CHAT_ICON } from '../../assets/icons/chat.svg?raw';
 export { default as NOTIFICATION_ICON } from '../../assets/icons/notification.svg?raw';
 export { default as GROUP_ICON } from '../../assets/icons/group.svg?raw';

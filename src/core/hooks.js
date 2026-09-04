@@ -1,4 +1,5 @@
-import { modApi, cfg, MOD_VER, BTN_X, BTN_Y, BTN_W, BTN_H, _fcmIconImg } from './config.js';
+import { modApi, cfg, MOD_VER, BTN_X, BTN_Y, BTN_W, BTN_H } from './config.js';
+import { fcmIconImage } from '../ui/fcm-icon.js';
 import { T } from '../i18n/i18n.js';
 import { setOnlineFriends } from '../data/data.js';
 import { PDB, syncRoomAvatar } from '../data/profile-db.js';
@@ -174,7 +175,7 @@ import { warnLimited } from './logger.js';
                 const btnColor = (panelOpen || panelMini) ? 'Pink' : 'Gray';
                 MainCanvas.globalAlpha = 0.75;
                 DrawButton(BTN_X, BTN_Y, BTN_W, BTN_H, '', btnColor, '', 'Friends & Room Manager');
-                if (_fcmIconImg && typeof DrawImageResize === 'function') { const pad = 4; DrawImageResize(_fcmIconImg, BTN_X + pad, BTN_Y + pad, BTN_W - pad * 2, BTN_H - pad * 2); }
+                if (fcmIconImage && typeof DrawImageResize === 'function') { const pad = 4; DrawImageResize(fcmIconImage, BTN_X + pad, BTN_Y + pad, BTN_W - pad * 2, BTN_H - pad * 2); }
                 MainCanvas.globalAlpha = 1.0;
             }
         }
@@ -202,9 +203,9 @@ import { warnLimited } from './logger.js';
         if (typeof DrawButton === 'function') {
             const btnColor = (panelOpen || panelMini) ? 'Pink' : 'White';
             DrawButton(HALL_BTN_X, HALL_BTN_Y, HALL_BTN_W, HALL_BTN_H, '', btnColor, '', 'FCM');
-            if (_fcmIconImg && typeof DrawImageResize === 'function') {
+            if (fcmIconImage && typeof DrawImageResize === 'function') {
                 const pad = 8;
-                DrawImageResize(_fcmIconImg, HALL_BTN_X + pad, HALL_BTN_Y + pad, HALL_BTN_W - pad * 2, HALL_BTN_H - pad * 2);
+                DrawImageResize(fcmIconImage, HALL_BTN_X + pad, HALL_BTN_Y + pad, HALL_BTN_W - pad * 2, HALL_BTN_H - pad * 2);
             }
         }
     });
@@ -301,8 +302,8 @@ import { warnLimited } from './logger.js';
             if (viewingSelf && cfg.btnShowProfile && typeof DrawButton === 'function') {
                 const btnColor = (panelOpen && !panelMini) ? '#3a1858' : 'White';
                 DrawButton(1715, 420, 90, 90, '', btnColor, '', 'FCM');
-                if (_fcmIconImg && typeof DrawImageResize === 'function') {
-                    DrawImageResize(_fcmIconImg, 1725, 428, 74, 74);
+                if (fcmIconImage && typeof DrawImageResize === 'function') {
+                    DrawImageResize(fcmIconImage, 1725, 428, 74, 74);
                 }
             }
             return r;
