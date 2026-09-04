@@ -1,9 +1,9 @@
 import { cfg } from '../core/config.js';
 import { T } from '../i18n/i18n.js';
 import { PDB, Snapshot } from '../data/profile-db.js';
-import { onlineFriends, showNickname, setShowNickname, getDisplayName, matchesSearch, buildFriendList, getAllRels, REL_ORDER, getZone, getRoomInfo, amAdmin, inRoomFn, isFav } from '../data/data.js';
+import { onlineFriends, showNickname, setShowNickname, getDisplayName, matchesSearch, searchScore, buildFriendList, getAllRels, REL_ORDER, getZone, getRoomInfo, amAdmin, inRoomFn, isFav } from '../data/data.js';
 import { showRoomJoinConfirm, roomInfoFromResult, makeIdCell } from '../chat/actions.js';
-import { makeAvEl, makeFavStar, makeRelEl, mkBtn, makeSearchWrap, makeSortSel, makeCountBar, buildMgmtBtns, buildPersonOps, _autoQueueVisible, refreshSnapshotsForList } from './panel-widgets.js';
+import { makeAvEl, makeFavStar, makeRelEl, mkBtn, makeSearchWrap, makeSortSel, makeCountBar, paginate, makePageBar, buildMgmtBtns, buildPersonOps, _autoQueueVisible, refreshSnapshotsForList } from './panel-widgets.js';
 import { queryRoomInfo, getCachedRoomInfo, fetchRoomFull } from './panel-rooms-data.js';
 import { renderCurrent, refreshPanel, getRenderToken } from './panel-controller.js';
 // ════════════════════════════════════════
@@ -12,10 +12,11 @@ import { renderCurrent, refreshPanel, getRenderToken } from './panel-controller.
 //  closePanel 透過 resetFriendsSearch 清空搜尋字串。
 // ════════════════════════════════════════
 
-let searchQ = '', sortMode = 'fav';
+const FRIENDS_PAGE_SIZE = 100;
+let searchQ = '', sortMode = 'fav', friendsPage = 0;
 const filters = { online: true, offline: false, owner: false, lover: false, sub: false, friend: false, whitelist: false, blacklist: false };
 
-function resetFriendsSearch() { searchQ = ''; }
+function resetFriendsSearch() { searchQ = ''; friendsPage = 0; }
 
 function applyFilters(f) {
     const online = isOnline(f.mn);
@@ -38,28 +39,28 @@ async function renderFriends(container, _myToken) {
     const toolbar = document.createElement('div'); toolbar.className = 'fcm-toolbar';
 
     const { wrap: sw, inp: searchInp } = makeSearchWrap(searchQ, T('search'), val => {
-        searchQ = val;
-    }, 'fcm-search', () => renderCurrent());
+        searchQ = val; friendsPage = 0;
+    }, 'fcm-search', () => { friendsPage = 0; renderCurrent(); });
 
     searchInp.addEventListener('keydown', e => {
         e.stopPropagation();
-        if (e.key === 'Enter') renderCurrent();
+        if (e.key === 'Enter') { friendsPage = 0; renderCurrent(); }
     });
     toolbar.appendChild(sw);
     const fl = document.createElement('span'); fl.className = 'fcm-lbl-sm'; fl.textContent = T('showOnly') + ':';
     toolbar.appendChild(fl);
     [['online', T('fOnline')], ['offline', T('fOffline')], ['owner', T('fOwner')], ['lover', T('fLover')], ['sub', T('fSub')], ['friend', T('fFriend')], ['whitelist', T('fWhitelist')], ['blacklist', T('fBlacklist')]].forEach(([key, label]) => {
         const b = document.createElement('button'); b.className = 'fcm-ftog' + (filters[key] ? ' on' : ''); b.textContent = label;
-        b.addEventListener('click', () => { filters[key] = !filters[key]; b.classList.toggle('on', filters[key]); renderCurrent(); });
+        b.addEventListener('click', () => { filters[key] = !filters[key]; friendsPage = 0; b.classList.toggle('on', filters[key]); renderCurrent(); });
         toolbar.appendChild(b);
     });
 
     toolbar.appendChild(Object.assign(document.createElement('span'), { className: 'fcm-spacer' }));
     const nickBtn = document.createElement('button'); nickBtn.className = 'fcm-nick-tog'; nickBtn.textContent = showNickname ? T('togNick') : T('togName');
     nickBtn.title = showNickname ? T('togNickToBCName') : T('togNickToNick');
-    nickBtn.addEventListener('click', () => { setShowNickname(!showNickname); renderCurrent(); });
+    nickBtn.addEventListener('click', () => { setShowNickname(!showNickname); friendsPage = 0; renderCurrent(); });
     toolbar.appendChild(nickBtn);
-    const { lbl: sl, sel: sortSel } = makeSortSel(sortMode, [['fav', T('sortFav')], ['rel', T('sortRel')], ['id', T('sortId')], ['name', T('sortName')], ['added', T('sortAdded')]], v => { sortMode = v; renderCurrent(); });
+    const { lbl: sl, sel: sortSel } = makeSortSel(sortMode, [['fav', T('sortFav')], ['rel', T('sortRel')], ['id', T('sortId')], ['name', T('sortName')], ['added', T('sortAdded')]], v => { sortMode = v; friendsPage = 0; renderCurrent(); });
     toolbar.appendChild(sl); toolbar.appendChild(sortSel);
     // 手動刷新：即刻抓最新資料，但有 5 秒冷卻（refreshPanel 回 false = 冷卻中，短暫變灰提示）
     const rBtn = mkBtn('↻', 'fcm-btn', () => {
@@ -87,6 +88,11 @@ async function renderFriends(container, _myToken) {
         // 最愛（預設）：最愛 > 關係 > ID（ID 已是明確順位，不再往下排）
         default:      friends.sort((a, b) => { const fd = (isFav(b.mn) ? 1 : 0) - (isFav(a.mn) ? 1 : 0); if (fd) return fd; const d = REL_ORDER[a.rel] - REL_ORDER[b.rel]; return d || a.mn - b.mn; });
     }
+    if (searchQ.trim()) friends.sort((a, b) => searchScore(a.mn, searchQ) - searchScore(b.mn, searchQ));
+    const totalFriends = friends.length;
+    const page = paginate(friends, friendsPage, FRIENDS_PAGE_SIZE);
+    friendsPage = page.page;
+    friends = page.items;
     await PDB.batchGet(friends.map(f => f.mn));
     if (_myToken !== getRenderToken()) return;
     friends.forEach(f => { f.name = getDisplayName(f.mn); });
@@ -183,7 +189,8 @@ async function renderFriends(container, _myToken) {
     }
     tbl.appendChild(tbody); scroll.appendChild(tbl);
     wrapper.appendChild(scroll);
-    wrapper.appendChild(makeCountBar(friends.length));
+    wrapper.appendChild(makeCountBar(friends.length, totalFriends));
+    wrapper.appendChild(makePageBar(friendsPage, page.totalPages, nextPage => { friendsPage = nextPage; renderCurrent(); }));
     container.appendChild(wrapper);
 
     if (cfg.avatars) _autoQueueVisible(friends.map(f => f.mn));

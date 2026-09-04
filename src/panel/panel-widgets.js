@@ -243,6 +243,30 @@ function makeCountBar(n, total) {
     return d;
 }
 
+function paginate(items, page, pageSize = 100) {
+    const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+    const currentPage = Math.max(0, Math.min(Number(page) || 0, totalPages - 1));
+    return { items: items.slice(currentPage * pageSize, (currentPage + 1) * pageSize), page: currentPage, totalPages };
+}
+
+function makePageBar(page, totalPages, onChange) {
+    const bar = document.createElement('div'); bar.className = 'fcm-page-bar';
+    bar.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 12px;background:#1a1230;border-top:1px solid #2a2048;flex-shrink:0;';
+    if (totalPages <= 1) return bar;
+    const previous = mkBtn('◀', 'fcm-btn', () => onChange(page - 1)); previous.disabled = page === 0;
+    const next = mkBtn('▶', 'fcm-btn', () => onChange(page + 1)); next.disabled = page >= totalPages - 1;
+    bar.appendChild(previous);
+    if (totalPages <= 7) {
+        for (let index = 0; index < totalPages; index++) {
+            bar.appendChild(mkBtn(String(index + 1), index === page ? 'fcm-btn-purple' : '', () => onChange(index)));
+        }
+    } else {
+        const info = document.createElement('span'); info.textContent = T('pageInfo', page + 1, totalPages); bar.appendChild(info);
+    }
+    bar.appendChild(next);
+    return bar;
+}
+
 async function _autoQueueVisible(mns) {
     const selfMn = parseInt(Player?.MemberNumber);
     await Promise.all([PDB.batchGet(mns), Snapshot.batchGet(mns)]);
@@ -289,4 +313,4 @@ async function refreshSnapshotsForList(mns) {
 }
 
 export { makeAvEl, makeFavStar, makeRelEl, makePermEl, mkBtn, mkToggle, makeSearchWrap,
-         buildMgmtBtns, buildPersonOps, makeSortSel, makeCountBar, _autoQueueVisible, refreshSnapshotsForList };
+         buildMgmtBtns, buildPersonOps, makeSortSel, makeCountBar, paginate, makePageBar, _autoQueueVisible, refreshSnapshotsForList };

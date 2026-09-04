@@ -1,9 +1,9 @@
 import { cfg } from '../core/config.js';
 import { T } from '../i18n/i18n.js';
 import { PDB, _pc, Snapshot } from '../data/profile-db.js';
-import { showNickname, setShowNickname, getDisplayName, matchesSearch, getRel, getAllRels, REL_ORDER, getRoomPerms, amAdmin, inRoomFn } from '../data/data.js';
+import { showNickname, setShowNickname, getDisplayName, matchesSearch, searchScore, getRel, getAllRels, REL_ORDER, getRoomPerms, amAdmin, inRoomFn } from '../data/data.js';
 import { roomOp, makeIdCell } from '../chat/actions.js';
-import { makeAvEl, makeRelEl, makePermEl, mkBtn, makeSearchWrap, makeSortSel, makeCountBar, buildMgmtBtns, buildPersonOps, _autoQueueVisible, refreshSnapshotsForList } from './panel-widgets.js';
+import { makeAvEl, makeRelEl, makePermEl, mkBtn, makeSearchWrap, makeSortSel, makeCountBar, paginate, makePageBar, buildMgmtBtns, buildPersonOps, _autoQueueVisible, refreshSnapshotsForList } from './panel-widgets.js';
 import { wpsShareProfile } from '../chat/wps-share.js';
 // ════════════════════════════════════════
 //  FCM module: panel-room.js  (split from panel.js)
@@ -15,8 +15,10 @@ import { wpsShareProfile } from '../chat/wps-share.js';
 let roomSubTab = 'members';
 let roomSearchQ = '', roomSortMode = 'name';
 let roomSearchDebounce = null;
+const ROOM_LIST_PAGE_SIZE = 100;
+const roomPages = { admin: 0, white: 0, ban: 0 };
 
-function resetRoomAdminSearch() { roomSearchQ = ''; }
+function resetRoomAdminSearch() { roomSearchQ = ''; Object.keys(roomPages).forEach(key => { roomPages[key] = 0; }); }
 
 async function renderRoom(container) {
     container.innerHTML = '';
@@ -39,6 +41,7 @@ async function renderRoom(container) {
     let addBtn;
     const { wrap: sw, inp: rsEl } = makeSearchWrap(roomSearchQ, T('roomSearch'), val => {
         roomSearchQ = val;
+        if (roomSubTab !== 'members') roomPages[roomSubTab] = 0;
         if (addBtn) addBtn.disabled = !(canAddHere && isNumericQ(val));
         clearTimeout(roomSearchDebounce);
         roomSearchDebounce = setTimeout(async () => {
@@ -72,9 +75,9 @@ async function renderRoom(container) {
 
     toolbar.appendChild(Object.assign(document.createElement('span'), { className: 'fcm-spacer' }));
     const rNickBtn = document.createElement('button'); rNickBtn.className = 'fcm-nick-tog'; rNickBtn.textContent = showNickname ? T('togNick') : T('togName');
-    rNickBtn.addEventListener('click', () => { setShowNickname(!showNickname); renderRoom(container); });
+    rNickBtn.addEventListener('click', () => { setShowNickname(!showNickname); if (roomSubTab !== 'members') roomPages[roomSubTab] = 0; renderRoom(container); });
     toolbar.appendChild(rNickBtn);
-    const { lbl: rsl, sel: rsortSel } = makeSortSel(roomSortMode, [['name', T('sortName')], ['id', T('sortId')], ['rel', T('sortRel')], ['perm', T('permAdmin')]], v => { roomSortMode = v; renderRoom(container); });
+    const { lbl: rsl, sel: rsortSel } = makeSortSel(roomSortMode, [['name', T('sortName')], ['id', T('sortId')], ['rel', T('sortRel')], ['perm', T('permAdmin')]], v => { roomSortMode = v; if (roomSubTab !== 'members') roomPages[roomSubTab] = 0; renderRoom(container); });
     toolbar.appendChild(rsl); toolbar.appendChild(rsortSel);
     const rBtn = mkBtn('↻', 'fcm-btn', () => renderRoom(container));
     rBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
@@ -99,6 +102,14 @@ async function renderRoom(container) {
         case 'perm': mns.sort((a, b) => { const pa = getRoomPerms(a), pb = getRoomPerms(b); const ord = ['admin','pass','ban','visit']; return (ord.indexOf(pa[0]) || 0) - (ord.indexOf(pb[0]) || 0); }); break;
         default:     mns.sort((a, b) => getDisplayName(a).localeCompare(getDisplayName(b))); break;
     }
+    if (roomSearchQ.trim()) mns.sort((a, b) => searchScore(a, roomSearchQ) - searchScore(b, roomSearchQ));
+
+    const totalMembers = mns.length;
+    const page = roomSubTab === 'members'
+        ? { items: mns, page: 0, totalPages: 1 }
+        : paginate(mns, roomPages[roomSubTab], ROOM_LIST_PAGE_SIZE);
+    if (roomSubTab !== 'members') roomPages[roomSubTab] = page.page;
+    mns = page.items;
 
     const wrapper = document.createElement('div'); wrapper.className = 'fcm-scroll-wrap';
     const scroll = document.createElement('div'); scroll.className = 'fcm-scroll';
@@ -160,7 +171,10 @@ async function renderRoom(container) {
     }
     tbl.appendChild(tbody); scroll.appendChild(tbl);
     wrapper.appendChild(scroll);
-    wrapper.appendChild(makeCountBar(mns.length));
+    wrapper.appendChild(makeCountBar(mns.length, totalMembers));
+    if (roomSubTab !== 'members') {
+        wrapper.appendChild(makePageBar(page.page, page.totalPages, nextPage => { roomPages[roomSubTab] = nextPage; renderRoom(container); }));
+    }
     container.appendChild(wrapper);
 
     if (cfg.avatars) _autoQueueVisible(mns);

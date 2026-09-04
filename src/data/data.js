@@ -107,17 +107,35 @@ import { cfg, saveCfg } from '../core/config.js';
         return `#${mn}`;
     }
 
-    // 搜尋比對：不論目前顯示切換是「名稱」還是「暱稱」，都同時比對 ID／BC 名稱／暱稱三者，
-    //  避免「顯示暱稱時搜不到名稱、顯示名稱時搜不到暱稱」的問題。
-    function matchesSearch(mn, q) {
-        if (!q) return true;
-        q = String(q).trim().toLowerCase();
-        if (!q) return true;
-        if (String(mn).includes(q)) return true;
-        if (getDisplayName(mn, true).toLowerCase().includes(q)) return true;
-        if (getDisplayName(mn, false).toLowerCase().includes(q)) return true;
-        return false;
+    function normalizeSearchText(value) {
+        return String(value ?? '').normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase().trim();
     }
+    function searchTokens(query) {
+        return normalizeSearchText(query).split(/\s+/).filter(Boolean).map(token => token.replace(/^[@#]/, ''));
+    }
+    function normalizedSearchFields(values) {
+        return values.map(normalizeSearchText).filter(Boolean);
+    }
+    function matchesSearchFields(values, query) {
+        const tokens = searchTokens(query);
+        if (!tokens.length) return true;
+        const fields = normalizedSearchFields(values);
+        return tokens.every(token => fields.some(field => field.includes(token)));
+    }
+    function searchScoreFields(values, query) {
+        const tokens = searchTokens(query);
+        if (!tokens.length) return 0;
+        const fields = normalizedSearchFields(values);
+        return tokens.reduce((score, token) => {
+            if (fields.some(field => field === token)) return score;
+            if (fields.some(field => field.startsWith(token))) return score + 1;
+            return score + 2;
+        }, 0);
+    }
+    // 顯示模式不影響搜尋：ID、BC 名稱與暱稱永遠同時納入。
+    function memberSearchFields(mn) { return [mn, getDisplayName(mn, true), getDisplayName(mn, false)]; }
+    function matchesSearch(mn, query) { return matchesSearchFields(memberSearchFields(mn), query); }
+    function searchScore(mn, query) { return searchScoreFields(memberSearchFields(mn), query); }
 
     function buildFriendList() {
         const seen = new Set(), rows = [], selfMn = parseInt(Player.MemberNumber);
@@ -244,4 +262,4 @@ import { cfg, saveCfg } from '../core/config.js';
     }
     function setShowNickname(v) { showNickname = v; }
 
-export { onlineFriends, setOnlineFriends, requestOnlineFriends, showNickname, setShowNickname, getRel, getAllRels, REL_ORDER, getDisplayName, matchesSearch, buildFriendList, getZone, getRoomInfo, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep, _getWhisperTargetMN, isFav, toggleFav };
+export { onlineFriends, setOnlineFriends, requestOnlineFriends, showNickname, setShowNickname, getRel, getAllRels, REL_ORDER, getDisplayName, matchesSearch, searchScore, matchesSearchFields, searchScoreFields, buildFriendList, getZone, getRoomInfo, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep, _getWhisperTargetMN, isFav, toggleFav };

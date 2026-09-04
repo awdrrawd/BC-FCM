@@ -1,7 +1,7 @@
 import { T } from '../i18n/i18n.js';
 import { PDB, _pc, Snapshot } from '../data/profile-db.js';
-import { inRoomFn, amAdmin, getAllRels, onlineFriends } from '../data/data.js';
-import { makeAvEl, makeRelEl, mkBtn, buildMgmtBtns, buildPersonOps } from './panel-widgets.js';
+import { inRoomFn, amAdmin, getAllRels, onlineFriends, matchesSearchFields, searchScoreFields } from '../data/data.js';
+import { makeAvEl, makeRelEl, mkBtn, paginate, makePageBar, buildMgmtBtns, buildPersonOps } from './panel-widgets.js';
 import { makeIdCell } from '../chat/actions.js';
 import { wpsShareProfile } from '../chat/wps-share.js';
 import { getRenderToken } from './panel-controller.js';
@@ -60,42 +60,30 @@ async function renderPeople(container, _myToken) {
     const wrapper = document.createElement('div'); wrapper.className = 'fcm-scroll-wrap';
     const scroll = document.createElement('div'); scroll.className = 'fcm-scroll';
     const countBar = document.createElement('div'); countBar.className = 'fcm-count';
-    const pageBar = document.createElement('div'); pageBar.className = 'fcm-page-bar';
-    pageBar.style.cssText = 'display:flex;align-items:center;justify-content:center;gap:8px;padding:6px 12px;background:#1a1230;border-top:1px solid #2a2048;flex-shrink:0;';
+    let pageBar = makePageBar(0, 1, () => {});
     wrapper.appendChild(scroll); wrapper.appendChild(countBar); wrapper.appendChild(pageBar);
     container.appendChild(wrapper);
 
     async function runSearch(q) {
         _peopleQ = q; q = q.trim();
         scroll.innerHTML = ''; pageBar.innerHTML = '';
-        const isNumId = /^\d+$/.test(q) && parseInt(q) > 0;
-        const qLow = q.toLowerCase();
+        const numericQuery = q.replace(/^[@#]/, '');
+        const isNumId = /^\d+$/.test(numericQuery) && parseInt(numericQuery) > 0;
+        const profileFields = profile => [profile.memberNumber, profile.name, profile.lastNick];
         let filtered = q
-        ? allProfiles.filter(p => (p.name || '').toLowerCase().includes(qLow) || (p.lastNick || '').toLowerCase().includes(qLow) || String(p.memberNumber).includes(q))
+        ? allProfiles.filter(profile => matchesSearchFields(profileFields(profile), q))
         : allProfiles;
         // 相關性排序：BC ID 是依序分配的，兩個人的 ID 很可能剛好相近（例如搜「123」會連帶找到
         // 「3123」「12345」），因此把「最接近」的結果（完全相同 → 開頭相符 → 其餘）排到最前面，
         // 其餘結果維持原本（最近見面）的相對順序。
         if (q && filtered.length > 1) {
-            const _score = (p) => {
-                if (isNumId) {
-                    const idStr = String(p.memberNumber);
-                    if (idStr === q) return 0;
-                    if (idStr.startsWith(q)) return 1;
-                    return 2;
-                }
-                const name = (p.name || '').toLowerCase(), nick = (p.lastNick || '').toLowerCase();
-                if (name === qLow || nick === qLow) return 0;
-                if (name.startsWith(qLow) || nick.startsWith(qLow)) return 1;
-                return 2;
-            };
             filtered = filtered
-                .map((p, i) => ({ p, i, s: _score(p) }))
+                .map((p, i) => ({ p, i, s: searchScoreFields(profileFields(p), q) }))
                 .sort((a, b) => a.s - b.s || a.i - b.i)
                 .map(x => x.p);
         }
         if (isNumId) {
-            const mn = parseInt(q);
+            const mn = parseInt(numericQuery);
             const exactMatch = allProfiles.find(p => p.memberNumber === mn);
             if (!exactMatch) {
                 const box = document.createElement('div'); box.className = 'fcm-unknown-id-box';
@@ -131,14 +119,13 @@ async function renderPeople(container, _myToken) {
             }
         }
         const totalFiltered = filtered.length;
-        const totalPages = Math.max(1, Math.ceil(totalFiltered / PEOPLE_PAGE_SIZE));
-        if (_peoplePage >= totalPages) _peoplePage = totalPages - 1;
-        const pageStart = _peoplePage * PEOPLE_PAGE_SIZE;
-        const show = filtered.slice(pageStart, pageStart + PEOPLE_PAGE_SIZE);
+        const page = paginate(filtered, _peoplePage, PEOPLE_PAGE_SIZE);
+        _peoplePage = page.page;
+        const show = page.items;
         countBar.textContent = q
             ? T('peopleTotal', totalFiltered, allProfiles.length)
         : T('peopleTotal', Math.min(allProfiles.length, PEOPLE_PAGE_SIZE * (_peoplePage + 1)), allProfiles.length);
-        if (!show.length && !(isNumId && !allProfiles.find(p => p.memberNumber === parseInt(q)))) {
+        if (!show.length && !(isNumId && !allProfiles.find(p => p.memberNumber === parseInt(numericQuery)))) {
             if (!scroll.querySelector('.fcm-unknown-id-box')) {
                 const em = document.createElement('div'); em.className = 'fcm-empty'; em.textContent = T('peopleNoResults');
                 scroll.appendChild(em);
@@ -216,24 +203,9 @@ async function renderPeople(container, _myToken) {
             tbody.appendChild(tr);
         }
         tbl.appendChild(tbody); scroll.appendChild(tbl);
-        if (totalPages > 1) {
-            const prevBtn = mkBtn('◀', 'fcm-btn', () => { _peoplePage--; runSearch(inp.value); });
-            prevBtn.disabled = _peoplePage === 0;
-            const nextBtn = mkBtn('▶', 'fcm-btn', () => { _peoplePage++; runSearch(inp.value); });
-            nextBtn.disabled = _peoplePage >= totalPages - 1;
-            const pageInfo = document.createElement('span');
-            pageInfo.style.cssText = 'font-size:11px;color:#9080b8;';
-            pageInfo.textContent = T('pageInfo', _peoplePage+1, totalPages);
-            pageBar.appendChild(prevBtn); pageBar.appendChild(pageInfo); pageBar.appendChild(nextBtn);
-            if (totalPages <= 7) {
-                pageBar.innerHTML = ''; pageBar.appendChild(prevBtn);
-                for (let i = 0; i < totalPages; i++) {
-                    const pb = mkBtn(String(i+1), i === _peoplePage ? 'fcm-btn fcm-btn-purple' : 'fcm-btn', () => { _peoplePage = parseInt(pb.textContent)-1; runSearch(inp.value); });
-                    pageBar.appendChild(pb);
-                }
-                pageBar.appendChild(nextBtn);
-            }
-        }
+        const nextPageBar = makePageBar(_peoplePage, page.totalPages, nextPage => { _peoplePage = nextPage; runSearch(inp.value); });
+        pageBar.replaceWith(nextPageBar);
+        pageBar = nextPageBar;
     }
 
     // Bug fix: stopPropagation on people search keydown
