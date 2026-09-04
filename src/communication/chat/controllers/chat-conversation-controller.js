@@ -1,5 +1,5 @@
-import { ConversationViewport } from './chat-viewport.js';
-import { mergeOlderMessages, normalizeConversationPage } from './chat-conversation-data.js';
+import { ConversationViewport } from '../../chat-viewport.js';
+import { mergeOlderMessages, normalizeConversationPage } from '../data/chat-conversation-data.js';
 
 class ChatConversationController {
     constructor(pageSize = 50, bottomThreshold = 40) {

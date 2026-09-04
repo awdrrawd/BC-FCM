@@ -1,4 +1,4 @@
-import { cleanMessage, parseRoomInvite } from './chat-content.js';
+import { cleanMessage, parseRoomInvite } from '../../chat-content.js';
 
 function normalizeMessage(data, { displayName, selectedMember }) {
     return {

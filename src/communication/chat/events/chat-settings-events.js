@@ -1,7 +1,7 @@
-import { cfg, saveCfg } from '../core/config.js';
-import { T, ensureLang } from '../i18n/i18n.js';
-import { applyTheme } from '../panel/styles.js';
-import { hasCustomNotificationSound, playNotificationSound, saveCustomNotificationSound } from './chat-audio.js';
+import { cfg, saveCfg } from '../../../core/config.js';
+import { T, ensureLang } from '../../../i18n/i18n.js';
+import { applyTheme } from '../../../panel/styles.js';
+import { hasCustomNotificationSound, playNotificationSound, saveCustomNotificationSound } from '../../chat-audio.js';
 
 const TOGGLE_SETTING_KEYS = {
     takeover: 'takeoverFcmChatButtons',

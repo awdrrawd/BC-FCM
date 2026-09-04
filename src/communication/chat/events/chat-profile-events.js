@@ -1,7 +1,7 @@
-import { cfg, saveCfg } from '../core/config.js';
-import { updateOwnAvatarProfile, updateOwnAvatarSnapshot } from '../data/profile-db.js';
-import { T } from '../i18n/i18n.js';
-import { isSupportedAvatarUrl } from './chat-profile.js';
+import { cfg, saveCfg } from '../../../core/config.js';
+import { updateOwnAvatarProfile, updateOwnAvatarSnapshot } from '../../../data/profile-db.js';
+import { T } from '../../../i18n/i18n.js';
+import { isSupportedAvatarUrl } from '../../chat-profile.js';
 
 function bindChatProfileEvents({ root, getPlayer, renderChat, saveOwnProfile, setStatus }) {
     root.querySelector('[data-save-profile]')?.addEventListener('click', saveOwnProfile);

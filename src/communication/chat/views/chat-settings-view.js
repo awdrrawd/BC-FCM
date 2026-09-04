@@ -1,10 +1,10 @@
-import { cfg } from '../core/config.js';
-import { THEME_KEYS } from '../core/themes.js';
-import { FCM_LANGS, FCM_LANG_FLAGS, FCM_LANG_NAMES, T, TH } from '../i18n/i18n.js';
-import { ALARM_ACTIVE_ICON, ALARM_MUTED_ICON } from '../ui/icons.js';
-import { hasCustomNotificationSound } from './chat-audio.js';
-import { availableFontChoices } from './chat-font.js';
-import { esc } from './chat-content.js';
+import { cfg } from '../../../core/config.js';
+import { THEME_KEYS } from '../../../core/themes.js';
+import { FCM_LANGS, FCM_LANG_FLAGS, FCM_LANG_NAMES, T, TH } from '../../../i18n/i18n.js';
+import { ALARM_ACTIVE_ICON, ALARM_MUTED_ICON } from '../../../ui/icons.js';
+import { hasCustomNotificationSound } from '../../chat-audio.js';
+import { availableFontChoices } from '../../chat-font.js';
+import { esc } from '../../chat-content.js';
 
 function selectOptions(options, current) {
     return options.map(([value, label]) => `<option value="${esc(value)}" ${current === value ? 'selected' : ''}>${esc(label)}</option>`).join('');

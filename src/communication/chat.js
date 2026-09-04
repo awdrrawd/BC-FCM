@@ -20,20 +20,20 @@ import { initChatAudio, playNotificationSound } from './chat-audio.js';
 import { installChatDrag, resetBalloonInteraction } from './chat-drag.js';
 import { createChatBalloonController } from './chat-balloon.js';
 import { createDialogHost } from '../ui/dialog.js';
-import { buildForwardTargetGroups, forEachForwardedMessage, forwardedMessageText, selectedMessages } from './chat-selection.js';
-import { bindForwardTargetEvents, forwardTargetsHtml as renderForwardTargetsHtml, updateMultiSelectUi as syncMultiSelectUi } from './chat-selection-view.js';
-import { installMessageActions } from './chat-message-actions.js';
-import { bindChatSettingsEvents } from './chat-settings-events.js';
-import { bindChatProfileEvents } from './chat-profile-events.js';
-import { chatListHtml as renderChatListHtml, contactRowsHtml, groupsHtml as renderGroupsHtml, notificationsHtml as renderNotificationsHtml } from './chat-list-view.js';
-import { settingsHtml as renderSettingsHtml } from './chat-settings-view.js';
-import { conversationMessagesHtml, messageDateKey, messageDateLabel, messageHtml } from './chat-message-view.js';
-import { contactCardHtml as renderContactCardHtml, conversationHtml as renderConversationHtml } from './chat-conversation-view.js';
-import { WhisperMetadata, classifyIncomingBeep, findPendingOutgoingWhisper, normalizeMessage as normalizeTransportMessage } from './chat-transport.js';
-import { conversationRows, historyMessageRows, recentConversationRows, unreadMessageCount } from './chat-conversation-data.js';
-import { ChatConversationController } from './chat-conversation-controller.js';
-import { createChatContactService } from './chat-contact-service.js';
-import { animateLayoutChange, animatePanelSize, positionPanel as applyPanelPosition, syncConversationBackButton as syncBackButton } from './chat-panel-layout.js';
+import { buildForwardTargetGroups, forEachForwardedMessage, forwardedMessageText, selectedMessages } from './chat/data/chat-selection.js';
+import { bindForwardTargetEvents, forwardTargetsHtml as renderForwardTargetsHtml, updateMultiSelectUi as syncMultiSelectUi } from './chat/views/chat-selection-view.js';
+import { installMessageActions } from './chat/events/chat-message-actions.js';
+import { bindChatSettingsEvents } from './chat/events/chat-settings-events.js';
+import { bindChatProfileEvents } from './chat/events/chat-profile-events.js';
+import { chatListHtml as renderChatListHtml, contactRowsHtml, groupsHtml as renderGroupsHtml, notificationsHtml as renderNotificationsHtml } from './chat/views/chat-list-view.js';
+import { settingsHtml as renderSettingsHtml } from './chat/views/chat-settings-view.js';
+import { conversationMessagesHtml, messageDateKey, messageDateLabel, messageHtml } from './chat/views/chat-message-view.js';
+import { contactCardHtml as renderContactCardHtml, conversationHtml as renderConversationHtml } from './chat/views/chat-conversation-view.js';
+import { WhisperMetadata, classifyIncomingBeep, findPendingOutgoingWhisper, normalizeMessage as normalizeTransportMessage } from './chat/services/chat-transport.js';
+import { conversationRows, historyMessageRows, recentConversationRows, unreadMessageCount } from './chat/data/chat-conversation-data.js';
+import { ChatConversationController } from './chat/controllers/chat-conversation-controller.js';
+import { createChatContactService } from './chat/services/chat-contact-service.js';
+import { animateLayoutChange, animatePanelSize, positionPanel as applyPanelPosition, syncConversationBackButton as syncBackButton } from './chat/controllers/chat-panel-layout.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
