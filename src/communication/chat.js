@@ -32,6 +32,7 @@ import { contactCardHtml as renderContactCardHtml, conversationHtml as renderCon
 import { WhisperMetadata, classifyIncomingBeep, findPendingOutgoingWhisper, normalizeMessage as normalizeTransportMessage } from './chat-transport.js';
 import { conversationRows, historyMessageRows, recentConversationRows, unreadMessageCount } from './chat-conversation-data.js';
 import { ChatConversationController } from './chat-conversation-controller.js';
+import { createChatContactService } from './chat-contact-service.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -78,8 +79,12 @@ function resetMessageSelectionState() {
     selectedMessageIds.clear();
 }
 
-// CHAT 固定使用「暱稱優先、沒有暱稱才用 BC 名稱」，不跟隨 FCM 主面板的名稱切換。
-const getDisplayName = memberNumber => getSharedDisplayName(memberNumber, true);
+const contactService = createChatContactService({
+    config: cfg, snapshot: Snapshot, syncRoomAvatar, displayName: getSharedDisplayName, inRoom: inRoomFn, isFriend: isFriendOf,
+    getPlayer: () => Player, getRoomCharacters: () => ChatRoomCharacter, getOnlineFriends: () => onlineFriends,
+    getRemoteProfiles: () => remoteProfiles, getRoot: () => root,
+});
+const { avatarHtml, avatarUrl, biography, capability, character, getDisplayName, hydrateAvatars: hydrateChatAvatars, isOnline, sharedProfile } = contactService;
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
 const chatBalloons = createChatBalloonController({
@@ -95,77 +100,6 @@ const chatBalloons = createChatBalloonController({
     unreadCount: memberNumber => unreadCount(memberNumber),
     waterShapeHtml,
 });
-
-function isOnline(memberNumber) {
-    const mn = Number(memberNumber);
-    if (inRoomFn(mn)) return true;
-    if (!isFriendOf(mn)) return false;
-    return onlineFriends.some(friend => Number(friend.MemberNumber) === mn);
-}
-
-function capability(memberNumber) {
-    if (inRoomFn(Number(memberNumber))) return 'whisper';
-    if (!isFriendOf(memberNumber)) return 'none';
-    return isOnline(memberNumber) ? 'beep' : 'none';
-}
-
-function character(memberNumber) {
-    return ChatRoomCharacter?.find(c => Number(c.MemberNumber) === Number(memberNumber));
-}
-
-function sharedProfile(memberNumber) {
-    if (Number(memberNumber) === Number(Player?.MemberNumber)) return Player?.OnlineSharedSettings?.FCM || {};
-    return character(memberNumber)?.OnlineSharedSettings?.FCM || {};
-}
-
-function biography(memberNumber) {
-    const shared = sharedProfile(memberNumber);
-    if (typeof shared.signature === 'string' && shared.signature) return shared.signature;
-    const lian = Number(memberNumber) === Number(Player?.MemberNumber)
-        ? Player?.OnlineSharedSettings?.LCData?.MessageSetting
-        : character(memberNumber)?.OnlineSharedSettings?.LCData?.MessageSetting;
-    if (typeof lian?.Signature === 'string' && lian.Signature) return lian.Signature;
-    return remoteProfiles.get(Number(memberNumber))?.signature || '';
-}
-
-function avatarUrl(memberNumber) {
-    const shared = sharedProfile(memberNumber);
-    if (Number(memberNumber) === Number(Player?.MemberNumber) && cfg.chatAvatarMode !== 'follow') {
-        if (cfg.chatAvatarMode === 'url') return cfg.chatAvatarUrl || cfg.avatarUrl || '';
-        if (cfg.chatAvatarMode === 'game') return shared.avatarSnapshot || Snapshot._cache[Number(memberNumber)] || '';
-    }
-    if (shared.avatarMode === 'url' && shared.avatarUrl) return shared.avatarUrl;
-    if (shared.avatarMode !== 'none' && shared.avatarSnapshot) return shared.avatarSnapshot;
-    return remoteProfiles.get(Number(memberNumber))?.avatarUrl || Snapshot._cache[Number(memberNumber)] || '';
-}
-
-function avatarHtml(memberNumber, size = 34, variant = 'normal') {
-    const url = avatarUrl(memberNumber);
-    const mine = Number(memberNumber) === Number(Player?.MemberNumber);
-    const status = mine ? (cfg.chatStatus || 'online') : (isOnline(memberNumber) ? (sharedProfile(memberNumber).status || 'online') : 'offline');
-    return `<span class="fcm-chat-avatar fcm-chat-avatar-${variant} ${cfg.chatAvatarShape === 'round' ? 'round' : 'square'}" data-avatar-member="${Number(memberNumber)}" style="width:${size}px;height:${size}px">
-        ${url ? `<img src="${esc(url)}" draggable="false">` : esc(getDisplayName(memberNumber).slice(0, 2))}
-        <i class="${esc(status)}"></i>
-    </span>`;
-}
-
-async function hydrateChatAvatars() {
-    const avatars = [...(root?.querySelectorAll('[data-avatar-member]') || [])];
-    const selfMemberNumber = Number(Player?.MemberNumber);
-    const members = [...new Set(avatars.map(element => Number(element.dataset.avatarMember)).filter(memberNumber => memberNumber && memberNumber !== selfMemberNumber))];
-    await Promise.all(members.map(async memberNumber => {
-        const liveCharacter = character(memberNumber);
-        if (liveCharacter) await syncRoomAvatar(liveCharacter);
-        const url = await Snapshot.get(memberNumber);
-        if (!url) return;
-        root?.querySelectorAll(`[data-avatar-member="${memberNumber}"]`).forEach(element => {
-            let img = element.querySelector('img');
-            if (!img) { img = document.createElement('img'); img.draggable = false; element.insertBefore(img, element.firstChild); }
-            if (img.src !== url) img.src = url;
-            [...element.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).forEach(node => node.remove());
-        });
-    }));
-}
 
 function chatColors() {
     if (cfg.chatThemeMode === 'custom') return [cfg.chatPanelColor, cfg.chatFontColor, cfg.chatAccentColor];
