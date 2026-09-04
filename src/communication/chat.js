@@ -11,7 +11,6 @@ import { installDragScroll } from '../ui/drag-scroll.js';
 import { themeColors } from '../core/themes.js';
 import { showAddFriendConfirm, showRoomJoinConfirm, showIncomingRoomInvite } from '../chat/actions.js';
 import { canSendBcxWhisper, sendBcxAwareBeep, sendBcxAwareWhisper } from './bcx-compat.js';
-import { normalizedImageOrigin, trustImageOrigin } from './image-trust.js';
 import { injectChatStyles } from './chat/views/chat-styles.js';
 import { warnLimited } from '../core/logger.js';
 import { balloonPreviewText, cleanMessage, esc } from './chat/services/chat-content.js';
@@ -50,6 +49,7 @@ import { createChatOwnProfileService } from './chat/services/chat-own-profile.js
 import { createChatDialogs } from './chat/controllers/chat-dialogs.js';
 import { createChatRoomActions } from './chat/services/chat-room-actions.js';
 import { createChatConversationActions } from './chat/services/chat-conversation-actions.js';
+import { createChatMessageImagesController } from './chat/controllers/chat-message-images.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -158,7 +158,7 @@ const contactCard = createChatContactCardController({
 });
 const historyViewport = createChatHistoryViewportController({
     getRoot: () => root, getMemberNumber: () => selectedMember, conversation, store: ChatStore,
-    renderMessages: conversationMessagesHtml, bindImages: bindMessageImages, syncSelection: () => messageSelection.updateUi(),
+    renderMessages: conversationMessagesHtml, bindImages: (...args) => messageImages.bind(...args), syncSelection: () => messageSelection.updateUi(),
     joinRoom: showRoomJoinConfirm, text: T,
 });
 const forwardTargets = createChatForwardTargetsController({
@@ -186,6 +186,9 @@ const ownProfile = createChatOwnProfileService({
     text: T, queueAccountUpdate: data => ServerAccountUpdate.QueueData(data), warn: warnLimited, onSaved: renderChat,
 });
 const chatDialogs = createChatDialogs({ colors: () => [cfg.panelColor, cfg.fontColor, cfg.accentColor], text: T, htmlText: TH });
+const messageImages = createChatMessageImagesController({
+    getViewport: () => conversation.viewport, confirm: chatDialogs.confirm, text: T, rerender: renderChat,
+});
 const roomActions = createChatRoomActions({
     getMemberNumber: () => selectedMember, getRoom: () => ChatRoomData, getRoomCharacters: () => ChatRoomCharacter,
     capability, confirm: chatDialogs.confirm, text: T, runWithoutOutgoingCapture, sendBeep: sendBcxAwareBeep,
@@ -532,30 +535,6 @@ function refreshChatList({ preserveScroll = false } = {}) {
     }
 }
 
-function bindMessageImages(scope, log) {
-    scope?.querySelectorAll?.('.fcm-chat-image').forEach(image => {
-        image.addEventListener('load', () => {
-            // Image decoding can increase the message height after the message was
-            // appended. Keep following only while the user has not left the bottom.
-            if (log && conversation.viewport.followingLatest) conversation.viewport.scrollToLatest(log);
-        }, { once: true });
-        image.addEventListener('error', () => {
-            const link = image.closest('a');
-            if (!link) return;
-            link.className = 'fcm-chat-link';
-            link.textContent = link.href;
-        }, { once: true });
-    });
-    scope?.querySelectorAll?.('[data-trust-image-origin]').forEach(button => {
-        button.addEventListener('click', async () => {
-            const origin = normalizedImageOrigin(button.dataset.trustImageOrigin);
-            if (!origin || !await chatDialogs.confirm(T('chatTrustImagePrompt', origin), T('chatTrustImage'))) return;
-            trustImageOrigin(origin);
-            renderChat();
-        });
-    });
-}
-
 function appendConversationMessage(message) {
     const log = root?.querySelector('.fcm-chat-main .fcm-chat-messages');
     if (!log || log.querySelector(`[data-msg-id="${CSS.escape(String(message.id))}"]`)) return;
@@ -574,7 +553,7 @@ function appendConversationMessage(message) {
         const room = event.currentTarget.dataset.joinRoom;
         if (room) showRoomJoinConfirm({ room });
     });
-    bindMessageImages(inserted, log);
+    messageImages.bind(inserted, log);
     if (shouldFollowLatest) {
         conversation.viewport.follow();
         conversation.unread = 0;
@@ -677,7 +656,7 @@ function renderChat() {
     hydrateChatAvatars();
     const log = root.querySelector('.fcm-chat-messages');
     if (log) {
-        bindMessageImages(log, log);
+        messageImages.bind(log, log);
         conversation.viewport.follow();
         conversation.viewport.scrollToLatest(log);
     }
@@ -804,7 +783,7 @@ function refreshConversationMain({ scrollToLatest = true } = {}) {
     hydrateChatAvatars();
     const log = main.querySelector('.fcm-chat-messages');
     if (log) {
-        bindMessageImages(log, log);
+        messageImages.bind(log, log);
         if (scrollToLatest) {
             conversation.viewport.follow();
             conversation.viewport.scrollToLatest(log);
