@@ -5,11 +5,12 @@
   "type": "module",
   "description": "Liko - FCM (Friends and ChatRoom Manager) for Bondage Club",
   "scripts": {
-    "predev": "node scripts/copy-assets.mjs",
+    "predev": "node scripts/validate-icons.mjs && node scripts/copy-assets.mjs",
     "dev": "vite build && concurrently -k -n build,serve \"vite build --watch\" \"vite preview --port 5176\"",
     "preview": "vite preview --port 5176",
-    "prebuild": "node scripts/copy-assets.mjs",
+    "prebuild": "node scripts/validate-icons.mjs && node scripts/copy-assets.mjs",
     "build": "vite build",
+    "validate:icons": "node scripts/validate-icons.mjs",
     "lint": "eslint ."
   },
   "devDependencies": {

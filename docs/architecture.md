@@ -24,5 +24,6 @@
 - `data/`：關係資料、共用搜尋正規化與相關性排序、Profile 快取、Profile DB 與頭像 Snapshot DB。
 - `ui/`：圖示入口、主題選單、Dialog 與共用拖曳捲動。主面板和 CHAT 都使用 `ui/drag-scroll.js`。
 - `i18n/`：語言載入、翻譯引擎及 fallback。
+- `assets/icons/`：使用 kebab-case 命名的 SVG 原始素材；`scripts/validate-icons.mjs` 會在開發及建置前檢查結構、安全性與引用完整性。
 
 各 CHAT 子目錄的 `index.js` 是分類匯入入口，不承載行為。完整公開介面另見 [FCM public API](./public-api.md)。
