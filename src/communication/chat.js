@@ -59,7 +59,6 @@ let closeContextMenuListener = null;
 let multiSelectMode = false;
 let forwardTargetMode = false;
 let forwardTargetTab = 'room';
-let forwardListSnapshot = null;
 const selectedMessageIds = new Set();
 let suppressMessageClickUntil = 0;
 const pendingReplyTags = new Map();
@@ -69,6 +68,13 @@ const autoReplyTimes = new Map();
 const offlineQueueInFlight = new Set();
 const remoteProfiles = new Map();
 const bypassedIncomingWhispers = new WeakSet();
+
+function resetMessageSelectionState() {
+    multiSelectMode = false;
+    forwardTargetMode = false;
+    forwardTargetTab = 'room';
+    selectedMessageIds.clear();
+}
 
 // CHAT 固定使用「暱稱優先、沒有暱稱才用 BC 名稱」，不跟隨 FCM 主面板的名稱切換。
 const getDisplayName = memberNumber => getSharedDisplayName(memberNumber, true);
@@ -375,10 +381,7 @@ async function openChat(memberNumber = null) {
     if (Number(memberNumber) === Number(Player?.MemberNumber)) memberNumber = null;
     if (memberNumber) {
         selectedMember = Number(memberNumber);
-        multiSelectMode = false;
-        forwardTargetMode = false;
-        forwardListSnapshot = null;
-        selectedMessageIds.clear();
+        resetMessageSelectionState();
         replyTarget = null;
         channel = inRoomFn(selectedMember) ? 'whisper' : 'beep';
         stackedDetail = true;
@@ -422,10 +425,7 @@ function filteredNotificationRows(rows) {
 function closeChat() {
     const memberToClose = selectedMember;
     selectedMember = null;
-    multiSelectMode = false;
-    forwardTargetMode = false;
-    forwardListSnapshot = null;
-    selectedMessageIds.clear();
+    resetMessageSelectionState();
     replyTarget = null;
     stackedDetail = false;
     if (root) root.style.display = 'none';
@@ -972,10 +972,7 @@ function animatePanelSize(panel, before) {
 function bindMemberRows(scope = root) {
     scope?.querySelectorAll('[data-member]').forEach(button => button.addEventListener('click', async () => {
         selectedMember = Number(button.dataset.member);
-        multiSelectMode = false;
-        forwardTargetMode = false;
-        forwardListSnapshot = null;
-        selectedMessageIds.clear();
+        resetMessageSelectionState();
         replyTarget = null;
         contactCardOpen = false;
         justOpenedMember = selectedMember;
@@ -988,6 +985,22 @@ function bindMemberRows(scope = root) {
         renderChat();
         setTimeout(() => { justOpenedMember = null; }, 350);
     }));
+}
+
+function bindChatListEvents(scope = root) {
+    scope?.querySelectorAll('[data-notification-tab]').forEach(button => button.addEventListener('click', () => { notificationTab = button.dataset.notificationTab; renderChat(); }));
+    scope?.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => { selectedGroup = button.dataset.group; renderChat(); }));
+    scope?.querySelector('[data-add-group]')?.addEventListener('click', async () => {
+        const label = await showGroupNameDialog(); if (!label) return;
+        const id = `group-${Date.now().toString(36)}`; cfg.chatGroups ||= {}; cfg.chatGroups[id] = label; selectedGroup = id; saveCfg(); renderChat();
+    });
+    scope?.querySelectorAll('[data-group-mode]').forEach(button => button.addEventListener('click', () => { groupMode = button.dataset.groupMode; renderChat(); }));
+    scope?.querySelector('[data-group-search]')?.addEventListener('input', event => { groupSearch = event.target.value; refreshVisibleChatScroll(); });
+    scope?.querySelector('[data-notification-search]')?.addEventListener('input', event => { notificationSearch = event.target.value; refreshVisibleChatScroll(); });
+    scope?.querySelector('[data-search]')?.addEventListener('input', event => { search = event.target.value; refreshVisibleChatScroll(); });
+    scope?.querySelectorAll('[data-presence]').forEach(button => button.addEventListener('click', () => { presenceFilter = button.dataset.presence; renderChat(); }));
+    scope?.querySelectorAll('[data-rel]').forEach(button => button.addEventListener('click', () => { relationFilter = relationFilter === button.dataset.rel ? '' : button.dataset.rel; renderChat(); }));
+    bindMemberRows(scope);
 }
 
 function bindEvents() {
@@ -1026,22 +1039,8 @@ function bindEvents() {
         syncConversationBackButton(main, stacked);
         if (beforeList && beforeMain) animateLayoutChange(list, main, beforeList, beforeMain, stacked, stackedDetail);
     });
-    root.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { activeView = button.dataset.view; forwardTargetMode = false; forwardListSnapshot = null; stackedDetail = false; renderChat(); }));
-    root.querySelectorAll('[data-notification-tab]').forEach(button => button.addEventListener('click', () => { notificationTab = button.dataset.notificationTab; renderChat(); }));
-    root.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => { selectedGroup = button.dataset.group; renderChat(); }));
-    root.querySelector('[data-add-group]')?.addEventListener('click', async () => {
-        const label = await showGroupNameDialog(); if (!label) return;
-        const id = `group-${Date.now().toString(36)}`; cfg.chatGroups ||= {}; cfg.chatGroups[id] = label; selectedGroup = id; saveCfg(); renderChat();
-    });
-    root.querySelectorAll('[data-group-mode]').forEach(button => button.addEventListener('click', () => { groupMode = button.dataset.groupMode; renderChat(); }));
-    root.querySelector('[data-group-search]')?.addEventListener('input', event => { groupSearch = event.target.value; refreshVisibleChatScroll(); });
-    root.querySelector('[data-notification-search]')?.addEventListener('input', event => { notificationSearch = event.target.value; refreshVisibleChatScroll(); });
-    root.querySelector('[data-search]')?.addEventListener('input', event => {
-        search = event.target.value; refreshVisibleChatScroll();
-    });
-    root.querySelectorAll('[data-presence]').forEach(button => button.addEventListener('click', () => { presenceFilter = button.dataset.presence; renderChat(); }));
-    root.querySelectorAll('[data-rel]').forEach(button => button.addEventListener('click', () => { relationFilter = relationFilter === button.dataset.rel ? '' : button.dataset.rel; renderChat(); }));
-    bindMemberRows();
+    root.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { activeView = button.dataset.view; resetMessageSelectionState(); stackedDetail = false; renderChat(); }));
+    bindChatListEvents();
     root.querySelector('[data-back]')?.addEventListener('click', () => { stackedDetail = false; renderChat(); });
     root.querySelectorAll('[data-channel]').forEach(button => button.addEventListener('click', () => { if (!button.disabled) { channel = button.dataset.channel; renderChat(); } }));
     root.querySelector('[data-send]')?.addEventListener('click', sendCurrentMessage);
@@ -1418,8 +1417,7 @@ function enterMultiSelect(messageElement) {
 
 function exitMultiSelect() {
     closeForwardTargetList();
-    multiSelectMode = false;
-    selectedMessageIds.clear();
+    resetMessageSelectionState();
     updateMultiSelectUi();
 }
 
@@ -1460,8 +1458,6 @@ function showForwardTargetList() {
     if (!selectedMessageIds.size) return;
     const list = root?.querySelector('.fcm-chat-list');
     if (!list || forwardTargetMode) return;
-    forwardListSnapshot = document.createDocumentFragment();
-    while (list.firstChild) forwardListSnapshot.appendChild(list.firstChild);
     forwardTargetMode = true;
     forwardTargetTab = 'room';
     refreshForwardTargetList();
@@ -1475,14 +1471,16 @@ function closeForwardTargetList() {
     const list = root?.querySelector('.fcm-chat-list');
     forwardTargetMode = false;
     root?.querySelector('.fcm-chat-body')?.classList.remove('forward-target-mode');
-    if (list && forwardListSnapshot) {
-        list.replaceChildren(forwardListSnapshot);
+    if (list) {
+        list.innerHTML = listHtml();
+        bindChatListEvents(list);
+        hydrateChatAvatars();
+        installDragScroll(list, '.fcm-chat-scroll');
         if (stackedDetail) {
             list.classList.add('slide-out');
             root?.querySelector('.fcm-chat-main')?.classList.add('slide-in');
         }
     }
-    forwardListSnapshot = null;
 }
 
 function bindForwardTargetRows() {
