@@ -36,6 +36,7 @@ import { ChatConversationController } from './chat/controllers/chat-conversation
 import { createChatContactService } from './chat/services/chat-contact-service.js';
 import { animateLayoutChange, animatePanelSize, positionPanel as applyPanelPosition, syncConversationBackButton as syncBackButton } from './chat/controllers/chat-panel-layout.js';
 import { createChatAutoReplyService } from './chat/services/chat-auto-reply.js';
+import { createOfflineDeliveryService } from './chat/services/chat-offline-delivery.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -71,7 +72,6 @@ let forwardTargetTab = 'room';
 const selectedMessageIds = new Set();
 const whisperMetadata = new WhisperMetadata();
 let onlinePresenceSignature = '';
-const offlineQueueInFlight = new Set();
 const remoteProfiles = new Map();
 
 function resetMessageSelectionState() {
@@ -95,6 +95,18 @@ const runWithoutOutgoingCapture = callback => {
 const autoReply = createChatAutoReplyService({
     config: cfg, inRoom: inRoomFn, isOnline, sendWhisper: sendBcxAwareWhisper, sendBeep: sendBcxAwareBeep,
     recordMessage: (...args) => recordMessage(...args), runWithoutOutgoingCapture,
+});
+const offlineDelivery = createOfflineDeliveryService({
+    offlineQueue: OfflineQueue, chatStore: ChatStore, isFriend: isFriendOf, sendBeep: sendBcxAwareBeep, runWithoutOutgoingCapture,
+    onDelivered: async stored => {
+        messages = await ChatStore.recentIndex();
+        if (root?.isConnected && root.style.display !== 'none') {
+            const element = root.querySelector(`[data-msg-id="${CSS.escape(String(stored?.id || ''))}"]`);
+            element?.classList.remove('queued');
+            refreshVisibleChatScroll();
+        }
+    },
+    onError: error => console.warn('🐈‍⬛ [FCM] offline message delivery failed:', error),
 });
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
@@ -1247,27 +1259,7 @@ async function handleOnlineFriendsUpdate(result) {
             refreshConversationPresence();
         }
     }
-    const online = new Set(result.map(row => Number(row.MemberNumber)).filter(Boolean));
-    const ready = OfflineQueue.all().filter(row => isFriendOf(row.memberNumber) && online.has(Number(row.memberNumber)) && !offlineQueueInFlight.has(row.id));
-    if (!ready.length) return;
-    ready.forEach(row => offlineQueueInFlight.add(row.id));
-    ready.forEach((row, index) => setTimeout(async () => {
-        let delivered = false;
-        try { delivered = runWithoutOutgoingCapture(() => sendBcxAwareBeep({ MemberNumber: row.memberNumber, BeepType: '', Message: row.content })); }
-        catch (error) { console.warn('🐈‍⬛ [FCM] offline message delivery failed:', error); }
-        if (delivered) {
-            OfflineQueue.remove([row.id]);
-            const stored = (await ChatStore.all()).find(message => message.queueId === row.id);
-            if (stored) await ChatStore.put({ ...stored, queued: false, deliveredAt: Date.now() });
-        messages = await ChatStore.recentIndex();
-            if (root?.isConnected && root.style.display !== 'none') {
-                const element = root.querySelector(`[data-msg-id="${CSS.escape(String(stored?.id || ''))}"]`);
-                element?.classList.remove('queued');
-                refreshVisibleChatScroll();
-            }
-        }
-        offlineQueueInFlight.delete(row.id);
-    }, index * 350));
+    offlineDelivery.dispatch(result);
 }
 
 function setStatus(status, rerender = true) {
