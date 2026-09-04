@@ -954,10 +954,9 @@ function sendCurrentMessage() {
     const selectedChannel = available;
     const replyId = selectedChannel === 'whisper' ? replyTarget?.nativeMsgId : '';
     const outgoingId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
-    suppressOutgoing++;
-    try {
+    const sent = runWithoutOutgoingCapture(() => {
         if (selectedChannel === 'whisper') {
-            if (!canSendBcxWhisper(selectedMember)) return;
+            if (!canSendBcxWhisper(selectedMember)) return false;
             ServerSend('ChatRoomChat', { Type: 'Hidden', Target: selectedMember, Content: 'FCM::CHAT::MESSAGE', Dictionary: [{ Tag: 'FCM::CHAT::MESSAGE', MessageId: outgoingId }] });
             if (replyTarget) ServerSend('ChatRoomChat', { Type: 'Hidden', Target: selectedMember, Content: 'FCM::CHAT::TAG', Dictionary: [{ Tag: 'FCM::CHAT::TAG', ReplyId: replyId, TargetSharedId: replyTarget.sharedMsgId, Preview: replyTarget.preview }] });
             const data = typeof globalThis.ChatRoomGenerateChatRoomChatMessage === 'function'
@@ -965,9 +964,11 @@ function sendCurrentMessage() {
                 : { Type: 'Whisper', Content: content, Dictionary: replyId ? [{ Tag: 'ReplyId', ReplyId: replyId }] : [] };
             data.Target = selectedMember;
             ServerSend('ChatRoomChat', data);
+            return true;
         }
-        else if (!sendBcxAwareBeep({ MemberNumber: selectedMember, BeepType: '', Message: content })) return;
-    } finally { suppressOutgoing--; }
+        return sendBcxAwareBeep({ MemberNumber: selectedMember, BeepType: '', Message: content });
+    });
+    if (!sent) return;
     recordMessage({ id: outgoingId, sharedMsgId: outgoingId, memberNumber: selectedMember, direction: 'out', channel: selectedChannel, content, replyPreview: replyTarget?.preview || '', replyToId: replyTarget?.sharedMsgId || '' }, { notify: false });
     replyTarget = null;
     input.value = '';
@@ -1090,13 +1091,9 @@ async function forwardSelectedTo(memberNumber) {
             await recordMessage({ memberNumber: target, direction: 'out', channel: 'beep', content, queued: true, queueId: queued.id }, { notify: false });
             return;
         }
-        suppressOutgoing++;
-        let sent = false;
-        try {
-            sent = available === 'whisper'
-                ? sendBcxAwareWhisper({ Type: 'Whisper', Target: target, Content: content })
-                : sendBcxAwareBeep({ MemberNumber: target, BeepType: '', Message: content });
-        } finally { suppressOutgoing--; }
+        const sent = runWithoutOutgoingCapture(() => available === 'whisper'
+            ? sendBcxAwareWhisper({ Type: 'Whisper', Target: target, Content: content })
+            : sendBcxAwareBeep({ MemberNumber: target, BeepType: '', Message: content }));
         if (sent) await recordMessage({ memberNumber: target, direction: 'out', channel: available, content }, { notify: false });
     });
     exitMultiSelect();
@@ -1227,19 +1224,16 @@ function inviteCurrent() {
     const limit = room.MemberLimit ?? null;
     const description = String(room.Description || '').trim();
     const message = `|${room.Name}| - ${room.Creator || '?'} ＜${count ?? 0}/${limit ?? 0}＞${description ? `\n${description}` : ''}`;
-    suppressOutgoing++;
-    try { if (!sendBcxAwareBeep({ MemberNumber: selectedMember, BeepType: '', IsSecret: false, Message: message })) return; }
-    finally { suppressOutgoing--; }
+    const sent = runWithoutOutgoingCapture(() => sendBcxAwareBeep({ MemberNumber: selectedMember, BeepType: '', IsSecret: false, Message: message }));
+    if (!sent) return;
     recordMessage({ memberNumber: selectedMember, direction: 'out', channel: 'beep', content: room.Name, roomName: room.Name }, { notify: false });
 }
 
 async function summonCurrent() {
     if (!selectedMember || capability(selectedMember) !== 'beep' || !ChatRoomData?.Name) return;
     if (!await showFcmConfirm(T('beepSummonTitle'), T('beepSummon'))) return;
-    suppressOutgoing++;
-    try {
-        if (!sendBcxAwareBeep({ MemberNumber: selectedMember, BeepType: '', Message: 'summon', ChatRoomName: ChatRoomData.Name, ChatRoomSpace: ChatRoomData.Space })) return;
-    } finally { suppressOutgoing--; }
+    const sent = runWithoutOutgoingCapture(() => sendBcxAwareBeep({ MemberNumber: selectedMember, BeepType: '', Message: 'summon', ChatRoomName: ChatRoomData.Name, ChatRoomSpace: ChatRoomData.Space }));
+    if (!sent) return;
     recordMessage({ memberNumber: selectedMember, direction: 'out', channel: 'beep', content: 'summon', roomName: ChatRoomData.Name }, { notify: false });
 }
 
@@ -1259,10 +1253,8 @@ async function handleOnlineFriendsUpdate(result) {
     ready.forEach(row => offlineQueueInFlight.add(row.id));
     ready.forEach((row, index) => setTimeout(async () => {
         let delivered = false;
-        suppressOutgoing++;
-        try { delivered = sendBcxAwareBeep({ MemberNumber: row.memberNumber, BeepType: '', Message: row.content }); }
+        try { delivered = runWithoutOutgoingCapture(() => sendBcxAwareBeep({ MemberNumber: row.memberNumber, BeepType: '', Message: row.content })); }
         catch (error) { console.warn('🐈‍⬛ [FCM] offline message delivery failed:', error); }
-        finally { suppressOutgoing--; }
         if (delivered) {
             OfflineQueue.remove([row.id]);
             const stored = (await ChatStore.all()).find(message => message.queueId === row.id);
