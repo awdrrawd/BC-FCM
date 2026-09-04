@@ -5,7 +5,8 @@ import { PDB, _pc, Snapshot, loadAvatarFromBundle, syncRoomAvatar } from '../dat
 import { ChatStore, OfflineQueue } from './chat/data/chat-store.js';
 import { T, TH } from '../i18n/i18n.js';
 import { chatFontFamily } from './chat-font.js';
-import { isSupportedAvatarUrl, profileHtml as renderProfileHtml } from './chat-profile.js';
+import { isSupportedAvatarUrl } from './chat/services/chat-avatar-url.js';
+import { profileHtml as renderProfileHtml } from './chat/views/chat-profile-view.js';
 import { chatPanelSession } from './chat/controllers/chat-panel-session.js';
 import { installDragScroll } from '../ui/drag-scroll.js';
 import { themeColors } from '../core/themes.js';
