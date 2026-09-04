@@ -23,7 +23,7 @@ import { installMessageActions } from './chat/events/chat-message-actions.js';
 import { bindChatSettingsEvents } from './chat/events/chat-settings-events.js';
 import { bindChatProfileEvents } from './chat/events/chat-profile-events.js';
 import { settingsHtml as renderSettingsHtml } from './chat/views/chat-settings-view.js';
-import { conversationMessagesHtml, messageDateKey, messageDateLabel, messageHtml } from './chat/views/chat-message-view.js';
+import { conversationMessagesHtml } from './chat/views/chat-message-view.js';
 import { normalizeMessage as normalizeTransportMessage } from './chat/services/chat-transport.js';
 import { ChatConversationController } from './chat/controllers/chat-conversation-controller.js';
 import { createChatContactService } from './chat/services/chat-contact-service.js';
@@ -52,6 +52,8 @@ import { createChatTransportHandler } from './chat/services/chat-transport-handl
 import { createChatListPresenter } from './chat/views/chat-list-presenter.js';
 import { createChatConversationPresenter } from './chat/views/chat-conversation-presenter.js';
 import { createChatConversationPresence } from './chat/controllers/chat-conversation-presence.js';
+import { createChatMessageAppender } from './chat/controllers/chat-message-appender.js';
+import { createChatListController } from './chat/controllers/chat-list-controller.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -103,8 +105,8 @@ const messageRecorder = createChatMessageRecorder({
     isPanelVisible: () => !!root?.isConnected && root.style.display !== 'none',
     isSelectedMember: memberNumber => Number(memberNumber) === Number(selectedMember),
     setMessageIndex: value => { messages = value; },
-    appendMessage: message => appendConversationMessage(message),
-    refreshList: () => refreshVisibleChatScroll(),
+    appendMessage: message => messageAppender.append(message),
+    refreshList: () => chatList.refreshVisible(),
     notifyIncoming: message => {
         chatBalloons.showIncoming(message);
         playNotificationSound();
@@ -122,7 +124,7 @@ const offlineDelivery = createOfflineDeliveryService({
         if (root?.isConnected && root.style.display !== 'none') {
             const element = root.querySelector(`[data-msg-id="${CSS.escape(String(stored?.id || ''))}"]`);
             element?.classList.remove('queued');
-            refreshVisibleChatScroll();
+            chatList.refreshVisible();
         }
     },
     onError: error => console.warn('🐈‍⬛ [FCM] offline message delivery failed:', error),
@@ -176,7 +178,7 @@ const forwardTargets = createChatForwardTargetsController({
     getSelfMemberNumber: () => Player?.MemberNumber, getConversationMemberNumber: () => selectedMember,
     isFriend: isFriendOf, isOnline, avatarHtml, displayName: getDisplayName, text: TH,
     hasSelection: () => messageSelection.size() > 0, isStackedDetail: () => stackedDetail,
-    refreshChatList, hydrateAvatars: hydrateChatAvatars, onSelect: memberNumber => selectedActions.forwardTo(memberNumber),
+    refreshChatList: () => chatList.refresh(), hydrateAvatars: hydrateChatAvatars, onSelect: memberNumber => selectedActions.forwardTo(memberNumber),
 });
 const messageSelection = createChatMessageSelectionController({
     getPanel: () => root?.querySelector('#fcm-chat-panel'), getMessages: () => conversation.messages,
@@ -213,6 +215,10 @@ const chatDialogs = createChatDialogs({ colors: () => [cfg.panelColor, cfg.fontC
 const messageImages = createChatMessageImagesController({
     getViewport: () => conversation.viewport, confirm: chatDialogs.confirm, text: T, rerender: renderChat,
 });
+const messageAppender = createChatMessageAppender({
+    getRoot: () => root, conversation, bindImages: (...args) => messageImages.bind(...args),
+    updateUnreadNotice: historyViewport.updateUnreadNotice, joinRoom: showRoomJoinConfirm,
+});
 const roomActions = createChatRoomActions({
     getMemberNumber: () => selectedMember, getRoom: () => ChatRoomData, getRoomCharacters: () => ChatRoomCharacter,
     capability, confirm: chatDialogs.confirm, text: T, runWithoutOutgoingCapture, sendBeep: sendBcxAwareBeep,
@@ -239,6 +245,11 @@ const listPresenter = createChatListPresenter({
     getState: () => ({ activeView, notificationTab, notificationSearch, presenceFilter, relationFilter, search, selectedGroup, groupMode, groupSearch }),
     avatarHtml, displayName: getDisplayName, biography, cleanMessage, isOnline, isFavorite: isFav,
     getRelations: getAllRels, text: T, htmlText: TH,
+});
+const chatList = createChatListController({
+    getRoot: () => root, renderListHtml: listHtml, renderVisibleScrollHtml: listPresenter.visibleScrollHtml,
+    isForwardTargetsActive: forwardTargets.isActive, bindForwardTargets: forwardTargets.bind,
+    bindListEvents: bindChatListEvents, bindMemberRows, hydrateAvatars: hydrateChatAvatars, installDragScroll,
 });
 const handleIncomingBeep = transportHandler.incomingBeep;
 const handleIncomingWhisper = transportHandler.incomingWhisper;
@@ -386,61 +397,6 @@ function listHtml() {
     return listPresenter.viewHtml() || '';
 }
 
-function refreshVisibleChatScroll() {
-    const html = listPresenter.visibleScrollHtml();
-    const scroll = root?.querySelector('.fcm-chat-list .fcm-chat-scroll');
-    if (html === null || !scroll) return;
-    const scrollTop = scroll.scrollTop;
-    scroll.innerHTML = html;
-    scroll.scrollTop = scrollTop;
-    bindMemberRows(scroll);
-    hydrateChatAvatars();
-}
-
-function refreshChatList({ preserveScroll = false } = {}) {
-    const list = root?.querySelector('.fcm-chat-list');
-    if (!list) return;
-    const scrollTop = preserveScroll ? list.querySelector('.fcm-chat-scroll')?.scrollTop || 0 : 0;
-    list.innerHTML = listHtml();
-    if (forwardTargets.isActive()) forwardTargets.bind();
-    else bindChatListEvents(list);
-    hydrateChatAvatars();
-    installDragScroll(list, '.fcm-chat-scroll');
-    if (preserveScroll) {
-        const scroll = list.querySelector('.fcm-chat-scroll');
-        if (scroll) scroll.scrollTop = scrollTop;
-    }
-}
-
-function appendConversationMessage(message) {
-    const log = root?.querySelector('.fcm-chat-main .fcm-chat-messages');
-    if (!log || log.querySelector(`[data-msg-id="${CSS.escape(String(message.id))}"]`)) return;
-    // This must be captured before inserting the new row. Measuring afterwards
-    // makes the new row itself look like the user scrolled away from the bottom.
-    const shouldFollowLatest = conversation.viewport.shouldFollow(log, message.direction);
-    log.querySelector(':scope > .fcm-chat-empty')?.remove();
-    const previousElement = [...log.querySelectorAll(':scope > .fcm-chat-message')].at(-1);
-    const previousMessage = previousElement ? conversation.messages.find(row => String(row.id) === previousElement.dataset.msgId) : null;
-    if (!previousMessage || messageDateKey(previousMessage.timestamp) !== messageDateKey(message.timestamp)) {
-        log.insertAdjacentHTML('beforeend', `<div class="fcm-chat-date-separator" data-message-date="${esc(messageDateKey(message.timestamp))}"><span>${esc(messageDateLabel(message.timestamp))}</span></div>`);
-    }
-    log.insertAdjacentHTML('beforeend', messageHtml(message));
-    const inserted = log.lastElementChild;
-    inserted?.querySelector('[data-join-room]')?.addEventListener('click', event => {
-        const room = event.currentTarget.dataset.joinRoom;
-        if (room) showRoomJoinConfirm({ room });
-    });
-    messageImages.bind(inserted, log);
-    if (shouldFollowLatest) {
-        conversation.viewport.follow();
-        conversation.unread = 0;
-        requestAnimationFrame(() => { conversation.viewport.scrollToLatest(log); historyViewport.updateUnreadNotice(); });
-    } else {
-        conversation.unread++;
-        historyViewport.updateUnreadNotice();
-    }
-}
-
 async function loadConversation(memberNumber) {
     await conversation.load(ChatStore, memberNumber, target => Number(selectedMember) === target);
 }
@@ -518,18 +474,18 @@ function bindMemberRows(scope = root) {
 }
 
 function bindChatListEvents(scope = root) {
-    scope?.querySelectorAll('[data-notification-tab]').forEach(button => button.addEventListener('click', () => { notificationTab = button.dataset.notificationTab; refreshChatList(); }));
-    scope?.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => { selectedGroup = button.dataset.group; refreshChatList(); }));
+    scope?.querySelectorAll('[data-notification-tab]').forEach(button => button.addEventListener('click', () => { notificationTab = button.dataset.notificationTab; chatList.refresh(); }));
+    scope?.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => { selectedGroup = button.dataset.group; chatList.refresh(); }));
     scope?.querySelector('[data-add-group]')?.addEventListener('click', async () => {
         const label = await chatDialogs.promptGroupName(); if (!label) return;
-        const id = `group-${Date.now().toString(36)}`; cfg.chatGroups ||= {}; cfg.chatGroups[id] = label; selectedGroup = id; saveCfg(); refreshChatList();
+        const id = `group-${Date.now().toString(36)}`; cfg.chatGroups ||= {}; cfg.chatGroups[id] = label; selectedGroup = id; saveCfg(); chatList.refresh();
     });
-    scope?.querySelectorAll('[data-group-mode]').forEach(button => button.addEventListener('click', () => { groupMode = button.dataset.groupMode; refreshChatList(); }));
-    scope?.querySelector('[data-group-search]')?.addEventListener('input', event => { groupSearch = event.target.value; refreshVisibleChatScroll(); });
-    scope?.querySelector('[data-notification-search]')?.addEventListener('input', event => { notificationSearch = event.target.value; refreshVisibleChatScroll(); });
-    scope?.querySelector('[data-search]')?.addEventListener('input', event => { search = event.target.value; refreshVisibleChatScroll(); });
-    scope?.querySelectorAll('[data-presence]').forEach(button => button.addEventListener('click', () => { presenceFilter = button.dataset.presence; refreshChatList(); }));
-    scope?.querySelectorAll('[data-rel]').forEach(button => button.addEventListener('click', () => { relationFilter = relationFilter === button.dataset.rel ? '' : button.dataset.rel; refreshChatList({ preserveScroll: true }); }));
+    scope?.querySelectorAll('[data-group-mode]').forEach(button => button.addEventListener('click', () => { groupMode = button.dataset.groupMode; chatList.refresh(); }));
+    scope?.querySelector('[data-group-search]')?.addEventListener('input', event => { groupSearch = event.target.value; chatList.refreshVisible(); });
+    scope?.querySelector('[data-notification-search]')?.addEventListener('input', event => { notificationSearch = event.target.value; chatList.refreshVisible(); });
+    scope?.querySelector('[data-search]')?.addEventListener('input', event => { search = event.target.value; chatList.refreshVisible(); });
+    scope?.querySelectorAll('[data-presence]').forEach(button => button.addEventListener('click', () => { presenceFilter = button.dataset.presence; chatList.refresh(); }));
+    scope?.querySelectorAll('[data-rel]').forEach(button => button.addEventListener('click', () => { relationFilter = relationFilter === button.dataset.rel ? '' : button.dataset.rel; chatList.refresh({ preserveScroll: true }); }));
     bindMemberRows(scope);
 }
 
@@ -685,7 +641,7 @@ async function handleOnlineFriendsUpdate(result) {
     if (!cfg.communicationEnabled || !Array.isArray(result)) return;
     if (presence.updateOnlineRows(result)) {
         if (root?.isConnected && root.style.display !== 'none') {
-            refreshVisibleChatScroll();
+            chatList.refreshVisible();
             conversationPresence.refresh();
         }
     }
