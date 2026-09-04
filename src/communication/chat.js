@@ -61,6 +61,7 @@ import { createChatConversationEvents } from './chat/controllers/chat-conversati
 import { createChatShellEvents } from './chat/controllers/chat-shell-events.js';
 import { createChatRenderer } from './chat/controllers/chat-renderer.js';
 import { createChatLifecycle } from './chat/controllers/chat-lifecycle.js';
+import { createChatRuntime } from './chat/controllers/chat-runtime.js';
 import { EDIT_ICON, WATER_ICON } from '../ui/icons.js';
 
 let root = null;
@@ -71,7 +72,6 @@ let activeView = 'chat';
 let maximized = false;
 let stackedDetail = false;
 let suppressOutgoing = 0;
-let bcxNoticeTimer = 0;
 let cleanupMessageActions = null;
 const remoteProfiles = new Map();
 
@@ -265,7 +265,6 @@ const handleIncomingChatTag = transportHandler.receiveReplyTag;
 const handleIncomingChatMessageId = transportHandler.receiveMessageId;
 const handleIncomingFriendRequestNotice = transportHandler.incomingFriendRequest;
 const handleOutgoingServerSend = transportHandler.outgoing;
-let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
 const chatBalloons = createChatBalloonController({
     avatarHtml: (...args) => avatarHtml(...args),
@@ -323,6 +322,14 @@ const chatLifecycle = createChatLifecycle({
     syncBalloonVisibility: chatBalloons.syncVisibility, ensureBalloons: chatBalloons.ensure,
     resetBalloonInteraction, paintBalloon: chatBalloons.paint,
 });
+const chatRuntime = createChatRuntime({
+    config: cfg, chatStore: ChatStore, setMessageIndex: value => { messages = value; }, getMessageIndex: () => messages,
+    cleanMessage, profileDb: PDB, initAudio: initChatAudio, injectStyles: injectChatStyles,
+    balloons: chatBalloons, getRoot: () => root, render: chatRenderer.render,
+    refreshSettings: () => refreshChatSettings(), text: T, contactCard, presence,
+    refreshList: chatList.refreshVisible, refreshConversationPresence: conversationPresence.refresh,
+    offlineDelivery, closeChat: chatLifecycle.close,
+});
 
 function chatColors() {
     if (cfg.chatThemeMode === 'custom') return [cfg.chatPanelColor, cfg.chatFontColor, cfg.chatAccentColor];
@@ -330,32 +337,7 @@ function chatColors() {
 }
 
 async function initChat() {
-    if (initialized) return;
-    initialized = true;
-    await ChatStore.init();
-    messages = await ChatStore.recentIndex();
-    if (cfg.saveMode !== 'off') {
-        await PDB.init();
-        await PDB.batchGet([...new Set(messages.map(message => Number(message.memberNumber)).filter(Boolean))]);
-    }
-    // 舊版本曾把完整隱藏尾碼寫入 IndexedDB；讀取時一併淨化，避免舊資料再次洩漏。
-    messages = messages.map(message => ({ ...message, content: cleanMessage(message.content) }));
-    await initChatAudio();
-    injectChatStyles();
-    chatBalloons.ensure();
-    // FCM 與 CHAT 是同一套設定的兩個畫面：任一邊改主題/語言都要讓另一邊即時反映，
-    // 不必（也不應該）整個重建 — 分別掛勾兩個共用事件，各自只重繪自己負責的畫面。
-    window.addEventListener('fcm-theme-change', refreshChatSettings);
-    window.addEventListener('fcm-language-change', () => { if (root?.isConnected && root.style.display !== 'none') renderChat(); chatBalloons.ensure(); });
-    window.addEventListener('fcm:bcx-send-blocked', event => {
-        const notice = root?.querySelector('[data-bcx-compose-notice]');
-        if (!notice) return;
-        notice.textContent = T(event.detail?.channel === 'whisper' ? 'bcxWhisperBlocked' : 'bcxBeepBlocked');
-        notice.hidden = false;
-        clearTimeout(bcxNoticeTimer);
-        bcxNoticeTimer = window.setTimeout(() => { if (notice.isConnected) notice.hidden = true; }, 4000);
-    });
-    document.addEventListener('pointerdown', contactCard.handleOutsidePointer, true);
+    return chatRuntime.init();
 }
 
 function recordMessage(data, options) {
@@ -429,32 +411,15 @@ function bindMessageActions() {
 }
 
 async function handleOnlineFriendsUpdate(result) {
-    if (!cfg.communicationEnabled || !Array.isArray(result)) return;
-    if (presence.updateOnlineRows(result)) {
-        if (root?.isConnected && root.style.display !== 'none') {
-            chatList.refreshVisible();
-            conversationPresence.refresh();
-        }
-    }
-    offlineDelivery.dispatch(result);
+    return chatRuntime.updateOnlineFriends(result);
 }
 
 function setStatus(status, rerender = true) {
-    presence.setStatus(status);
-    const dot = root?.querySelector('.fcm-chat-rail [data-status] .fcm-status-dot');
-    if (dot) dot.className = `fcm-status-dot ${status}`;
-    if (rerender) renderChat();
+    chatRuntime.setStatus(status, rerender);
 }
 
 function refreshChatSettings() {
-    chatBalloons.ensure();
-    document.querySelectorAll('.fcm-chat-user-balloon').forEach(chatBalloons.paint);
-    document.getElementById('fcm-chat-balloon')?.classList.toggle('persistent', !!cfg.communicationEnabled && cfg.balloonPlacement !== 'off');
-    if (cfg.userBalloonPlacement === 'off') document.querySelectorAll('.fcm-chat-user-balloon').forEach(balloon => balloon.remove());
-    if (!cfg.communicationEnabled) {
-        closeChat();
-        document.querySelectorAll('.fcm-chat-user-balloon').forEach(balloon => balloon.remove());
-    } else if (root?.isConnected && root.style.display !== 'none') renderChat();
+    chatRuntime.applySettings();
 }
 
 export { initChat, openChat, closeChat, refreshChatSettings, handleIncomingBeep, handleIncomingChatMessageId, handleIncomingChatTag, handleIncomingFriendRequestNotice, handleIncomingWhisper, handleIncomingWhisperDisplay, handleOutgoingServerSend, handleOnlineFriendsUpdate };
