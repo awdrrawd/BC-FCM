@@ -41,6 +41,7 @@ import { createChatSender } from './chat/services/chat-sender.js';
 import { createChatMessageRecorder } from './chat/services/chat-message-recorder.js';
 import { createChatPresenceService } from './chat/services/chat-presence.js';
 import { createChatRoomStateService } from './chat/services/chat-room-state.js';
+import { buildGroupDefinitions, filterContactRows, filterGroupRows, filterNotificationRows, selectedGroupDefinition } from './chat/data/chat-list-data.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -327,9 +328,7 @@ function minimizeChat() {
 }
 
 function filteredNotificationRows(rows) {
-    const query = notificationSearch.trim().toLowerCase();
-    if (!query) return rows;
-    return rows.filter(row => `${getDisplayName(row.memberNumber)} ${row.memberNumber} ${biography(row.memberNumber)} ${cleanMessage(row.content)}`.toLowerCase().includes(query));
+    return filterNotificationRows(rows, notificationSearch, { displayName: getDisplayName, biography, cleanMessage });
 }
 
 function closeChat() {
@@ -355,14 +354,8 @@ function closeChat() {
 }
 
 function filteredContacts() {
-    return conversations().filter(row => {
-        if (presenceFilter === 'online' ? !isOnline(row.memberNumber) : isOnline(row.memberNumber)) return false;
-        if (relationFilter === 'follow' && !isFav(row.memberNumber)) return false;
-        if (relationFilter && relationFilter !== 'follow') {
-            const roles = getAllRels(row.memberNumber);
-            if (relationFilter === 'owner' ? !roles.some(role => role === 'owner' || role === 'lover') : !roles.includes(relationFilter)) return false;
-        }
-        return !search || `${getDisplayName(row.memberNumber)} ${biography(row.memberNumber)}`.toLowerCase().includes(search.toLowerCase());
+    return filterContactRows(conversations(), { presence: presenceFilter, relation: relationFilter, search }, {
+        isOnline, isFavorite: isFav, getRelations: getAllRels, displayName: getDisplayName, biography,
     });
 }
 
@@ -376,21 +369,12 @@ function notificationsHtml() {
 }
 
 function groupDefinitions() {
-    const roomMembers = (ChatRoomCharacter || []).filter(c => Number(c.MemberNumber) !== Number(Player?.MemberNumber)).map(c => Number(c.MemberNumber));
-    const favorites = buildFriendList().map(f => Number(f.mn)).filter(isFav);
-    const contacts = buildFriendList().map(f => Number(f.mn));
-    const manual = Object.entries(cfg.chatGroups || {}).map(([id, label]) => ({
-        id, label, members: Object.entries(cfg.chatMemberGroups || {}).filter(([, groups]) => Array.isArray(groups) && groups.includes(id)).map(([mn]) => Number(mn)),
-    }));
-    return { room: { id: 'room', label: T('chatRoom'), members: roomMembers }, groups: [
-        { id: 'favorites', label: T('chatFavorites'), members: favorites },
-        { id: 'contacts', label: T('chatAllContacts'), members: contacts }, ...manual,
-    ] };
+    return buildGroupDefinitions({ roomCharacters: ChatRoomCharacter, selfMemberNumber: Player?.MemberNumber, friendRows: buildFriendList(), isFavorite: isFav, groups: cfg.chatGroups, memberGroups: cfg.chatMemberGroups, text: T });
 }
 
 function groupsHtml() {
     const definitions = groupDefinitions();
-    const group = groupMode === 'room' ? definitions.room : (definitions.groups.find(item => item.id === selectedGroup) || definitions.groups[0]);
+    const group = selectedGroupDefinition(definitions, groupMode, selectedGroup);
     const rows = filteredGroupRows(group);
     return renderGroupsHtml({ definitions, group, rowsHtml: contactRows(rows), groupMode, groupSearch, esc, text: TH });
 }
@@ -469,14 +453,14 @@ function visibleChatScrollHtml() {
     if (activeView === 'chat') return contactRows(filteredContacts()) || `<div class="fcm-chat-empty">${TH('chatEmptyCategory')}</div>`;
     if (activeView === 'groups') {
         const definitions = groupDefinitions();
-        const group = groupMode === 'room' ? definitions.room : (definitions.groups.find(item => item.id === selectedGroup) || definitions.groups[0]);
+        const group = selectedGroupDefinition(definitions, groupMode, selectedGroup);
         return contactRows(filteredGroupRows(group)) || `<div class="fcm-chat-empty">${TH('chatGroupEmpty')}</div>`;
     }
     return null;
 }
 
 function filteredGroupRows(group) {
-    return (group?.members || []).filter(memberNumber => !groupSearch || `${getDisplayName(memberNumber)} ${biography(memberNumber)}`.toLowerCase().includes(groupSearch.toLowerCase())).map(memberNumber => ({ memberNumber, timestamp: 0, unread: 0 }));
+    return filterGroupRows(group, groupSearch, getDisplayName, biography);
 }
 
 function refreshVisibleChatScroll() {
