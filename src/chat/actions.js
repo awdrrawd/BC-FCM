@@ -4,7 +4,7 @@ import { amAdmin, inRoomFn, getDisplayName, isFriendOf } from '../data/data.js';
 import { renderCurrent, minimizePanel, closePanel } from '../panel/panel-controller.js';
 import { sendBcxAwareBeep } from '../communication/bcx-compat.js';
 import { warnLimited } from '../core/logger.js';
-import { createDialogHost } from '../ui/dialog.js';
+import { closeDialog, createDialogHost } from '../ui/dialog.js';
 // ════════════════════════════════════════
 //  FCM module: actions.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -57,35 +57,30 @@ import { createDialogHost } from '../ui/dialog.js';
         // This does not bypass ModSDK; it only moves the normal send to the
         // next painted frame so the click itself remains responsive.
         const sendAfterPaint = callback => requestAnimationFrame(() => setTimeout(callback, 0));
-        const ex = document.getElementById('fcm-beep-overlay'); if (ex) { ex.remove(); return; }
-        const overlay = document.createElement('div'); overlay.id = 'fcm-beep-overlay'; overlay.className = 'fcm-overlay';
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:100000;display:flex;align-items:center;justify-content:center;';
-        overlay.addEventListener('click', () => overlay.remove());
-        const pop = document.createElement('div'); pop.className = 'fcm-dialog';
-        pop.style.cssText = 'background:#241840;border:2px solid #8060c8;border-radius:16px;padding:26px;width:min(520px,92vw);box-shadow:0 10px 50px rgba(0,0,0,.85);display:flex;flex-direction:column;gap:16px;';
-        pop.addEventListener('click', e => e.stopPropagation());
-        const titleEl = document.createElement('div'); titleEl.style.cssText = 'color:#d0a8f0;font-size:16px;font-weight:700;text-align:center;'; titleEl.textContent = T('beepTitle', name);
-        const ta = document.createElement('textarea'); ta.rows = 10; ta.placeholder = T('beepPlaceholder');
-        ta.style.cssText = 'background:#1a1030;border:1.5px solid #6050a0;border-radius:10px;padding:12px;color:#f0e0ff;font-size:13px;outline:none;width:100%;box-sizing:border-box;resize:vertical;min-height:140px;max-height:360px;overflow-y:auto;font-family:inherit;line-height:1.5;';
-        ta.style.setProperty('user-select', 'text', 'important');
-        const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex;gap:12px;';
-        const cancelBtn = document.createElement('button'); cancelBtn.textContent = T('beepCancel'); cancelBtn.style.cssText = 'flex:1;padding:14px;background:#1e1635;border:1.5px solid #5a48a8;border-radius:10px;color:#c4a0e0;font-size:14px;cursor:pointer;font-weight:600;'; cancelBtn.addEventListener('click', () => overlay.remove());
-        const sendBtn = document.createElement('button'); sendBtn.textContent = T('beepSend'); sendBtn.style.cssText = 'flex:2;padding:14px;background:#1a3860;border:1.5px solid #4090d8;border-radius:10px;color:#90d0ff;font-size:15px;cursor:pointer;font-weight:700;';
-        sendBtn.addEventListener('click', () => {
+        const existing = document.getElementById('fcm-beep-overlay');
+        if (existing) { closeDialog('fcm-beep-overlay'); return; }
+        const host = createDialogHost({ id: 'fcm-beep-overlay', dialogClass: 'fcm-dialog fcm-dialog-beep' });
+        const { dialog: pop } = host;
+        const titleEl = document.createElement('div'); titleEl.className = 'fcm-dialog-title'; titleEl.textContent = T('beepTitle', name);
+        const ta = document.createElement('textarea'); ta.className = 'fcm-dialog-textarea'; ta.rows = 10; ta.placeholder = T('beepPlaceholder');
+        const btnRow = document.createElement('div'); btnRow.className = 'fcm-dialog-actions';
+        const cancelBtn = document.createElement('button'); cancelBtn.className = 'fcm-dialog-action fcm-dialog-action-cancel'; cancelBtn.textContent = T('beepCancel'); host.listen(cancelBtn, 'click', () => host.close());
+        const sendBtn = document.createElement('button'); sendBtn.className = 'fcm-dialog-action fcm-dialog-action-send'; sendBtn.textContent = T('beepSend');
+        host.listen(sendBtn, 'click', () => {
             const msg = ta.value.trim();
-            overlay.remove();
+            host.close();
             sendAfterPaint(() => {
                 if (sendBcxAwareBeep({ MemberNumber: mn, BeepType: '', Message: msg || undefined }) && typeof FriendListBeepLog !== 'undefined') FriendListBeepLog.push({ MemberNumber: mn, MemberName: name, Sent: true, Time: new Date(), Message: msg });
             });
         });
-        ta.addEventListener('keydown', e => { if (e.key === 'Enter' && e.ctrlKey) { e.preventDefault(); sendBtn.click(); } if (e.key === 'Escape') overlay.remove(); e.stopPropagation(); });
+        host.listen(ta, 'keydown', event => { if (event.key === 'Enter' && event.ctrlKey) { event.preventDefault(); sendBtn.click(); } if (event.key === 'Escape') host.close(); event.stopPropagation(); });
         const summonBtn = document.createElement('button');
+        summonBtn.className = 'fcm-dialog-action fcm-dialog-action-summon';
         summonBtn.textContent = T('beepSummon');
-        summonBtn.style.cssText = 'flex:1;padding:14px;background:#182a10;border:1.5px solid #40a030;border-radius:10px;color:#80e860;font-size:14px;cursor:pointer;font-weight:700;';
-        summonBtn.addEventListener('click', () => {
+        host.listen(summonBtn, 'click', () => {
             const msg = T('beepSummonConfirm', name);
             showConfirm(msg, () => {
-                overlay.remove();
+                host.close();
                 sendAfterPaint(() => {
                     try {
                         const sent = sendBcxAwareBeep({
@@ -101,12 +96,12 @@ import { createDialogHost } from '../ui/dialog.js';
             }, T('beepSummon'));
         });
         if (typeof ChatRoomData === 'undefined' || !ChatRoomData) {
-            summonBtn.disabled = true; summonBtn.style.opacity = '0.35'; summonBtn.style.cursor = 'not-allowed';
+            summonBtn.disabled = true;
             summonBtn.title = T('beepSummonNoRoom');
         }
         btnRow.appendChild(cancelBtn); btnRow.appendChild(summonBtn); btnRow.appendChild(sendBtn);
         pop.appendChild(titleEl); pop.appendChild(ta); pop.appendChild(btnRow);
-        overlay.appendChild(pop); document.body.appendChild(overlay); ta.focus();
+        host.mount(); ta.focus();
     }
 
     function doWhisper(mn) { const el = document.getElementById('InputChat'); if (el) { el.value = `/w ${mn} `; el.focus(); } minimizePanel(); }
