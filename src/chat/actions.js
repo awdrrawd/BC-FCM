@@ -4,6 +4,7 @@ import { amAdmin, inRoomFn, getDisplayName, isFriendOf } from '../data/data.js';
 import { renderCurrent, minimizePanel, closePanel } from '../panel/panel-controller.js';
 import { sendBcxAwareBeep } from '../communication/bcx-compat.js';
 import { warnLimited } from '../core/logger.js';
+import { createDialogHost } from '../ui/dialog.js';
 // ════════════════════════════════════════
 //  FCM module: actions.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -161,42 +162,28 @@ import { warnLimited } from '../core/logger.js';
     // BC's room-join handler from firing after the confirm dialog closes.
     // Also guards against double-fire via _confirmed flag.
     function showConfirm(msg, onOk, okLabel) {
-        const ex = document.getElementById('fcm-confirm-overlay'); if (ex) ex.remove();
-        const overlay = document.createElement('div'); overlay.id = 'fcm-confirm-overlay'; overlay.className = 'fcm-overlay';
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center;';
-        const box = document.createElement('div'); box.className = 'fcm-dialog';
-        box.style.cssText = 'background:#241840;border:2px solid #7060c0;border-radius:14px;padding:28px 24px;width:min(380px,88vw);box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:20px;font-family:-apple-system,sans-serif;';
-        box.addEventListener('click', e => e.stopPropagation());
+        let confirmed = false;
+        const host = createDialogHost({
+            id: 'fcm-confirm-overlay',
+            overlayStyle: 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center;',
+            dialogStyle: 'background:#241840;border:2px solid #7060c0;border-radius:14px;padding:28px 24px;width:min(380px,88vw);box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:20px;font-family:-apple-system,sans-serif;',
+            onKeyDown: (event, close) => {
+                event.stopPropagation();
+                if (event.key === 'Escape') close();
+                if (event.key === 'Enter' && !confirmed) { confirmed = true; close(); onOk?.(); }
+            },
+        });
+        const { dialog: box } = host;
         const msgEl = document.createElement('div'); msgEl.style.cssText = 'color:#e8d0ff;font-size:14px;text-align:center;line-height:1.7;white-space:pre-wrap;'; msgEl.textContent = msg;
         const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex;gap:12px;';
         const cancelBtn = document.createElement('button'); cancelBtn.textContent = T('btnCancel');
-        cancelBtn.style.cssText = 'flex:1;padding:12px;background:#1e1635;border:1.5px solid #5a48a8;border-radius:10px;color:#c4a0e0;font-size:13px;cursor:pointer;font-weight:600;'; cancelBtn.addEventListener('click', () => { cleanup(); overlay.remove(); });
+        cancelBtn.style.cssText = 'flex:1;padding:12px;background:#1e1635;border:1.5px solid #5a48a8;border-radius:10px;color:#c4a0e0;font-size:13px;cursor:pointer;font-weight:600;'; host.listen(cancelBtn, 'click', () => host.close());
         const okBtn = document.createElement('button'); okBtn.textContent = okLabel || T('btnConfirm');
         okBtn.style.cssText = 'flex:2;padding:12px;background:#1a3060;border:1.5px solid #4080d8;border-radius:10px;color:#90c8ff;font-size:13px;cursor:pointer;font-weight:700;';
-
-        // Bug fix: one-shot guard prevents double-fire on rapid double-click
-        let _confirmed = false;
-        okBtn.addEventListener('click', () => {
-            if (_confirmed) return; _confirmed = true;
-            cleanup(); overlay.remove(); if (onOk) onOk();
-        });
-
-        const keyFn = e => {
-            // Bug fix: stopPropagation so Enter/Escape don't reach BC's global handlers
-            e.stopPropagation();
-            if (e.key === 'Escape') { cleanup(); overlay.remove(); }
-            if (e.key === 'Enter') {
-                if (_confirmed) return; _confirmed = true;
-                cleanup(); overlay.remove(); if (onOk) onOk();
-            }
-        };
-        function cleanup() { document.removeEventListener('keydown', keyFn, true); }
-        // Use capture phase so we intercept before BC's handlers
-        document.addEventListener('keydown', keyFn, true);
-        overlay.addEventListener('click', () => { cleanup(); overlay.remove(); });
+        host.listen(okBtn, 'click', () => { if (confirmed) return; confirmed = true; host.close(); onOk?.(); });
         btnRow.appendChild(cancelBtn); btnRow.appendChild(okBtn);
         box.appendChild(msgEl); box.appendChild(btnRow);
-        overlay.appendChild(box); document.body.appendChild(overlay); setTimeout(() => okBtn.focus(), 50);
+        host.mount(); setTimeout(() => okBtn.focus(), 50);
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -212,12 +199,13 @@ import { warnLimited } from '../core/logger.js';
 
     function showAddFriendConfirm(mn, dname, oneSided) {
         mn = parseInt(mn);
-        const ex = document.getElementById('fcm-confirm-overlay'); if (ex) ex.remove();
-        const overlay = document.createElement('div'); overlay.id = 'fcm-confirm-overlay'; overlay.className = 'fcm-overlay';
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center;';
-        const box = document.createElement('div'); box.className = 'fcm-dialog';
-        box.style.cssText = 'background:#241840;border:2px solid #7060c0;border-radius:14px;padding:26px 24px;width:min(400px,90vw);box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:18px;font-family:-apple-system,sans-serif;';
-        box.addEventListener('click', e => e.stopPropagation());
+        const host = createDialogHost({
+            id: 'fcm-confirm-overlay',
+            overlayStyle: 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center;',
+            dialogStyle: 'background:#241840;border:2px solid #7060c0;border-radius:14px;padding:26px 24px;width:min(400px,90vw);box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:18px;font-family:-apple-system,sans-serif;',
+            onKeyDown: (event, close) => { event.stopPropagation(); if (event.key === 'Escape') close(); },
+        });
+        const { dialog: box } = host;
 
         const msgEl = document.createElement('div'); msgEl.style.cssText = 'color:#e8d0ff;font-size:14px;text-align:center;line-height:1.7;white-space:pre-wrap;';
         const hint = document.createElement('span'); hint.style.cssText = 'display:block;color:#9a86c8;font-size:12px;margin-top:6px;';
@@ -225,28 +213,21 @@ import { warnLimited } from '../core/logger.js';
         msgEl.textContent = T('addFriendTitle', dname) + (oneSided ? '\n\n' + T('peopleOneSidedWarn') : '');
         msgEl.appendChild(hint);
 
-        const cleanup = () => { document.removeEventListener('keydown', keyFn, true); };
-        const close = () => { cleanup(); overlay.remove(); };
-
         const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex;gap:10px;';
         const cancelBtn = document.createElement('button'); cancelBtn.textContent = T('btnCancel');
         cancelBtn.style.cssText = 'flex:1;padding:11px;background:#1e1635;border:1.5px solid #5a48a8;border-radius:10px;color:#c4a0e0;font-size:13px;cursor:pointer;font-weight:600;';
-        cancelBtn.addEventListener('click', close);
+        host.listen(cancelBtn, 'click', () => host.close());
 
         const okBtn = document.createElement('button'); okBtn.textContent = T('btnAgree');
         okBtn.style.cssText = 'flex:1;padding:11px;background:#123a20;border:1.5px solid #40a860;border-radius:10px;color:#90f0b0;font-size:13px;cursor:pointer;font-weight:700;';
-        okBtn.addEventListener('click', () => { close(); doAddFriend(mn); });
+        host.listen(okBtn, 'click', () => { host.close(); doAddFriend(mn); });
 
         const okNotifyBtn = document.createElement('button'); okNotifyBtn.textContent = T('btnAgreeNotify');
         okNotifyBtn.style.cssText = 'flex:1.3;padding:11px;background:#1a3060;border:1.5px solid #4080d8;border-radius:10px;color:#90c8ff;font-size:13px;cursor:pointer;font-weight:700;';
-        okNotifyBtn.addEventListener('click', () => { close(); doAddFriend(mn); sendFriendReqNotify(mn); });
-
-        const keyFn = e => { e.stopPropagation(); if (e.key === 'Escape') close(); };
-        document.addEventListener('keydown', keyFn, true);
-        overlay.addEventListener('click', close);
+        host.listen(okNotifyBtn, 'click', () => { host.close(); doAddFriend(mn); sendFriendReqNotify(mn); });
         btnRow.appendChild(cancelBtn); btnRow.appendChild(okBtn); btnRow.appendChild(okNotifyBtn);
         box.appendChild(msgEl); box.appendChild(btnRow);
-        overlay.appendChild(box); document.body.appendChild(overlay);
+        host.mount();
     }
 
     function sendFriendReqNotify(mn) {
@@ -412,12 +393,18 @@ import { warnLimited } from '../core/logger.js';
     //  待 Promise 解析出完整 info 後就地抽換內容。使用者可在載入完成前就按「加入」。
     function showRoomJoinConfirm(info, infoPromise) {
         if (!info || !info.room) return;
-        const ex = document.getElementById('fcm-confirm-overlay'); if (ex) ex.remove();
-        const overlay = document.createElement('div'); overlay.id = 'fcm-confirm-overlay'; overlay.className = 'fcm-overlay';
-        overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center;';
-        const box = document.createElement('div'); box.className = 'fcm-dialog';
-        box.style.cssText = 'background:rgb(36,24,64);border:2px solid rgb(112,96,192);border-radius:14px;padding:28px 24px;width:min(380px,88vw);box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:20px;font-family:-apple-system,sans-serif;';
-        box.addEventListener('click', e => e.stopPropagation());
+        let confirmed = false;
+        const host = createDialogHost({
+            id: 'fcm-confirm-overlay',
+            overlayStyle: 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:100001;display:flex;align-items:center;justify-content:center;',
+            dialogStyle: 'background:rgb(36,24,64);border:2px solid rgb(112,96,192);border-radius:14px;padding:28px 24px;width:min(380px,88vw);box-shadow:0 8px 40px rgba(0,0,0,.8);display:flex;flex-direction:column;gap:20px;font-family:-apple-system,sans-serif;',
+            onKeyDown: (event, close) => {
+                event.stopPropagation();
+                if (event.key === 'Escape') close();
+                if (event.key === 'Enter' && !confirmed) { confirmed = true; close(); _doJoinRoom(info.room); }
+            },
+        });
+        const { overlay, dialog: box } = host;
         const detailWrap = document.createElement('div');
         detailWrap.appendChild(_buildRoomDetail(info, !!infoPromise));
         box.appendChild(detailWrap);
@@ -431,23 +418,13 @@ import { warnLimited } from '../core/logger.js';
         const btnRow = document.createElement('div'); btnRow.style.cssText = 'display:flex;gap:12px;';
         const cancelBtn = document.createElement('button'); cancelBtn.textContent = T('btnCancel');
         cancelBtn.style.cssText = 'flex:1;padding:12px;background:#1e1635;border:1.5px solid #5a48a8;border-radius:10px;color:#c4a0e0;font-size:13px;cursor:pointer;font-weight:600;';
-        cancelBtn.addEventListener('click', () => { cleanup(); overlay.remove(); });
+        host.listen(cancelBtn, 'click', () => host.close());
         const okBtn = document.createElement('button'); okBtn.textContent = '🚪 ' + T('roomJoinRoomBtn');
         okBtn.style.cssText = 'flex:2;padding:12px;background:#1a3060;border:1.5px solid #4080d8;border-radius:10px;color:#90c8ff;font-size:13px;cursor:pointer;font-weight:700;';
-        let _confirmed = false;
-        okBtn.addEventListener('click', () => { if (_confirmed) return; _confirmed = true; cleanup(); overlay.remove(); _doJoinRoom(info.room); });
-
-        const keyFn = e => {
-            e.stopPropagation();
-            if (e.key === 'Escape') { cleanup(); overlay.remove(); }
-            if (e.key === 'Enter') { if (_confirmed) return; _confirmed = true; cleanup(); overlay.remove(); _doJoinRoom(info.room); }
-        };
-        function cleanup() { document.removeEventListener('keydown', keyFn, true); }
-        document.addEventListener('keydown', keyFn, true);
-        overlay.addEventListener('click', () => { cleanup(); overlay.remove(); });
+        host.listen(okBtn, 'click', () => { if (confirmed) return; confirmed = true; host.close(); _doJoinRoom(info.room); });
         btnRow.appendChild(cancelBtn); btnRow.appendChild(okBtn);
         box.appendChild(btnRow);
-        overlay.appendChild(box); document.body.appendChild(overlay); setTimeout(() => okBtn.focus(), 50);
+        host.mount(); setTimeout(() => okBtn.focus(), 50);
     }
 
     function _roomShareInfoFromEntry(entry) {

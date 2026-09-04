@@ -21,6 +21,7 @@ import { hasCustomNotificationSound, initChatAudio, playNotificationSound, saveC
 import { installChatDrag, resetBalloonInteraction } from './chat-drag.js';
 import { ConversationViewport } from './chat-viewport.js';
 import { createChatBalloonController } from './chat-balloon.js';
+import { createDialogHost } from '../ui/dialog.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     ALARM_MUTED_ICON, ALARM_ACTIVE_ICON, EXIT_ICON, DOWNLOAD_ICON,
@@ -1623,14 +1624,11 @@ function saveOwnProfile() {
 
 function showFcmConfirm(message, confirmLabel = T('chatConfirmDelete')) {
     return new Promise(resolve => {
-        const overlay = document.createElement('div'); overlay.className = 'fcm-chat-modal-overlay';
-        overlay.style.cssText = `--s:${cfg.panelColor};--tx:${cfg.fontColor};--ac:${cfg.accentColor}`;
-        overlay.innerHTML = `<div class="fcm-chat-modal"><div>${esc(message)}</div><div><button data-modal-cancel>${TH('chatCancel')}</button><button data-modal-ok>${esc(confirmLabel)}</button></div></div>`;
-        const finish = value => { overlay.remove(); resolve(value); };
-        overlay.querySelector('[data-modal-cancel]').addEventListener('click', () => finish(false));
-        overlay.querySelector('[data-modal-ok]').addEventListener('click', () => finish(true));
-        overlay.addEventListener('click', event => { if (event.target === overlay) finish(false); });
-        document.body.appendChild(overlay);
+        const host = createDialogHost({ overlayClass: 'fcm-chat-modal-overlay', dialogClass: 'fcm-chat-modal', overlayStyle: `--s:${cfg.panelColor};--tx:${cfg.fontColor};--ac:${cfg.accentColor}`, onClose: value => resolve(!!value) });
+        host.dialog.innerHTML = `<div>${esc(message)}</div><div><button data-modal-cancel>${TH('chatCancel')}</button><button data-modal-ok>${esc(confirmLabel)}</button></div>`;
+        host.listen(host.dialog.querySelector('[data-modal-cancel]'), 'click', () => host.close(false));
+        host.listen(host.dialog.querySelector('[data-modal-ok]'), 'click', () => host.close(true));
+        host.mount();
     });
 }
 
@@ -1720,15 +1718,13 @@ function setStatus(status, rerender = true) {
 
 function showGroupNameDialog() {
     return new Promise(resolve => {
-        const overlay = document.createElement('div'); overlay.className = 'fcm-chat-modal-overlay';
-        overlay.style.cssText = `--s:${cfg.panelColor};--tx:${cfg.fontColor};--ac:${cfg.accentColor}`;
-        overlay.innerHTML = `<div class="fcm-chat-modal fcm-chat-group-dialog"><div>${TH('chatNewGroup')}</div><input data-new-group-name maxlength="24" placeholder="${TH('chatNewGroup')}"><div><button data-modal-cancel>${TH('chatCancel')}</button><button data-modal-ok>${TH('btnConfirm')}</button></div></div>`;
-        const input = overlay.querySelector('[data-new-group-name]');
-        const finish = value => { overlay.remove(); resolve(value); };
-        overlay.querySelector('[data-modal-cancel]').addEventListener('click', () => finish(''));
-        overlay.querySelector('[data-modal-ok]').addEventListener('click', () => finish(input.value.trim()));
-        input.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Enter') finish(input.value.trim()); else if (event.key === 'Escape') finish(''); });
-        document.body.appendChild(overlay); input.focus();
+        const host = createDialogHost({ overlayClass: 'fcm-chat-modal-overlay', dialogClass: 'fcm-chat-modal fcm-chat-group-dialog', overlayStyle: `--s:${cfg.panelColor};--tx:${cfg.fontColor};--ac:${cfg.accentColor}`, onClose: value => resolve(value || '') });
+        host.dialog.innerHTML = `<div>${TH('chatNewGroup')}</div><input data-new-group-name maxlength="24" placeholder="${TH('chatNewGroup')}"><div><button data-modal-cancel>${TH('chatCancel')}</button><button data-modal-ok>${TH('btnConfirm')}</button></div>`;
+        const input = host.dialog.querySelector('[data-new-group-name]');
+        host.listen(host.dialog.querySelector('[data-modal-cancel]'), 'click', () => host.close(''));
+        host.listen(host.dialog.querySelector('[data-modal-ok]'), 'click', () => host.close(input.value.trim()));
+        host.listen(input, 'keydown', event => { event.stopPropagation(); if (event.key === 'Enter') host.close(input.value.trim()); else if (event.key === 'Escape') host.close(''); });
+        host.mount(); input.focus();
     });
 }
 
