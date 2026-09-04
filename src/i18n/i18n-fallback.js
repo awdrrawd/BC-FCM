@@ -1,7 +1,7 @@
 // ════════════════════════════════════════
 //  FCM module: i18n-fallback.js  （內建後備字庫：TW + EN）
-//  執行期 fetch Translation/<LANG>.js 失敗／未完成時的安全網——載入時同步註冊進共用引擎，
-//  之後 fetch 到的完整字庫會覆蓋這裡。翻譯以 Translation/*.js（一國一檔）為準；
+//  執行期 fetch Translation/<LANG>.json 失敗／未完成時的安全網——載入時同步註冊進共用引擎，
+//  之後 fetch 到的完整字庫會覆蓋這裡。翻譯以 Translation/*.json（一國一檔）為準；
 //  這份僅需維持 TW/EN 可用即可（由 scripts 生成，勿手動大改）。
 // ════════════════════════════════════════
 import './i18n-engine.js';   // 確保 window.Liko.__Sys_i18n__ 存在（引擎自帶防重載）

@@ -4,9 +4,9 @@ import './i18n-fallback.js';   // 內建後備字庫（TW+EN）同步註冊，�
 // ════════════════════════════════════════
 //  FCM module: i18n.js  （薄轉接層，不含引擎、不含完整文本）
 //  結構參考 BC-AFC：i18n-engine.js（共用引擎）＋ i18n-fallback.js（TW+EN 後備）＋ 一國一檔的
-//    Translation/<LANG>.js（自註冊到 FCM 命名空間、{0} 位置佔位）。
+//    Translation/<LANG>.json（純資料、載入至 FCM 命名空間、{0} 相容佔位）。
 //  介面字串走共用引擎 window.Liko.__Sys_i18n__；完整文本改為「執行期 fetch JSON」：
-//    翻譯者只需改 Translation/<LANG>.js，build 會複製到 public/ 部署，免動程式。
+//    翻譯者只需改 Translation/<LANG>.json，build 會複製到 public/ 部署，免動程式。
 //    載入前／離線時用內建後備（fallback）；fetch 到的完整字庫會覆蓋後備。
 // ════════════════════════════════════════
 
