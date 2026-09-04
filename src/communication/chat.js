@@ -58,6 +58,8 @@ import { createChatListNavigation } from './chat/controllers/chat-list-navigatio
 import { createChatMemberSelection } from './chat/controllers/chat-member-selection.js';
 import { chatShellHtml } from './chat/views/chat-shell-view.js';
 import { createChatPanelControls } from './chat/controllers/chat-panel-controls.js';
+import { createChatConversationEvents } from './chat/controllers/chat-conversation-events.js';
+import { createChatShellEvents } from './chat/controllers/chat-shell-events.js';
 import { EDIT_ICON, WATER_ICON } from '../ui/icons.js';
 
 let root = null;
@@ -284,6 +286,20 @@ const panelControls = createChatPanelControls({
     getSelectedMember: () => selectedMember, closeChat, minimizeChat,
     syncBalloonVisibility: chatBalloons.syncVisibility, text: T, htmlText: TH,
 });
+const conversationEvents = createChatConversationEvents({
+    getRoot: () => root, getMemberNumber: () => selectedMember, config: cfg, saveConfig: saveCfg,
+    closeStackedDetail: panelControls.closeStackedDetail, composer, historyViewport, forwardTargets,
+    selectedActions, messageSelection, bindMessageActions, replyController, profileSuggestion,
+    conversationActions, roomActions, showRoomJoin: showRoomJoinConfirm, getCachedRoomInfo, contactCard,
+    promptGroupName: chatDialogs.promptGroupName, createGroup: listNavigation.createGroup, rerender: renderChat,
+});
+const shellEvents = createChatShellEvents({
+    getRoot: () => root, panelControls, setActiveView: value => { activeView = value; },
+    resetSelection: resetMessageSelectionState, setStackedDetail: value => { stackedDetail = value; }, rerender: renderChat,
+    bindListNavigation: listNavigation.bind, bindConversation: conversationEvents.bind, bindForwardTargets: forwardTargets.bind,
+    setStatus, bindSettings: () => bindChatSettingsEvents({ root, renderChat, refreshChatSettings, chatColors }),
+    bindProfile: () => bindChatProfileEvents({ root, getPlayer: () => Player, renderChat, saveProfile: ownProfile.save, setStatus }),
+});
 
 function chatColors() {
     if (cfg.chatThemeMode === 'custom') return [cfg.chatPanelColor, cfg.chatFontColor, cfg.chatAccentColor];
@@ -429,7 +445,7 @@ function renderChat() {
     });
     applyPanelPosition(root.querySelector('#fcm-chat-panel'), maximized, cfg.chatPanelPosition);
     chatBalloons.syncVisibility();
-    bindEvents();
+    shellEvents.bind();
     installDragScroll(root, '.fcm-chat-scroll,.fcm-chat-messages,.fcm-chat-profile,.fcm-chat-body.view-settings .fcm-chat-list');
     conversationPresence.refreshRoomMeta();
     hydrateChatAvatars();
@@ -446,67 +462,13 @@ function renderChat() {
     requestAnimationFrame(() => { const bio = root?.querySelector('.fcm-chat-bio'); if (bio) bio.classList.toggle('marquee', bio.scrollWidth > bio.clientWidth); });
 }
 
-function bindConversationEvents() {
-    const main = root?.querySelector('.fcm-chat-main');
-    if (!main) return;
-    main.querySelector('[data-back]')?.addEventListener('click', () => {
-        stackedDetail = false;
-        root.querySelector('.fcm-chat-list')?.classList.remove('slide-out');
-        main.classList.remove('slide-in');
-    });
-    main.querySelector('[data-send]')?.addEventListener('click', composer.send);
-    const conversationLog = main.querySelector('.fcm-chat-messages');
-    historyViewport.bind(conversationLog, main.querySelector('[data-new-messages]'));
-    main.querySelector('[data-multi-forward-contact]')?.addEventListener('click', forwardTargets.show);
-    main.querySelector('[data-multi-forward-room]')?.addEventListener('click', selectedActions.forwardToRoom);
-    main.querySelectorAll('[data-multi-export]').forEach(button => button.addEventListener('click', () => selectedActions.exportMessages(button.dataset.multiExport)));
-    main.querySelector('[data-multi-cancel]')?.addEventListener('click', messageSelection.exit);
-    if (messageSelection.isActive()) messageSelection.updateUi();
-    bindMessageActions();
-    main.querySelector('[data-cancel-reply]')?.addEventListener('click', replyController.clear);
-    main.querySelector('[data-input]')?.addEventListener('keydown', composer.handleKeydown);
-    main.querySelector('[data-input]')?.addEventListener('input', profileSuggestion.update);
-    main.querySelector('[data-delete]')?.addEventListener('click', conversationActions.deleteCurrent);
-    main.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => conversationActions.exportCurrent(button.dataset.export)));
-    main.querySelector('[data-invite]')?.addEventListener('click', roomActions.inviteCurrent);
-    main.querySelector('[data-summon]')?.addEventListener('click', roomActions.summonCurrent);
-    main.querySelector('[data-toggle-tools]')?.addEventListener('click', event => { event.stopPropagation(); event.currentTarget.closest('.fcm-chat-tools')?.classList.toggle('open'); });
-    main.querySelectorAll('[data-join-room]').forEach(button => button.addEventListener('click', () => {
-        if (button.dataset.joinRoom) showRoomJoinConfirm({ room: button.dataset.joinRoom });
-    }));
-    const openHeaderRoom = element => {
-        if (!element?.dataset.roomName) return;
-        const cached = getCachedRoomInfo(element.dataset.roomName);
-        showRoomJoinConfirm({ room: element.dataset.roomName, creator: cached?.Creator || '', count: cached?.MemberCount ?? null, limit: cached?.MemberLimit ?? null, desc: cached?.Description || '', priv: !!cached?.Private });
-    };
-    main.querySelector('[data-room-meta]')?.addEventListener('click', event => openHeaderRoom(event.currentTarget));
-    main.querySelector('[data-room-meta]')?.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openHeaderRoom(event.currentTarget); } });
-    main.querySelector('.fcm-chat-conversation-header > [data-avatar-member]')?.addEventListener('click', contactCard.toggle);
-    contactCard.bind();
-    const assign = main.querySelector('.fcm-chat-assign');
-    assign?.addEventListener('pointerdown', event => event.stopPropagation());
-    assign?.addEventListener('click', event => event.stopPropagation());
-    main.querySelector('[data-toggle-assign]')?.addEventListener('click', event => { event.stopPropagation(); main.querySelector('[data-assign-menu]')?.classList.toggle('open'); });
-    main.querySelectorAll('button[data-assign-group]').forEach(button => button.addEventListener('click', () => {
-        if (!selectedMember || !button.dataset.assignGroup) return;
-        cfg.chatMemberGroups ||= {}; cfg.chatMemberGroups[selectedMember] ||= [];
-        if (!cfg.chatMemberGroups[selectedMember].includes(button.dataset.assignGroup)) cfg.chatMemberGroups[selectedMember].push(button.dataset.assignGroup);
-        saveCfg(); main.querySelector('[data-assign-menu]')?.classList.remove('open');
-    }));
-    main.querySelector('[data-create-group-from-chat]')?.addEventListener('click', async () => {
-        const label = await chatDialogs.promptGroupName(); if (!label) return;
-        listNavigation.createGroup(label, 'groups');
-        renderChat();
-    });
-}
-
 function refreshConversationMain({ scrollToLatest = true } = {}) {
     const main = root?.querySelector('.fcm-chat-main');
     if (!main) return;
     profileSuggestion.reset();
     historyViewport.reset();
     main.innerHTML = conversationPresenter.html();
-    bindConversationEvents();
+    conversationEvents.bind();
     installDragScroll(main, '.fcm-chat-messages');
     conversationPresence.refreshRoomMeta();
     hydrateChatAvatars();
@@ -519,22 +481,6 @@ function refreshConversationMain({ scrollToLatest = true } = {}) {
         }
     }
     requestAnimationFrame(() => { const bio = main.querySelector('.fcm-chat-bio'); if (bio) bio.classList.toggle('marquee', bio.scrollWidth > bio.clientWidth); });
-}
-
-function bindEvents() {
-    const panel = root.querySelector('#fcm-chat-panel');
-    panelControls.bind(panel);
-    root.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { activeView = button.dataset.view; resetMessageSelectionState(); stackedDetail = false; renderChat(); }));
-    listNavigation.bind(root);
-    bindConversationEvents();
-    forwardTargets.bind();
-    panel.addEventListener('click', event => {
-        if (!event.target.closest('.fcm-chat-message')) panel.querySelectorAll('.fcm-chat-message.selected').forEach(element => element.classList.remove('selected'));
-    });
-    root.querySelector('[data-status]')?.addEventListener('click', () => root.querySelector('.fcm-chat-status-menu')?.classList.toggle('open'));
-    root.querySelectorAll('[data-status-value]').forEach(button => button.addEventListener('click', () => setStatus(button.dataset.statusValue)));
-    bindChatSettingsEvents({ root, renderChat, refreshChatSettings, chatColors });
-    bindChatProfileEvents({ root, getPlayer: () => Player, renderChat, saveProfile: ownProfile.save, setStatus });
 }
 
 function bindMessageActions() {
