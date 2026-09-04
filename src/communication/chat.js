@@ -14,7 +14,7 @@ import { canSendBcxWhisper, sendBcxAwareBeep, sendBcxAwareWhisper } from './bcx-
 import { normalizedImageOrigin, trustImageOrigin } from './image-trust.js';
 import { injectChatStyles } from './chat-styles.js';
 import { warnLimited } from '../core/logger.js';
-import { balloonPreviewText, cleanMessage, esc, parseRoomInvite } from './chat-content.js';
+import { balloonPreviewText, cleanMessage, esc } from './chat-content.js';
 import { exportConversation as exportConversationFile } from './chat-export.js';
 import { initChatAudio, playNotificationSound } from './chat-audio.js';
 import { installChatDrag, resetBalloonInteraction } from './chat-drag.js';
@@ -30,6 +30,7 @@ import { chatListHtml as renderChatListHtml, contactRowsHtml, groupsHtml as rend
 import { settingsHtml as renderSettingsHtml } from './chat-settings-view.js';
 import { conversationMessagesHtml, messageDateKey, messageDateLabel, messageHtml } from './chat-message-view.js';
 import { contactCardHtml as renderContactCardHtml, conversationHtml as renderConversationHtml } from './chat-conversation-view.js';
+import { WhisperMetadata, classifyIncomingBeep, findPendingOutgoingWhisper, normalizeMessage as normalizeTransportMessage } from './chat-transport.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -68,13 +69,11 @@ let multiSelectMode = false;
 let forwardTargetMode = false;
 let forwardTargetTab = 'room';
 const selectedMessageIds = new Set();
-const pendingReplyTags = new Map();
-const pendingMessageIds = new Map();
+const whisperMetadata = new WhisperMetadata();
 let onlinePresenceSignature = '';
 const autoReplyTimes = new Map();
 const offlineQueueInFlight = new Set();
 const remoteProfiles = new Map();
-const bypassedIncomingWhispers = new WeakSet();
 
 function resetMessageSelectionState() {
     multiSelectMode = false;
@@ -211,24 +210,7 @@ async function initChat() {
 }
 
 function normalizeMessage(data) {
-    return {
-        id: data.id || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
-        memberNumber: Number(data.memberNumber),
-        direction: data.direction,
-        channel: data.channel,
-        content: cleanMessage(data.content),
-        roomName: data.roomName || '',
-        name: getDisplayName(data.memberNumber),
-        timestamp: Number(data.timestamp) || Date.now(),
-        read: data.direction === 'out' || Number(data.memberNumber) === selectedMember,
-        queued: !!data.queued,
-        queueId: data.queueId || '',
-        nativeMsgId: data.nativeMsgId || '',
-        translatedContent: cleanMessage(data.translatedContent || ''),
-        replyPreview: cleanMessage(data.replyPreview || ''),
-        replyToId: data.replyToId || '',
-        sharedMsgId: data.sharedMsgId || '',
-    };
+    return normalizeTransportMessage(data, { displayName: getDisplayName, selectedMember });
 }
 
 async function recordMessage(data, { notify = true } = {}) {
@@ -266,41 +248,38 @@ function sendStatusAutoReply(message) {
 }
 
 function handleIncomingBeep(data) {
-    if (!data || !data.Message) return;
-    if (data.BeepType === 'LCPlayerInfo' || data.BeepType === 'FCMPlayerInfo') {
-        try {
-            const info = JSON.parse(data.Message);
-            remoteProfiles.set(Number(data.MemberNumber), { avatarUrl: info.avatarUrl || info.Avatar || '', signature: info.signature || info.Signature || '', status: info.status || 'online', updatedAt: Number(info.updatedAt || info.UpdateTime) || Date.now() });
-        } catch (error) { warnLimited('LianChat profile payload parse failed', error); }
+    const incoming = classifyIncomingBeep(data);
+    if (incoming.type === 'profile') {
+        remoteProfiles.set(Number(data.MemberNumber), incoming.profile);
         return;
     }
-    const invite = parseRoomInvite(data.Message);
-    if (invite) {
-        const roomName = invite.roomName || data.ChatRoomName;
-        const content = roomName;
-        recordMessage({ memberNumber: data.MemberNumber, name: data.MemberName, direction: 'in', channel: 'beep', content, roomName });
+    if (incoming.type === 'invalid-profile') {
+        warnLimited('LianChat profile payload parse failed', incoming.error);
+        return;
+    }
+    if (incoming.type === 'invite') {
+        const { invite, roomName } = incoming;
+        recordMessage({ memberNumber: data.MemberNumber, name: data.MemberName, direction: 'in', channel: 'beep', content: roomName, roomName });
         showIncomingRoomInvite(data.MemberNumber, getDisplayName(data.MemberNumber), { room: roomName, creator: invite.creator || '', count: invite.count ?? null, limit: invite.limit ?? null, desc: invite.desc || '', priv: !!invite.priv, type: invite.type || '' });
         return;
     }
-    // Ordinary private messages can arrive as BeepType "Message".
-    if (data.BeepType && !['Message', 'Beep'].includes(data.BeepType)) return;
+    if (incoming.type !== 'message') return;
     recordMessage({ memberNumber: data.MemberNumber, name: data.MemberName, direction: 'in', channel: 'beep', content: data.Message });
 }
 
 function handleIncomingWhisper(data) {
     if (!data || data.Type !== 'Whisper' || !data.Content || Number(data.Sender) === Number(Player?.MemberNumber)) return;
     recordMessage({ memberNumber: data.Sender, direction: 'in', channel: 'whisper', content: data.Content, timestamp: data.Time });
-    bypassedIncomingWhispers.add(data);
+    whisperMetadata.markBypassed(data);
 }
 
 function handleIncomingWhisperDisplay(data, displayedMessage, senderCharacter) {
     if (!data || data.Type !== 'Whisper') return;
-    if (bypassedIncomingWhispers.delete(data)) return;
+    if (whisperMetadata.consumeBypassed(data)) return;
     const idEntry = Array.isArray(data.Dictionary) ? data.Dictionary.find(entry => entry?.Tag === 'MsgId' && entry.MsgId) : null;
     if (Number(data.Sender) === Number(Player?.MemberNumber)) {
         const target = Number(data.Target);
-        const pending = [...messages].reverse().find(message => message.direction === 'out' && message.channel === 'whisper'
-            && message.memberNumber === target && !message.nativeMsgId && Date.now() - message.timestamp < 30000);
+        const pending = findPendingOutgoingWhisper(messages, target);
         if (pending && idEntry?.MsgId) {
             pending.nativeMsgId = idEntry.MsgId;
             ChatStore.put(pending);
@@ -308,32 +287,16 @@ function handleIncomingWhisperDisplay(data, displayedMessage, senderCharacter) {
         }
         return;
     }
-    let content = String(displayedMessage ?? data.Content ?? '');
-    const garble = Array.isArray(data.Dictionary)
-        ? data.Dictionary.find(entry => Array.isArray(entry?.Effects) && entry.Effects.includes('gagGarble') && entry.Original)
-        : null;
-    const translatedContent = garble?.Original && cleanMessage(garble.Original) !== cleanMessage(content) ? garble.Original : '';
-    const nativeReply = Array.isArray(data.Dictionary) ? data.Dictionary.find(entry => entry?.Tag === 'ReplyId')?.ReplyId : '';
-    const pendingTag = pendingReplyTags.get(Number(data.Sender));
-    const replyTag = pendingTag && (!nativeReply || !pendingTag.replyId || pendingTag.replyId === nativeReply) ? pendingTag : null;
-    if (replyTag) pendingReplyTags.delete(Number(data.Sender));
-    const sharedMsgId = pendingMessageIds.get(Number(data.Sender)) || '';
-    pendingMessageIds.delete(Number(data.Sender));
-    recordMessage({ memberNumber: senderCharacter?.MemberNumber ?? data.Sender, direction: 'in', channel: 'whisper', content, translatedContent, timestamp: data.Time, nativeMsgId: idEntry?.MsgId || '', replyPreview: replyTag?.preview || '', replyToId: replyTag?.targetSharedId || '', sharedMsgId });
+    const metadata = whisperMetadata.consumeDisplay(data, displayedMessage);
+    recordMessage({ memberNumber: senderCharacter?.MemberNumber ?? data.Sender, direction: 'in', channel: 'whisper', ...metadata, timestamp: data.Time });
 }
 
 function handleIncomingChatTag(data) {
-    const tag = Array.isArray(data?.Dictionary) ? data.Dictionary.find(entry => entry?.Tag === 'FCM::CHAT::TAG') : null;
-    if (!tag || !data.Sender) return false;
-    pendingReplyTags.set(Number(data.Sender), { preview: cleanMessage(tag.Preview || ''), replyId: tag.ReplyId || '', targetSharedId: tag.TargetSharedId || '' });
-    return true;
+    return whisperMetadata.receiveReplyTag(data);
 }
 
 function handleIncomingChatMessageId(data) {
-    const tag = Array.isArray(data?.Dictionary) ? data.Dictionary.find(entry => entry?.Tag === 'FCM::CHAT::MESSAGE') : null;
-    if (!tag?.MessageId || !data.Sender) return false;
-    pendingMessageIds.set(Number(data.Sender), String(tag.MessageId));
-    return true;
+    return whisperMetadata.receiveMessageId(data);
 }
 
 function handleIncomingFriendRequestNotice(data) {
