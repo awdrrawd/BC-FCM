@@ -35,6 +35,7 @@ import { conversationRows, historyMessageRows, recentConversationRows, unreadMes
 import { ChatConversationController } from './chat/controllers/chat-conversation-controller.js';
 import { createChatContactService } from './chat/services/chat-contact-service.js';
 import { animateLayoutChange, animatePanelSize, positionPanel as applyPanelPosition, syncConversationBackButton as syncBackButton } from './chat/controllers/chat-panel-layout.js';
+import { createChatAutoReplyService } from './chat/services/chat-auto-reply.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -70,7 +71,6 @@ let forwardTargetTab = 'room';
 const selectedMessageIds = new Set();
 const whisperMetadata = new WhisperMetadata();
 let onlinePresenceSignature = '';
-const autoReplyTimes = new Map();
 const offlineQueueInFlight = new Set();
 const remoteProfiles = new Map();
 
@@ -87,6 +87,15 @@ const contactService = createChatContactService({
     getRemoteProfiles: () => remoteProfiles, getRoot: () => root,
 });
 const { avatarHtml, avatarUrl, biography, capability, character, getDisplayName, hydrateAvatars: hydrateChatAvatars, isOnline, sharedProfile } = contactService;
+const runWithoutOutgoingCapture = callback => {
+    suppressOutgoing++;
+    try { return callback(); }
+    finally { suppressOutgoing--; }
+};
+const autoReply = createChatAutoReplyService({
+    config: cfg, inRoom: inRoomFn, isOnline, sendWhisper: sendBcxAwareWhisper, sendBeep: sendBcxAwareBeep,
+    recordMessage: (...args) => recordMessage(...args), runWithoutOutgoingCapture,
+});
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
 const chatBalloons = createChatBalloonController({
@@ -161,22 +170,8 @@ async function recordMessage(data, { notify = true } = {}) {
     if (notify && message.direction === 'in') {
         chatBalloons.showIncoming(message);
         playNotificationSound();
-        sendStatusAutoReply(message);
+        autoReply.handle(message);
     }
-}
-
-function sendStatusAutoReply(message) {
-    const status = cfg.chatStatus;
-    const content = status === 'busy' && cfg.busyAutoReply ? cfg.busyMessage : status === 'afk' && cfg.afkAutoReply ? cfg.afkMessage : '';
-    if (!content || Date.now() - (autoReplyTimes.get(message.memberNumber) || 0) < 60000) return;
-    autoReplyTimes.set(message.memberNumber, Date.now());
-    suppressOutgoing++;
-    let sent = false;
-    try {
-        if (message.channel === 'whisper' && inRoomFn(message.memberNumber)) sent = sendBcxAwareWhisper({ Type: 'Whisper', Target: message.memberNumber, Content: content });
-        else if (isOnline(message.memberNumber)) sent = sendBcxAwareBeep({ MemberNumber: message.memberNumber, BeepType: '', Message: content });
-    } finally { suppressOutgoing--; }
-    if (sent) recordMessage({ memberNumber: message.memberNumber, direction: 'out', channel: message.channel, content }, { notify: false });
 }
 
 function handleIncomingBeep(data) {
