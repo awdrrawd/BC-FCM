@@ -49,6 +49,7 @@ import { createChatSelectedActions } from './chat/services/chat-selected-actions
 import { createChatOwnProfileService } from './chat/services/chat-own-profile.js';
 import { createChatDialogs } from './chat/controllers/chat-dialogs.js';
 import { createChatRoomActions } from './chat/services/chat-room-actions.js';
+import { createChatConversationActions } from './chat/services/chat-conversation-actions.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -189,6 +190,13 @@ const roomActions = createChatRoomActions({
     getMemberNumber: () => selectedMember, getRoom: () => ChatRoomData, getRoomCharacters: () => ChatRoomCharacter,
     capability, confirm: chatDialogs.confirm, text: T, runWithoutOutgoingCapture, sendBeep: sendBcxAwareBeep,
     recordMessage: (...args) => recordMessage(...args),
+});
+const conversationActions = createChatConversationActions({
+    getMemberNumber: () => selectedMember, displayName: getDisplayName, confirm: chatDialogs.confirm, text: T,
+    chatStore: ChatStore, offlineQueue: OfflineQueue,
+    removeFromIndex: memberNumber => { messages = messages.filter(message => Number(message.memberNumber) !== memberNumber); },
+    resetConversation: () => conversation.reset(), exportConversation: exportConversationFile,
+    biography, avatarUrl, chatColors, onDeleted: renderChat,
 });
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
@@ -751,10 +759,8 @@ function bindConversationEvents() {
     main.querySelector('[data-cancel-reply]')?.addEventListener('click', replyController.clear);
     main.querySelector('[data-input]')?.addEventListener('keydown', event => { event.stopPropagation(); if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); sendCurrentMessage(); } });
     main.querySelector('[data-input]')?.addEventListener('input', profileSuggestion.update);
-    main.querySelector('[data-delete]')?.addEventListener('click', deleteConversation);
-    main.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => exportConversationFile(button.dataset.export, {
-        memberNumber: selectedMember, getDisplayName, biography, avatarUrl, chatColors,
-    })));
+    main.querySelector('[data-delete]')?.addEventListener('click', conversationActions.deleteCurrent);
+    main.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => conversationActions.exportCurrent(button.dataset.export)));
     main.querySelector('[data-invite]')?.addEventListener('click', roomActions.inviteCurrent);
     main.querySelector('[data-summon]')?.addEventListener('click', roomActions.summonCurrent);
     main.querySelector('[data-toggle-tools]')?.addEventListener('click', event => { event.stopPropagation(); event.currentTarget.closest('.fcm-chat-tools')?.classList.toggle('open'); });
@@ -903,15 +909,6 @@ function bindMessageActions() {
         enterMultiSelect: messageSelection.enter,
         isMobile: () => typeof globalThis.CommonIsMobile === 'function' && globalThis.CommonIsMobile(),
     });
-}
-
-async function deleteConversation() {
-    if (!selectedMember || !await chatDialogs.confirm(T('chatConfirmDeleteConv', getDisplayName(selectedMember)))) return;
-    await ChatStore.deleteMember(selectedMember);
-    OfflineQueue.removeMember(selectedMember);
-    messages = messages.filter(message => message.memberNumber !== selectedMember);
-    conversation.reset();
-    renderChat();
 }
 
 async function handleOnlineFriendsUpdate(result) {
