@@ -21,8 +21,8 @@ import { initChatAudio, playNotificationSound } from './chat-audio.js';
 import { installChatDrag, resetBalloonInteraction } from './chat/controllers/chat-drag.js';
 import { createChatBalloonController } from './chat/controllers/chat-balloon.js';
 import { createDialogHost } from '../ui/dialog.js';
-import { buildForwardTargetGroups, forEachForwardedMessage, forwardedMessageText, selectedMessages } from './chat/data/chat-selection.js';
-import { bindForwardTargetEvents, forwardTargetsHtml as renderForwardTargetsHtml, updateMultiSelectUi as syncMultiSelectUi } from './chat/views/chat-selection-view.js';
+import { forEachForwardedMessage, forwardedMessageText, selectedMessages } from './chat/data/chat-selection.js';
+import { updateMultiSelectUi as syncMultiSelectUi } from './chat/views/chat-selection-view.js';
 import { installMessageActions } from './chat/events/chat-message-actions.js';
 import { bindChatSettingsEvents } from './chat/events/chat-settings-events.js';
 import { bindChatProfileEvents } from './chat/events/chat-profile-events.js';
@@ -47,6 +47,7 @@ import { createChatReplyController } from './chat/controllers/chat-reply.js';
 import { createChatContactCardController } from './chat/controllers/chat-contact-card.js';
 import { createChatHistoryViewportController } from './chat/controllers/chat-history-viewport.js';
 import { createChatMessageSelectionController } from './chat/controllers/chat-message-selection.js';
+import { createChatForwardTargetsController } from './chat/controllers/chat-forward-targets.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -73,15 +74,12 @@ let suppressOutgoing = 0;
 let justOpenedMember = null;
 let bcxNoticeTimer = 0;
 let cleanupMessageActions = null;
-let forwardTargetMode = false;
-let forwardTargetTab = 'room';
 const whisperMetadata = new WhisperMetadata();
 const remoteProfiles = new Map();
 
 function resetMessageSelectionState() {
     messageSelection.reset();
-    forwardTargetMode = false;
-    forwardTargetTab = 'room';
+    forwardTargets.reset();
 }
 
 const contactService = createChatContactService({
@@ -161,10 +159,17 @@ const historyViewport = createChatHistoryViewportController({
     renderMessages: conversationMessagesHtml, bindImages: bindMessageImages, syncSelection: () => messageSelection.updateUi(),
     joinRoom: showRoomJoinConfirm, text: T,
 });
+const forwardTargets = createChatForwardTargetsController({
+    getRoot: () => root, getRoomCharacters: () => ChatRoomCharacter, getFriendRows: buildFriendList,
+    getSelfMemberNumber: () => Player?.MemberNumber, getConversationMemberNumber: () => selectedMember,
+    isFriend: isFriendOf, isOnline, avatarHtml, displayName: getDisplayName, text: TH,
+    hasSelection: () => messageSelection.size() > 0, isStackedDetail: () => stackedDetail,
+    refreshChatList, hydrateAvatars: hydrateChatAvatars, onSelect: forwardSelectedTo,
+});
 const messageSelection = createChatMessageSelectionController({
     getPanel: () => root?.querySelector('#fcm-chat-panel'), getMessages: () => conversation.messages,
     canForwardToRoom: () => !!ChatRoomData, renderUi: syncMultiSelectUi, selectMessages: selectedMessages,
-    selectedCountText: count => TH('chatSelectedCount', count), onExit: closeForwardTargetList,
+    selectedCountText: count => TH('chatSelectedCount', count), onExit: forwardTargets.close,
 });
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
@@ -414,20 +419,8 @@ function chatListHtml() {
     return renderChatListHtml({ rowsHtml: contactRows(filteredContacts()), search, presenceFilter, relationFilter, esc, text: TH });
 }
 
-function forwardTargetsHtml() {
-    const groups = buildForwardTargetGroups({
-        roomCharacters: ChatRoomCharacter,
-        friendRows: buildFriendList(),
-        selfMemberNumber: Player?.MemberNumber,
-        conversationMemberNumber: selectedMember,
-        isFriend: isFriendOf,
-        isOnline,
-    });
-    return renderForwardTargetsHtml({ groups, activeTab: forwardTargetTab, avatarHtml, displayName: getDisplayName, esc, text: TH });
-}
-
 function listHtml() {
-    if (forwardTargetMode) return forwardTargetsHtml();
+    if (forwardTargets.isActive()) return forwardTargets.html();
     if (activeView === 'profile') return profileHtml();
     if (activeView === 'notifications') return notificationsHtml();
     if (activeView === 'groups') return groupsHtml();
@@ -502,7 +495,7 @@ function refreshChatList({ preserveScroll = false } = {}) {
     if (!list) return;
     const scrollTop = preserveScroll ? list.querySelector('.fcm-chat-scroll')?.scrollTop || 0 : 0;
     list.innerHTML = listHtml();
-    if (forwardTargetMode) bindForwardTargetRows();
+    if (forwardTargets.isActive()) forwardTargets.bind();
     else bindChatListEvents(list);
     hydrateChatAvatars();
     installDragScroll(list, '.fcm-chat-scroll');
@@ -633,7 +626,7 @@ function renderChat() {
     const sessionSizeStyle = chatPanelSession.inlineSizeStyle();
     root.innerHTML = `<div id="fcm-chat-panel" class="${maximized ? 'maximized' : ''}" data-layout-mode="${esc(cfg.chatLayout || 'split')}" data-theme="${esc(cfg.chatThemeMode === 'preset' ? cfg.chatThemePreset : cfg.chatThemeMode === 'custom' ? 'custom' : cfg.themePreset || 'violet')}" style="${sessionSizeStyle}--s:${esc(chatPanel)};--tx:${esc(chatText)};--ac:${esc(chatAccent)};--chat-font-size:${Number(cfg.chatFontSize) || 13}px;--chat-font-family:${esc(chatFontFamily())}">
         <div class="fcm-chat-titlebar"><b>FCM-Chat</b><span></span><button class="fcm-chat-icon-action ${cfg.chatLayout === 'stacked' ? 'active' : ''}" data-layout title="${TH('chatToggleLayout')}">${LAYOUT_ICON}<i>${cfg.chatLayout === 'stacked' ? TH('chatLayoutSplit') : TH('chatLayoutMerged')}</i></button><button class="fcm-chat-icon-action ${maximized ? 'active' : ''}" data-max title="${TH('chatToggleMax')}">${MAXIMIZE_ICON}<i>${maximized ? TH('chatRestore') : TH('chatMaximize')}</i></button><button class="fcm-chat-icon-action" data-min title="${TH('chatMinimize')}">—</button><button class="fcm-chat-icon-action" data-close title="${TH('chatClose')}">×</button></div>
-        <div class="fcm-chat-body view-${esc(activeView)} ${cfg.chatLayout === 'stacked' ? 'stacked' : ''} ${activeView === 'profile' || activeView === 'settings' ? 'wide-view' : ''} ${forwardTargetMode ? 'forward-target-mode' : ''}">
+        <div class="fcm-chat-body view-${esc(activeView)} ${cfg.chatLayout === 'stacked' ? 'stacked' : ''} ${activeView === 'profile' || activeView === 'settings' ? 'wide-view' : ''} ${forwardTargets.isActive() ? 'forward-target-mode' : ''}">
             <nav class="fcm-chat-rail">
                 <button class="fcm-chat-rail-button fcm-chat-self ${activeView === 'profile' ? 'active' : ''}" data-view="profile" title="${TH('chatProfileTab')}">${avatarHtml(Player?.MemberNumber || 0, 34, 'toolbar')}</button>
                 <button class="fcm-chat-rail-button ${activeView === 'notifications' ? 'active' : ''}" data-view="notifications" title="${TH('chatNotificationsTab')}">${NOTIFICATION_ICON}${unreadBadge()}</button>
@@ -643,8 +636,8 @@ function renderChat() {
                 <button class="fcm-chat-rail-button" data-status title="${TH('chatStatusTab')}"><i class="fcm-status-dot ${esc(cfg.chatStatus || 'online')}"></i></button>
                 <button class="fcm-chat-rail-button ${activeView === 'settings' ? 'active' : ''}" data-view="settings" title="${TH('chatSettingsTab')}">${SETTINGS_ICON}</button>
             </nav>
-            <aside class="fcm-chat-list ${stackedDetail && !forwardTargetMode ? 'slide-out' : ''}">${listHtml()}</aside>
-            <main class="fcm-chat-main ${stackedDetail && !forwardTargetMode ? 'slide-in' : ''}">${conversationHtml()}</main>
+            <aside class="fcm-chat-list ${stackedDetail && !forwardTargets.isActive() ? 'slide-out' : ''}">${listHtml()}</aside>
+            <main class="fcm-chat-main ${stackedDetail && !forwardTargets.isActive() ? 'slide-in' : ''}">${conversationHtml()}</main>
         </div>
         <div class="fcm-chat-status-menu"><button data-status-value="online"><i class="online"></i>${TH('chatStatusOnline')}</button><button data-status-value="busy"><i class="busy"></i>${TH('chatStatusBusy')}</button><button data-status-value="afk"><i class="afk"></i>${TH('chatStatusAFK')}</button></div>
         <div class="fcm-chat-context-menu" hidden><button data-context-select>${TH('chatSelectMessage')}</button><button data-context-copy>${TH('chatCopy')}</button><button data-context-multi>${TH('chatMultiSelect')}</button><button data-context-reply>${TH('chatReply')}</button><button data-context-cancel>${TH('chatCancel')}</button></div>
@@ -730,7 +723,7 @@ function bindConversationEvents() {
     main.querySelector('[data-send]')?.addEventListener('click', sendCurrentMessage);
     const conversationLog = main.querySelector('.fcm-chat-messages');
     historyViewport.bind(conversationLog, main.querySelector('[data-new-messages]'));
-    main.querySelector('[data-multi-forward-contact]')?.addEventListener('click', showForwardTargetList);
+    main.querySelector('[data-multi-forward-contact]')?.addEventListener('click', forwardTargets.show);
     main.querySelector('[data-multi-forward-room]')?.addEventListener('click', forwardSelectedToRoom);
     main.querySelectorAll('[data-multi-export]').forEach(button => button.addEventListener('click', () => exportSelectedMessages(button.dataset.multiExport)));
     main.querySelector('[data-multi-cancel]')?.addEventListener('click', messageSelection.exit);
@@ -841,7 +834,7 @@ function bindEvents() {
     root.querySelectorAll('[data-view]').forEach(button => button.addEventListener('click', () => { activeView = button.dataset.view; resetMessageSelectionState(); stackedDetail = false; renderChat(); }));
     bindChatListEvents();
     bindConversationEvents();
-    bindForwardTargetRows();
+    forwardTargets.bind();
     panel.addEventListener('click', event => {
         if (!event.target.closest('.fcm-chat-message')) panel.querySelectorAll('.fcm-chat-message.selected').forEach(element => element.classList.remove('selected'));
     });
@@ -897,51 +890,6 @@ async function forwardSelectedTo(memberNumber) {
         if (sent) await recordMessage({ memberNumber: target, direction: 'out', channel: available, content }, { notify: false });
     });
     messageSelection.exit();
-}
-
-function showForwardTargetList() {
-    if (!messageSelection.size()) return;
-    const list = root?.querySelector('.fcm-chat-list');
-    if (!list || forwardTargetMode) return;
-    forwardTargetMode = true;
-    forwardTargetTab = 'room';
-    refreshForwardTargetList();
-    root.querySelector('.fcm-chat-body')?.classList.add('forward-target-mode');
-    list.classList.remove('slide-out');
-    root.querySelector('.fcm-chat-main')?.classList.remove('slide-in');
-}
-
-function closeForwardTargetList() {
-    if (!forwardTargetMode) return;
-    const list = root?.querySelector('.fcm-chat-list');
-    forwardTargetMode = false;
-    root?.querySelector('.fcm-chat-body')?.classList.remove('forward-target-mode');
-    if (list) {
-        refreshChatList();
-        if (stackedDetail) {
-            list.classList.add('slide-out');
-            root?.querySelector('.fcm-chat-main')?.classList.add('slide-in');
-        }
-    }
-}
-
-function bindForwardTargetRows() {
-    bindForwardTargetEvents(root, {
-        onCancel: closeForwardTargetList,
-        onSelect: forwardSelectedTo,
-        onTab: tab => {
-            forwardTargetTab = tab;
-            refreshForwardTargetList();
-        },
-    });
-}
-
-function refreshForwardTargetList() {
-    const list = root?.querySelector('.fcm-chat-list');
-    if (!list || !forwardTargetMode) return;
-    list.innerHTML = forwardTargetsHtml();
-    hydrateChatAvatars();
-    bindForwardTargetRows();
 }
 
 async function forwardSelectedToRoom() {
