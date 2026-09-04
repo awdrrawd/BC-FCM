@@ -14,7 +14,7 @@ import { canSendBcxWhisper, sendBcxAwareBeep, sendBcxAwareWhisper } from './bcx-
 import { normalizedImageOrigin, trustImageOrigin } from './image-trust.js';
 import { injectChatStyles } from './chat-styles.js';
 import { warnLimited } from '../core/logger.js';
-import { balloonPreviewText, cleanMessage, esc, messageContentHtml, parseRoomInvite } from './chat-content.js';
+import { balloonPreviewText, cleanMessage, esc, parseRoomInvite } from './chat-content.js';
 import { exportConversation as exportConversationFile } from './chat-export.js';
 import { initChatAudio, playNotificationSound } from './chat-audio.js';
 import { installChatDrag, resetBalloonInteraction } from './chat-drag.js';
@@ -28,11 +28,12 @@ import { bindChatSettingsEvents } from './chat-settings-events.js';
 import { bindChatProfileEvents } from './chat-profile-events.js';
 import { chatListHtml as renderChatListHtml, contactRowsHtml, groupsHtml as renderGroupsHtml, notificationsHtml as renderNotificationsHtml } from './chat-list-view.js';
 import { settingsHtml as renderSettingsHtml } from './chat-settings-view.js';
+import { conversationMessagesHtml, messageDateKey, messageDateLabel, messageHtml } from './chat-message-view.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, DOWNLOAD_ICON,
     TRASH_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
-    SUMMON_ICON, INVITE_ICON, WATER_ICON, FOLDER_ICON, MAXIMIZE_ICON, REPLY_ICON, ADD_FRIEND_ICON, SEARCH_ICON,
+    SUMMON_ICON, INVITE_ICON, WATER_ICON, FOLDER_ICON, MAXIMIZE_ICON, ADD_FRIEND_ICON, SEARCH_ICON,
 } from '../ui/icons.js';
 
 let root = null;
@@ -582,50 +583,13 @@ function conversationHtml() {
     <div class="fcm-chat-multi-actions" data-multi-actions ${multiSelectMode ? '' : 'hidden'}><b data-multi-count>${TH('chatSelectedCount', selectedMessageIds.size)}</b><div><button data-multi-forward-contact>${TH('chatForwardContact')}</button><button data-multi-forward-room ${!ChatRoomData ? 'disabled' : ''}>${TH('chatForwardRoom')}</button><button data-multi-export="json">${TH('chatExportJson')}</button><button data-multi-export="html">${TH('chatExportHtml')}</button><button data-multi-cancel>${TH('chatCancel')}</button></div></div>`;
 }
 
-function messageHtml(message) {
-    const kind = message.channel === 'whisper' && cleanMessage(message.content).startsWith('*') ? ' emote' : message.channel === 'whisper' && cleanMessage(message.content).startsWith('(') ? ' ooc' : '';
-    return `<div class="fcm-chat-message ${message.direction}${kind} ${message.queued ? 'queued' : ''}" data-msg-id="${esc(message.id)}" data-message-date="${esc(messageDateKey(message.timestamp))}" data-shared-msg-id="${esc(message.sharedMsgId || message.id)}" data-native-msg-id="${esc(message.nativeMsgId || '')}"><button class="fcm-chat-message-reply" data-message-reply title="${TH('chatReply')}">${REPLY_ICON}</button>${message.replyPreview ? `<button class="fcm-chat-tag-preview" data-reply-jump="${esc(message.replyToId || '')}">${REPLY_ICON}<i>${esc(message.replyPreview)}</i></button>` : ''}<span class="fcm-chat-content">${profileMentionsHtml(cleanMessage(message.content))}</span>${message.translatedContent ? `<span class="fcm-chat-message-original">[${esc(cleanMessage(message.translatedContent))}]</span>` : ''}${message.roomName ? `<button class="fcm-chat-room-join" data-join-room="${esc(message.roomName)}">${TH('roomJoinRoomBtn')}</button>` : ''}<time>${message.channel === 'whisper' ? TH('chatChannelWhisper') : TH('chatChannelPrivate')} · ${new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}${message.queued ? ` · ${TH('chatQueued')}` : ''}</time></div>`;
-}
-
 function contactCardHtml() {
     const hasProfile = !!_pc[Number(selectedMember)]?.characterBundle;
     return `<section class="fcm-chat-contact-card">${avatarHtml(selectedMember, 100, 'card')}<div><b>${esc(getDisplayName(selectedMember))} (${selectedMember})</b><small>${esc(biography(selectedMember) || T('chatNoBiography'))}</small><span class="fcm-chat-card-actions"><button data-card-refresh>${TH('chatProfileSnapshot')}</button>${hasProfile ? `<button class="fcm-chat-card-search" data-card-profile title="${TH('btnViewProfile')}">${SEARCH_ICON}</button>` : ''}${isFriendOf(selectedMember) ? '' : `<button data-card-add-friend title="${TH('addFriend')}">${ADD_FRIEND_ICON}${TH('addFriend')}</button>`}</span></div></section>`;
 }
 
-function profileMentionsHtml(content) {
-    const pattern = /@([^@\n()]*?)\s*\((\d+)\)|@(\d+)/gu;
-    let html = '', last = 0;
-    for (const match of String(content).matchAll(pattern)) {
-        html += messageContentHtml(String(content).slice(last, match.index));
-        const mn = match[2] || match[3];
-        html += `<button class="fcm-chat-profile-mention" data-profile-member="${mn}">${esc(match[0])}</button>`;
-        last = match.index + match[0].length;
-    }
-    return html + messageContentHtml(String(content).slice(last));
-}
-
 function expandProfileMentions(content) {
     return String(content).replace(/@(\d+)/gu, (all, id) => `@${getDisplayName(Number(id))} (${id})`);
-}
-
-function messageDateKey(timestamp) {
-    const date = new Date(timestamp);
-    return `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`;
-}
-
-function messageDateLabel(timestamp) {
-    const date = new Date(timestamp);
-    return `${date.getFullYear()}/${date.getMonth() + 1}/${date.getDate()}`;
-}
-
-function conversationMessagesHtml(rows) {
-    let previousDate = '';
-    return rows.map(message => {
-        const date = messageDateKey(message.timestamp);
-        const separator = date !== previousDate ? `<div class="fcm-chat-date-separator" data-message-date="${esc(date)}"><span>${esc(messageDateLabel(message.timestamp))}</span></div>` : '';
-        previousDate = date;
-        return separator + messageHtml(message);
-    }).join('');
 }
 
 function visibleChatScrollHtml() {
