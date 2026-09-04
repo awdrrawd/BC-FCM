@@ -227,7 +227,8 @@ import { warnLimited } from './logger.js';
         if (data?.Type === 'Hidden' && data?.Content === 'FCM::CHAT::TAG' && handleIncomingChatTag(data)) return;
         if (data?.Type === 'Hidden' && data?.Content === 'FCM::CHAT::MESSAGE' && handleIncomingChatMessageId(data)) return;
         if (data?.Type === 'Hidden' && data?.Content?.startsWith(WPS_PREFIX)) {
-            if (!window.LikoWPSInstance) { wpsHandleMessage(data); return; }
+            wpsHandleMessage(data);
+            return;
         }
         // 房間分享（Action 對所有人可見）→ 先讓 BC 正常顯示，再疊上 FCM 專屬加入按鈕
         if (data?.Type === 'Action' && Array.isArray(data?.Dictionary) && data.Dictionary.some(e => e?.Tag === ROOMSHARE_TAG)) {

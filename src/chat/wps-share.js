@@ -73,7 +73,6 @@ import { warnLimited } from '../core/logger.js';
 
     function wpsHandleMessage(data) {
         if (!data?.Content?.startsWith(WPS_PREFIX)) return false;
-        if (window.LikoWPSInstance && window.__LIKOSHARE_CACHE__ !== _wpsCache) return false;
         try {
             pruneWpsState();
             const parts = data.Content.split(' ');
