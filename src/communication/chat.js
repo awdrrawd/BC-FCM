@@ -44,6 +44,7 @@ import { createChatRoomStateService } from './chat/services/chat-room-state.js';
 import { buildGroupDefinitions, filterContactRows, filterGroupRows, filterNotificationRows, selectedGroupDefinition } from './chat/data/chat-list-data.js';
 import { createProfileSuggestionController } from './chat/controllers/chat-profile-suggest.js';
 import { createChatReplyController } from './chat/controllers/chat-reply.js';
+import { createChatContactCardController } from './chat/controllers/chat-contact-card.js';
 import {
     CHAT_ICON, NOTIFICATION_ICON, GROUP_ICON,
     EXIT_ICON, LAYOUT_ICON, EDIT_ICON, SETTINGS_ICON,
@@ -69,7 +70,6 @@ let maximized = false;
 let stackedDetail = false;
 let suppressOutgoing = 0;
 let justOpenedMember = null;
-let contactCardOpen = false;
 let bcxNoticeTimer = 0;
 let cleanupMessageActions = null;
 let multiSelectMode = false;
@@ -148,6 +148,16 @@ const profileSuggestion = createProfileSuggestionController({
     avatarHtml, text: TH,
 });
 const replyController = createChatReplyController({ getRoot: () => root, cleanMessage, text: TH });
+const contactCard = createChatContactCardController({
+    getRoot: () => root, getMemberNumber: () => selectedMember, loadProfile: memberNumber => PDB.get(memberNumber),
+    renderHtml: contactCardHtml, hydrateAvatars: hydrateChatAvatars, findLiveCharacter: character,
+    deleteSnapshot: memberNumber => Snapshot.delete(memberNumber),
+    loadCharacterCanvas: characterValue => globalThis.CharacterLoadCanvas?.(characterValue),
+    nextPaint: () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))),
+    createFaceSnapshot: (characterValue, size) => PDB._face(characterValue, size),
+    saveSnapshot: (...args) => Snapshot.save(...args), loadAvatarFromBundle,
+    addFriend: showAddFriendConfirm, displayName: getDisplayName, openProfile: openSharedProfile,
+});
 let initialized = false;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
 const chatBalloons = createChatBalloonController({
@@ -195,11 +205,7 @@ async function initChat() {
         clearTimeout(bcxNoticeTimer);
         bcxNoticeTimer = window.setTimeout(() => { if (notice.isConnected) notice.hidden = true; }, 4000);
     });
-    document.addEventListener('pointerdown', event => {
-        if (!contactCardOpen || event.target.closest('.fcm-chat-contact-card') || event.target.closest('.fcm-chat-conversation-header > [data-avatar-member]')) return;
-        contactCardOpen = false;
-        root?.querySelector('.fcm-chat-contact-card')?.remove();
-    }, true);
+    document.addEventListener('pointerdown', contactCard.handleOutsidePointer, true);
 }
 
 function recordMessage(data, options) {
@@ -299,6 +305,7 @@ async function openChat(memberNumber = null) {
         selectedMember = Number(memberNumber);
         resetMessageSelectionState();
         replyController.clear({ focus: false });
+        contactCard.close();
         channel = inRoomFn(selectedMember) ? 'whisper' : 'beep';
         stackedDetail = true;
     }
@@ -343,6 +350,7 @@ function closeChat() {
     selectedMember = null;
     resetMessageSelectionState();
     replyController.clear({ focus: false });
+    contactCard.close();
     stackedDetail = false;
     cleanupMessageActions?.();
     cleanupMessageActions = null;
@@ -436,7 +444,7 @@ function conversationHtml() {
         displayName: getDisplayName(selectedMember), biography: biography(selectedMember), showNotFriendBadge,
         roomText, roomName: roomInfo?.name || '', canOpenRoom,
         canSummon: !!ChatRoomData && online && !inRoomFn(selectedMember), groups: Object.entries(cfg.chatGroups || {}),
-        contactCardHtml: contactCardOpen ? contactCardHtml() : '', messagesHtml: conversationMessagesHtml(conversation.messages),
+        contactCardHtml: contactCard.isOpen() ? contactCardHtml() : '', messagesHtml: conversationMessagesHtml(conversation.messages),
         unread: conversation.unread, multiSelect: multiSelectMode, available, online,
         canInvite: available !== 'none' && !inRoomFn(selectedMember), inputPlaceholder, unavailable,
         replyTarget: replyController.get(), selectedCount: selectedMessageIds.size, canForwardToRoom: !!ChatRoomData,
@@ -702,7 +710,7 @@ function bindMemberRows(scope = root) {
         selectedMember = Number(button.dataset.member);
         resetMessageSelectionState();
         replyController.clear({ focus: false });
-        contactCardOpen = false;
+        contactCard.close();
         justOpenedMember = selectedMember;
         channel = inRoomFn(selectedMember) ? 'whisper' : 'beep';
         stackedDetail = true;
@@ -798,8 +806,8 @@ function bindConversationEvents() {
     };
     main.querySelector('[data-room-meta]')?.addEventListener('click', event => openHeaderRoom(event.currentTarget));
     main.querySelector('[data-room-meta]')?.addEventListener('keydown', event => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openHeaderRoom(event.currentTarget); } });
-    main.querySelector('.fcm-chat-conversation-header > [data-avatar-member]')?.addEventListener('click', toggleContactCard);
-    bindContactCardEvents();
+    main.querySelector('.fcm-chat-conversation-header > [data-avatar-member]')?.addEventListener('click', contactCard.toggle);
+    contactCard.bind();
     const assign = main.querySelector('.fcm-chat-assign');
     assign?.addEventListener('pointerdown', event => event.stopPropagation());
     assign?.addEventListener('click', event => event.stopPropagation());
@@ -884,10 +892,6 @@ function bindEvents() {
     bindConversationEvents();
     bindForwardTargetRows();
     panel.addEventListener('click', event => {
-        if (contactCardOpen && !event.target.closest('.fcm-chat-contact-card') && !event.target.closest('.fcm-chat-conversation-header > [data-avatar-member]')) {
-            contactCardOpen = false;
-            root.querySelector('.fcm-chat-contact-card')?.remove();
-        }
         if (!event.target.closest('.fcm-chat-message')) panel.querySelectorAll('.fcm-chat-message.selected').forEach(element => element.classList.remove('selected'));
     });
     root.querySelector('[data-status]')?.addEventListener('click', () => root.querySelector('.fcm-chat-status-menu')?.classList.toggle('open'));
@@ -918,53 +922,6 @@ function sendCurrentMessage() {
     if (!sent) return;
     replyController.clear({ focus: false });
     input.value = '';
-}
-
-async function toggleContactCard() {
-    const main = root?.querySelector('.fcm-chat-main');
-    const existing = main?.querySelector('.fcm-chat-contact-card');
-    if (existing) { existing.remove(); contactCardOpen = false; return; }
-    await PDB.get(selectedMember);
-    contactCardOpen = true;
-    main?.querySelector('.fcm-chat-conversation-header')?.insertAdjacentHTML('afterend', contactCardHtml());
-    bindContactCardEvents();
-    hydrateChatAvatars();
-}
-
-function bindContactCardEvents() {
-    root?.querySelector('[data-card-refresh]')?.addEventListener('click', async event => {
-        const button = event.currentTarget;
-        if (button.disabled) return;
-        button.disabled = true;
-        const avatar = root?.querySelector('.fcm-chat-contact-card .fcm-chat-avatar');
-        avatar?.classList.add('fcm-avatar-loading');
-        avatar?.setAttribute('aria-busy', 'true');
-        const live = character(selectedMember);
-        try {
-            await Snapshot.delete(selectedMember);
-            if (live) {
-                if (live.MustDraw && typeof globalThis.CharacterLoadCanvas === 'function') globalThis.CharacterLoadCanvas(live);
-                await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-                const fresh = PDB._face(live, 100);
-                if (fresh) await Snapshot.save(selectedMember, fresh, { source: 'manual-room-refresh', sourceUpdatedAt: Date.now() });
-            }
-            else await loadAvatarFromBundle(selectedMember, await PDB.get(selectedMember));
-            const card = root?.querySelector('.fcm-chat-contact-card');
-            if (card) { card.outerHTML = contactCardHtml(); bindContactCardEvents(); hydrateChatAvatars(); }
-        } finally {
-            button.disabled = false;
-            avatar?.classList.remove('fcm-avatar-loading');
-            avatar?.removeAttribute('aria-busy');
-        }
-    });
-    root?.querySelector('[data-card-add-friend]')?.addEventListener('click', event => {
-        event.stopPropagation();
-        showAddFriendConfirm(selectedMember, `${getDisplayName(selectedMember)} (${selectedMember})`, false);
-    });
-    root?.querySelector('[data-card-profile]')?.addEventListener('click', event => {
-        event.stopPropagation();
-        openSharedProfile(selectedMember);
-    });
 }
 
 function selectedMessageRecords() {
