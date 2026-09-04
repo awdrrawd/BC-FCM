@@ -42,6 +42,12 @@ let conversationUnread = 0;
 let historyDateFrame = 0;
 const conversationViewport = new ConversationViewport(40);
 const CONVERSATION_PAGE_SIZE = 50;
+const CHAT_TOGGLE_SETTING_KEYS = {
+    takeover: 'takeoverFcmChatButtons',
+    bcxBypass: 'bypassBcxCommunication',
+    animation: 'notificationAnimation',
+    balloonSnap: 'balloonSnap',
+};
 let search = '';
 let presenceFilter = 'online';
 let relationFilter = '';
@@ -1117,6 +1123,14 @@ function refreshConversationMain({ scrollToLatest = true } = {}) {
     requestAnimationFrame(() => { const bio = main.querySelector('.fcm-chat-bio'); if (bio) bio.classList.toggle('marquee', bio.scrollWidth > bio.clientWidth); });
 }
 
+function commitChatSetting(update, { refresh = false, render = true, applySharedTheme = false } = {}) {
+    update();
+    saveCfg();
+    if (refresh) refreshChatSettings();
+    else if (render && root?.style.display !== 'none') renderChat();
+    if (applySharedTheme) applyTheme();
+}
+
 function bindEvents() {
     const panel = root.querySelector('#fcm-chat-panel');
     chatPanelSession.observe(panel, () => maximized);
@@ -1167,43 +1181,40 @@ function bindEvents() {
     root.querySelector('[data-status]')?.addEventListener('click', () => root.querySelector('.fcm-chat-status-menu')?.classList.toggle('open'));
     root.querySelectorAll('[data-status-value]').forEach(button => button.addEventListener('click', () => setStatus(button.dataset.statusValue)));
     root.querySelectorAll('[data-setting]').forEach(button => button.addEventListener('click', () => {
-        if (button.dataset.setting === 'takeover') cfg.takeoverFcmChatButtons = !cfg.takeoverFcmChatButtons;
-        if (button.dataset.setting === 'bcxBypass') cfg.bypassBcxCommunication = !cfg.bypassBcxCommunication;
-        if (button.dataset.setting === 'animation') cfg.notificationAnimation = !cfg.notificationAnimation;
-        if (button.dataset.setting === 'balloonSnap') cfg.balloonSnap = !cfg.balloonSnap;
-        saveCfg(); refreshChatSettings(); if (root?.style.display !== 'none') renderChat();
+        const key = CHAT_TOGGLE_SETTING_KEYS[button.dataset.setting];
+        if (key) commitChatSetting(() => { cfg[key] = !cfg[key]; }, { refresh: true });
     }));
     root.querySelector('[data-balloon-placement]')?.addEventListener('change', event => {
-        cfg.balloonPlacement = event.target.value; cfg.persistentBalloon = cfg.balloonPlacement !== 'off'; cfg.chatBalloonPosition = null; saveCfg(); refreshChatSettings();
+        commitChatSetting(() => { cfg.balloonPlacement = event.target.value; cfg.persistentBalloon = cfg.balloonPlacement !== 'off'; cfg.chatBalloonPosition = null; }, { refresh: true });
     });
     root.querySelector('[data-user-balloon-placement]')?.addEventListener('change', event => {
-        cfg.userBalloonPlacement = event.target.value; cfg.individualBalloons = cfg.userBalloonPlacement !== 'off'; cfg.chatUserBalloonPositions = {}; saveCfg(); refreshChatSettings();
+        commitChatSetting(() => { cfg.userBalloonPlacement = event.target.value; cfg.individualBalloons = cfg.userBalloonPlacement !== 'off'; cfg.chatUserBalloonPositions = {}; }, { refresh: true });
     });
     root.querySelector('[data-chat-language]')?.addEventListener('change', async event => {
-        cfg.lang = event.target.value; saveCfg(); await ensureLang(cfg.lang); renderChat();
+        cfg.lang = event.target.value; saveCfg(); await ensureLang(cfg.lang);
         window.dispatchEvent(new CustomEvent('fcm-language-change'));
     });
     root.querySelector('[data-chat-sound]')?.addEventListener('change', event => {
         const value = event.target.value;
         if (value === 'custom' && !hasCustomNotificationSound()) { event.target.value = cfg.notificationAudio ? (cfg.notificationSound || '') : ''; root.querySelector('[data-custom-sound]')?.click(); return; }
-        cfg.notificationSound = value; cfg.notificationAudio = !!value; saveCfg(); renderChat();
+        commitChatSetting(() => { cfg.notificationSound = value; cfg.notificationAudio = !!value; });
     });
     root.querySelector('[data-preview-sound]')?.addEventListener('click', playNotificationSound);
     root.querySelector('[data-custom-sound]')?.addEventListener('change', async event => {
         if (!await saveCustomNotificationSound(event.target.files?.[0])) return;
         renderChat();
     });
-    root.querySelector('[data-chat-avatar-shape]')?.addEventListener('change', event => { cfg.chatAvatarShape = event.target.value; saveCfg(); renderChat(); refreshChatSettings(); });
+    root.querySelector('[data-chat-avatar-shape]')?.addEventListener('change', event => commitChatSetting(() => { cfg.chatAvatarShape = event.target.value; }, { refresh: true }));
     root.querySelector('[data-chat-theme-manage]')?.addEventListener('click', () => { const box = root.querySelector('[data-chat-theme-options]'); box.hidden = !box.hidden; });
-    root.querySelector('[data-chat-theme-follow]')?.addEventListener('click', () => { cfg.chatThemeMode = 'follow'; saveCfg(); renderChat(); refreshChatSettings(); });
-    root.querySelectorAll('button[data-chat-theme-preset]').forEach(button => button.addEventListener('click', () => { cfg.chatThemePreset = button.dataset.chatThemePreset; cfg.chatThemeMode = 'preset'; saveCfg(); renderChat(); refreshChatSettings(); }));
+    root.querySelector('[data-chat-theme-follow]')?.addEventListener('click', () => commitChatSetting(() => { cfg.chatThemeMode = 'follow'; }, { refresh: true }));
+    root.querySelectorAll('button[data-chat-theme-preset]').forEach(button => button.addEventListener('click', () => commitChatSetting(() => { cfg.chatThemePreset = button.dataset.chatThemePreset; cfg.chatThemeMode = 'preset'; }, { refresh: true })));
     root.querySelectorAll('[data-chat-theme-color]').forEach(input => input.addEventListener('input', () => { cfg[input.dataset.chatThemeColor] = input.value; cfg.chatThemeMode = 'custom'; saveCfg(); refreshChatSettings(); const [p,t,a]=chatColors(); const panel=root.querySelector('#fcm-chat-panel'); panel.style.setProperty('--s',p); panel.style.setProperty('--tx',t); panel.style.setProperty('--ac',a); const button=root.querySelector('[data-chat-theme-manage]'); if(button) button.textContent=`${T('themeSettingsLabel')} · ${T('themeCustom')}`; }));
     // 字體大小／字型是 FCM 與 CHAT 共用的同一組設定：改這裡也要讓 FCM 面板（若已開啟）跟著即時更新，
     //  不必等使用者手動切一次分頁或重開才看得到。
-    root.querySelector('[data-chat-font-size]')?.addEventListener('change', event => { cfg.chatFontSize = Math.max(10, Math.min(24, Number(event.target.value) || 13)); saveCfg(); renderChat(); applyTheme(); });
-    root.querySelector('[data-chat-font-family]')?.addEventListener('change', event => { cfg.chatFontFamily = event.target.value; saveCfg(); renderChat(); applyTheme(); });
-    root.querySelector('[data-chat-avatar-mode]')?.addEventListener('change', event => { cfg.chatAvatarMode = event.target.value; saveCfg(); renderChat(); });
-    root.querySelector('[data-chat-avatar-url]')?.addEventListener('change', event => { cfg.chatAvatarUrl = event.target.value.trim(); saveCfg(); renderChat(); });
+    root.querySelector('[data-chat-font-size]')?.addEventListener('change', event => commitChatSetting(() => { cfg.chatFontSize = Math.max(10, Math.min(24, Number(event.target.value) || 13)); }, { applySharedTheme: true }));
+    root.querySelector('[data-chat-font-family]')?.addEventListener('change', event => commitChatSetting(() => { cfg.chatFontFamily = event.target.value; }, { applySharedTheme: true }));
+    root.querySelector('[data-chat-avatar-mode]')?.addEventListener('change', event => commitChatSetting(() => { cfg.chatAvatarMode = event.target.value; }));
+    root.querySelector('[data-chat-avatar-url]')?.addEventListener('change', event => commitChatSetting(() => { cfg.chatAvatarUrl = event.target.value.trim(); }));
     root.querySelector('[data-save-profile]')?.addEventListener('click', saveOwnProfile);
     root.querySelector('[data-profile-nickname-edit]')?.addEventListener('click', () => {
         const editor = root.querySelector('[data-profile-nickname-editor]'); const text = root.querySelector('[data-profile-nickname-text]');
