@@ -1,3 +1,4 @@
+import { CAMERA_ICON } from '../ui/icons.js';
 import { cfg } from '../core/config.js';
 import { T } from '../i18n/i18n.js';
 import { PDB, Snapshot } from '../data/profile-db.js';
@@ -68,7 +69,8 @@ async function renderFriends(container, _myToken) {
     });
     rBtn.title = T('btnRefresh'); rBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
     toolbar.appendChild(rBtn);
-    const avBtn = mkBtn('📸', 'fcm-btn', () => { const curMns = friends.map(f => f.mn); refreshSnapshotsForList(curMns); });
+    const avBtn = mkBtn('', 'fcm-btn', () => { const curMns = friends.map(f => f.mn); refreshSnapshotsForList(curMns); });
+    avBtn.innerHTML = CAMERA_ICON;
     avBtn.title = T('btnSnapshotTitle');
     avBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
     toolbar.appendChild(avBtn);

@@ -1,3 +1,4 @@
+import { CAMERA_ICON } from '../ui/icons.js';
 import { cfg, saveCfg, THEME_DEFAULTS } from '../core/config.js';
 import { T, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, ensureI18n } from '../i18n/i18n.js';
 import { applyTheme } from './styles.js';
@@ -223,7 +224,7 @@ function renderSettings(container) {
     const loadNote = document.createElement('div'); loadNote.className = 'fcm-set-note'; loadNote.textContent = T('loadFriendAvatarsNote');
     loadInfo.appendChild(loadLbl); loadInfo.appendChild(loadNote);
     const loadExecBtn = document.createElement('button'); loadExecBtn.className = 'fcm-btn fcm-btn-blue';
-    loadExecBtn.textContent = '📸'; loadExecBtn.style.cssText = 'flex-shrink:0;font-size:14px;padding:5px 10px;';
+    loadExecBtn.innerHTML = CAMERA_ICON; loadExecBtn.title = T('btnLoadFriendAvatars'); loadExecBtn.setAttribute('aria-label', loadExecBtn.title); loadExecBtn.style.cssText = 'flex-shrink:0;font-size:14px;padding:5px 10px;';
     loadExecBtn.addEventListener('click', async () => {
         if (loadExecBtn.disabled) return;
         loadExecBtn.disabled = true;

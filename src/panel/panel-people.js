@@ -1,3 +1,4 @@
+import { attachSearchClear } from '../ui/search-clear.js';
 import { T } from '../i18n/i18n.js';
 import { PDB, _pc, Snapshot } from '../data/profile-db.js';
 import { inRoomFn, amAdmin, getAllRels, onlineFriends, matchesSearchFields, searchScoreFields } from '../data/data.js';
@@ -32,9 +33,8 @@ async function renderPeople(container, _myToken) {
     const sw = document.createElement('div'); sw.style.cssText = 'position:relative;display:inline-flex;align-items:center;flex:1;min-width:180px;max-width:320px;';
     const inp = document.createElement('input'); inp.className = 'fcm-search'; inp.style.width = '100%';
     inp.placeholder = T('peopleSearchPlaceholder'); inp.value = _peopleQ;
-    const clrX = document.createElement('button'); clrX.className = 'fcm-clear-btn'; clrX.textContent = '×';
-    clrX.addEventListener('click', () => { inp.value = ''; _peopleQ = ''; _peoplePage = 0; runSearch(''); });
-    sw.appendChild(inp); sw.appendChild(clrX); toolbar.appendChild(sw);
+    sw.appendChild(inp); toolbar.appendChild(sw);
+    attachSearchClear(inp, { onClear: () => { _peopleQ = ''; _peoplePage = 0; runSearch(''); } });
 
     const srchBtn = mkBtn(T('btnSearch'), 'fcm-btn', () => { _peoplePage = 0; runSearch(inp.value); });
     srchBtn.style.cssText = 'padding:5px 12px;font-size:12px;flex-shrink:0;';

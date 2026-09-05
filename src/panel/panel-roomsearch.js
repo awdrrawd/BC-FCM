@@ -1,3 +1,4 @@
+import { attachSearchClear } from '../ui/search-clear.js';
 import { T } from '../i18n/i18n.js';
 import { onlineFriends } from '../data/data.js';
 import { showRoomJoinConfirm, roomInfoFromResult, shareRoomToChat } from '../chat/actions.js';
@@ -28,9 +29,8 @@ async function renderRoomSearch(container) {
 
     const sw = document.createElement('div'); sw.style.cssText = 'position:relative;display:inline-flex;align-items:center;flex:1;min-width:120px;max-width:200px;';
     const inp = document.createElement('input'); inp.className = 'fcm-search'; inp.placeholder = T('roomSearch2'); inp.value = _roomSearchQ2; inp.style.width = '100%';
-    const clrX = document.createElement('button'); clrX.className = 'fcm-clear-btn'; clrX.textContent = '×';
-    clrX.addEventListener('click', () => { inp.value = ''; _roomSearchQ2 = ''; });
-    sw.appendChild(inp); sw.appendChild(clrX); tb.appendChild(sw);
+    sw.appendChild(inp); tb.appendChild(sw);
+    attachSearchClear(inp, { onClear: () => { _roomSearchQ2 = ''; } });
 
     const srchBtn = mkBtn(T('roomSearchBtn'), 'fcm-btn', () => runSearch());
     srchBtn.style.cssText = 'padding:5px 10px;border-radius:8px;border:1.5px solid #4038a0;background:#1e1635;color:#b098d0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;';

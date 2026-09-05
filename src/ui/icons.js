@@ -21,3 +21,4 @@ export { default as MAXIMIZE_ICON } from '../../assets/icons/maximize.svg?raw';
 export { default as REPLY_ICON } from '../../assets/icons/reply.svg?raw';
 export { default as ADD_FRIEND_ICON } from '../../assets/icons/add-friend.svg?raw';
 export { default as SEARCH_ICON } from '../../assets/icons/search.svg?raw';
+export { default as CAMERA_ICON } from '../../assets/icons/camera.svg?raw';

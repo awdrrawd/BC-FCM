@@ -1,3 +1,4 @@
+import { CAMERA_ICON } from '../ui/icons.js';
 import { cfg } from '../core/config.js';
 import { T } from '../i18n/i18n.js';
 import { PDB, _pc, Snapshot } from '../data/profile-db.js';
@@ -82,7 +83,8 @@ async function renderRoom(container) {
     const rBtn = mkBtn('↻', 'fcm-btn', () => renderRoom(container));
     rBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
     toolbar.appendChild(rBtn);
-    const avBtnR = mkBtn('📸', 'fcm-btn', () => { refreshSnapshotsForList(mns); });
+    const avBtnR = mkBtn('', 'fcm-btn', () => { refreshSnapshotsForList(mns); });
+    avBtnR.innerHTML = CAMERA_ICON;
     avBtnR.title = T('btnSnapshotTitle');
     avBtnR.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
     toolbar.appendChild(avBtnR);

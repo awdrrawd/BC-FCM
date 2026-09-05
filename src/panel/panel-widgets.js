@@ -1,3 +1,4 @@
+import { attachSearchClear } from '../ui/search-clear.js';
 import { cfg } from '../core/config.js';
 import { T, isZh } from '../i18n/i18n.js';
 import { PDB, _pc, Snapshot, _avQueue, _avBusy, _processAvQueue, loadAvatarFromBundle, _captureSnapshotDelayed, syncRoomAvatar } from '../data/profile-db.js';
@@ -138,16 +139,8 @@ function mkToggle(on, onChange) { const w = document.createElement('div'); w.cla
 function makeSearchWrap(initialValue, placeholder, onInput, extraClass, onClear) {
     const wrap = document.createElement('div'); wrap.className = 'fcm-search-wrap';
     const inp = document.createElement('input'); inp.className = 'fcm-search' + (extraClass ? ' ' + extraClass : ''); inp.placeholder = placeholder; inp.value = initialValue;
-    const clrBtn = document.createElement('button'); clrBtn.className = 'fcm-clear-btn'; clrBtn.textContent = '×'; clrBtn.title = 'Clear';
-    clrBtn.addEventListener('click', e => {
-        e.stopPropagation(); inp.value = ''; inp.focus();
-        onInput('');
-        if (onClear) onClear();
-    });
-    inp.addEventListener('input', () => { onInput(inp.value); }); // 只更新 searchQ 狀態
-    // Bug fix: stop all keydown propagation from search inputs
-    inp.addEventListener('keydown', e => { e.stopPropagation(); });
-    wrap.appendChild(inp); wrap.appendChild(clrBtn);
+    wrap.appendChild(inp);
+    attachSearchClear(inp, { onInput, onClear });
     return { wrap, inp };
 }
 
