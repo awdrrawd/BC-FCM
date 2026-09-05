@@ -19,10 +19,13 @@ const OfflineQueue = {
         } catch (error) { warnLimited('offline queue read failed', error); return []; }
     },
     add(memberNumber, content) {
+        const key = this.key();
+        if (!key) return null;
         const rows = this.all();
         const row = { id: `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`, memberNumber: Number(memberNumber), content: String(content), queuedAt: Date.now() };
         rows.push(row);
-        try { localStorage.setItem(this.key(), JSON.stringify(rows)); } catch (error) { warnLimited('offline queue write failed', error); }
+        try { localStorage.setItem(key, JSON.stringify(rows)); }
+        catch (error) { warnLimited('offline queue write failed', error); return null; }
         return row;
     },
     remove(ids) {

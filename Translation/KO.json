@@ -384,5 +384,10 @@
   "chatProvLibre": "LibreTranslate",
   "chatProvCustom": "사용자 정의",
   "chatProvDeepl": "DeepL",
-  "chatProvGoogle": "Google 번역"
+  "chatProvGoogle": "Google 번역",
+  "chatClearSearch": "검색 지우기",
+  "chatSending": "전송 중…",
+  "chatSendFailed": "전송에 실패했습니다. 입력한 내용은 유지됩니다. 오프라인에서는 Profiles를 공유할 수 없습니다. 프로필 데이터, 메시지 길이 및 전송 권한을 확인하세요.",
+  "chatOfflineQueuePlaceholder": "텍스트는 상대가 접속하면 전송됩니다. Profiles는 접속 후 다시 공유하세요…",
+  "chatQueueSend": "전송 예약"
 }

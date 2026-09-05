@@ -384,5 +384,10 @@
   "chatProvLibre": "LibreTranslate",
   "chatProvCustom": "カスタム",
   "chatProvDeepl": "DeepL",
-  "chatProvGoogle": "Google 翻訳"
+  "chatProvGoogle": "Google 翻訳",
+  "chatClearSearch": "検索をクリア",
+  "chatSending": "送信中…",
+  "chatSendFailed": "送信に失敗しました。入力は保持されています。オフラインでは Profiles を共有できません。人物データ、文字数、送信権限を確認してください。",
+  "chatOfflineQueuePlaceholder": "文章は相手のオンライン復帰後に送信されます。Profiles は復帰後に再共有してください…",
+  "chatQueueSend": "送信予約"
 }

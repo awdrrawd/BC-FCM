@@ -63,6 +63,33 @@ import { warnLimited } from '../core/logger.js';
                 }
             } catch (error) { warnLimited('profile cache write failed', error); }
         },
+        async receiveShared(profile) {
+            const memberNumber = Number(profile?.memberNumber);
+            if (!Number.isSafeInteger(memberNumber) || memberNumber <= 0 || !Number.isFinite(profile?.seen) || profile.seen <= 0 || typeof profile?.characterBundle !== 'string') return false;
+            try {
+                const bundle = JSON.parse(profile.characterBundle);
+                if (Number(bundle?.MemberNumber) !== memberNumber || !Array.isArray(bundle.Appearance)) return false;
+                if (!this.db) await this.init();
+                if (!this.db?.objectStoreNames.contains('profiles')) return false;
+                return await new Promise(resolve => {
+                    const tx = this.db.transaction('profiles', 'readwrite');
+                    const store = tx.objectStore('profiles');
+                    const req = store.get(memberNumber);
+                    let saved;
+                    req.onsuccess = () => {
+                        const existing = req.result;
+                        // Compare observation times, never the time the share arrived.
+                        saved = existing && Number(existing.seen) >= profile.seen ? existing : {
+                            ...existing, memberNumber, name: bundle.Name || '', lastNick: bundle.Nickname || bundle.Name || '',
+                            seen: profile.seen, characterBundle: profile.characterBundle,
+                        };
+                        if (saved !== existing) store.put(saved);
+                    };
+                    tx.oncomplete = () => { _pc[memberNumber] = saved; resolve(true); };
+                    tx.onerror = tx.onabort = () => { warnLimited('shared profile save failed', tx.error); resolve(false); };
+                });
+            } catch (error) { warnLimited('shared profile save failed', error); return false; }
+        },
         get(mn) {
             mn = parseInt(mn); if (_pc[mn] !== undefined) return Promise.resolve(_pc[mn]); if (!this.db) { _pc[mn] = null; return Promise.resolve(null); }
             return new Promise(res => { try { const req = this.db.transaction('profiles', 'readonly').objectStore('profiles').get(mn); req.onsuccess = () => { _pc[mn] = req.result || null; res(_pc[mn]); }; req.onerror = () => { warnLimited('profile cache read failed', req.error); _pc[mn] = null; res(null); }; } catch (error) { warnLimited('profile cache read failed', error); _pc[mn] = null; res(null); } });

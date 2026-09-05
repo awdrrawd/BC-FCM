@@ -63,10 +63,10 @@ test('background list refresh preserves forwarding targets and normal scroll pos
     assert.equal(bindings, 1);
 });
 
-test('Enter confirms IME composition without sending; ordinary Enter sends', () => {
+test('Enter confirms IME composition without sending; ordinary Enter sends', async () => {
     let sent = 0;
     let prevented = 0;
-    const input = { value: '測試' };
+    const input = { value: '測試', isConnected: true };
     const composer = createChatComposer({
         getRoot: () => ({ querySelector: () => input }), getMemberNumber: () => 42,
         displayName: String, capability: () => 'whisper', isFriend: () => true,
@@ -79,7 +79,7 @@ test('Enter confirms IME composition without sending; ordinary Enter sends', () 
     assert.equal(sent, 0);
     assert.equal(prevented, 0);
     assert.equal(input.value, '測試');
-    enter({});
+    await enter({});
     assert.equal(sent, 1);
     assert.equal(input.value, '');
 });

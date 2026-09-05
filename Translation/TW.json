@@ -330,6 +330,8 @@
   "chatSaveProfile": "保存個人資料",
   "chatSearchPlayers": "搜尋玩家…",
   "chatClearSearch": "清除搜尋",
+  "chatSending": "傳送中…",
+  "chatSendFailed": "傳送失敗，文字已保留。離線時無法分享 Profiles；請確認人物資料、訊息長度及傳送權限。",
   "chatSelectPlayer": "選擇一位玩家開始對話",
   "chatSend": "發送",
   "chatSettingsTab": "設定",
@@ -385,5 +387,7 @@
   "chatProvLibre": "LibreTranslate",
   "chatProvCustom": "自訂",
   "chatProvDeepl": "DeepL",
-  "chatProvGoogle": "Google 翻譯"
+  "chatProvGoogle": "Google 翻譯",
+  "chatOfflineQueuePlaceholder": "離線文字將於上線後補送；Profiles 請上線後重分享…",
+  "chatQueueSend": "離線傳送"
 }

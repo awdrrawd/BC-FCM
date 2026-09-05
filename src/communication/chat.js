@@ -23,9 +23,9 @@ import {
 } from './chat/controllers/index.js';
 import {
     balloonPreviewText, cleanMessage, createChatAutoReplyService, createChatContactService,
-    createChatConversationActions, createChatMessageRecorder, createChatOwnProfileService,
+    createChatConversationActions, createOfflineDeliveryService, createChatMessageRecorder, createChatOwnProfileService,
     createChatPresenceService, createChatProfileViewer, createChatRoomActions, createChatRoomStateService,
-    createChatSelectedActions, createChatSender, createChatTransportHandler, createOfflineDeliveryService,
+    createChatSelectedActions, createChatSender, createChatTransportHandler,
     exportConversation as exportConversationFile, normalizeMessage as normalizeTransportMessage,
 } from './chat/services/index.js';
 import {
@@ -34,6 +34,7 @@ import {
 } from './chat/views/index.js';
 import { bindChatProfileEvents, bindChatSettingsEvents, createChatMessageActionsController } from './chat/events/index.js';
 import { WATER_ICON } from '../ui/icons.js';
+import { createNativeChatTags } from './chat/controllers/chat-native-tags.js';
 
 let root = null;
 let selectedMember = null;
@@ -62,6 +63,7 @@ const runWithoutOutgoingCapture = callback => {
     finally { suppressOutgoing--; }
 };
 const messageRecorder = createChatMessageRecorder({
+    saveSharedProfile: profile => PDB.receiveShared(profile),
     config: cfg,
     normalizeMessage: data => normalizeTransportMessage(data, { displayName: getDisplayName }),
     chatStore: ChatStore,
@@ -94,7 +96,19 @@ const offlineDelivery = createOfflineDeliveryService({
     onError: error => console.warn('🐈‍⬛ [FCM] offline message delivery failed:', error),
 });
 const chatSender = createChatSender({
-    offlineQueue: OfflineQueue, canSendWhisper: canSendBcxWhisper, sendServer: (...args) => ServerSend(...args),
+    offlineQueue: OfflineQueue, isFriend: isFriendOf,
+    warn: warnLimited,
+    onNativeMessage: (...args) => nativeTags.appendBeep(...args),
+    loadSharedProfile: async memberNumber => {
+        const saved = await PDB.get(memberNumber);
+        if (saved?.characterBundle) return { memberNumber, seen: saved.seen, characterBundle: saved.characterBundle };
+        const live = character(memberNumber);
+        if (!live || typeof globalThis.ServerAppearanceBundle !== 'function') return null;
+        return { memberNumber, seen: Date.now(), characterBundle: JSON.stringify({ MemberNumber: memberNumber, Name: live.Name || '',
+            Nickname: live.Nickname || '', Description: live.Description || '', LabelColor: live.LabelColor,
+            Appearance: globalThis.ServerAppearanceBundle(live.Appearance || []), Lovership: live.Lovership || [], Title: live.Title || '' }) };
+    },
+    canSendWhisper: canSendBcxWhisper, sendServer: (...args) => ServerSend(...args),
     sendBeep: sendBcxAwareBeep, recordMessage: (...args) => recordMessage(...args), runWithoutOutgoingCapture,
 });
 const presence = createChatPresenceService({
@@ -113,6 +127,7 @@ const profileSuggestion = createProfileSuggestionController({
 });
 const replyController = createChatReplyController({ getRoot: () => root, cleanMessage, text: TH });
 const composer = createChatComposer({
+    text: T,
     getRoot: () => root, getMemberNumber: () => selectedMember, displayName: getDisplayName,
     capability, isFriend: isFriendOf, sender: chatSender, getReplyTarget: replyController.get,
     clearReplyTarget: replyController.clear,
@@ -122,6 +137,7 @@ const profileViewer = createChatProfileViewer({
     loadCharacter: (bundle, memberNumber) => globalThis.CharacterLoadOnline(bundle, memberNumber),
     showInformationSheet: characterValue => globalThis.InformationSheetLoadCharacter?.(characterValue), warn: warnLimited,
 });
+const nativeTags = createNativeChatTags({ getSelf: () => Player?.MemberNumber, openProfile: profileViewer.open, displayName: getDisplayName, text: T });
 const contactCard = createChatContactCardController({
     getRoot: () => root, getMemberNumber: () => selectedMember, loadProfile: memberNumber => PDB.get(memberNumber),
     renderHtml: () => conversationPresenter.contactCardHtml(), hydrateAvatars: hydrateChatAvatars, findLiveCharacter: character,
@@ -150,7 +166,9 @@ const messageSelection = createChatMessageSelectionController({
     selectedCountText: count => TH('chatSelectedCount', count), onExit: forwardTargets.close,
 });
 const messageActions = createChatMessageActionsController({
-    getRoot: () => root, messageSelection, openProfile: profileViewer.open,
+    getRoot: () => root, messageSelection,
+    openProfile: (memberNumber, messageId) => profileViewer.open(memberNumber,
+        conversation.messages.find(message => message.id === messageId)?.profiles?.find(profile => profile.memberNumber === Number(memberNumber))),
     replyToMessage: replyController.select,
     isMobile: () => typeof globalThis.CommonIsMobile === 'function' && globalThis.CommonIsMobile(),
 });
@@ -171,8 +189,7 @@ const conversationPresence = createChatConversationPresence({
 const selectedActions = createChatSelectedActions({
     selection: messageSelection, getPlayer: () => Player, getConversationMemberNumber: () => selectedMember,
     displayName: getDisplayName, cleanContent: cleanMessage, capability, isFriend: isFriendOf,
-    offlineQueue: OfflineQueue, recordMessage: (...args) => recordMessage(...args), runWithoutOutgoingCapture,
-    sendWhisper: sendBcxAwareWhisper, sendBeep: sendBcxAwareBeep, getRoom: () => ChatRoomData,
+    sender: chatSender, getRoom: () => ChatRoomData,
     sendRoomMessage: (...args) => ServerSend(...args), exportConversation: exportConversationFile,
     biography, avatarUrl, chatColors,
 });
@@ -201,6 +218,7 @@ const conversationActions = createChatConversationActions({
     biography, avatarUrl, chatColors, onDeleted: renderChat,
 });
 const transportHandler = createChatTransportHandler({
+    nativeTags, getOutgoing: chatSender.getOutgoing,
     getPlayer: () => Player, getMessages: () => messages, getRoot: () => root,
     recordMessage: (...args) => recordMessage(...args), chatStore: ChatStore,
     setRemoteProfile: (memberNumber, profile) => remoteProfiles.set(memberNumber, profile), displayName: getDisplayName,
@@ -240,6 +258,8 @@ const chatList = createChatListController({
     bindListEvents: listNavigation.bind, bindMemberRows: memberSelection.bind, hydrateAvatars: hydrateChatAvatars, installDragScroll,
 });
 const handleIncomingBeep = transportHandler.incomingBeep;
+const handleIncomingBeepDisplay = transportHandler.incomingBeepDisplay;
+const handleIncomingPrivateChat = transportHandler.receivePrivate;
 const handleIncomingWhisper = transportHandler.incomingWhisper;
 const handleIncomingWhisperDisplay = transportHandler.incomingWhisperDisplay;
 const handleIncomingChatTag = transportHandler.receiveReplyTag;
@@ -370,4 +390,4 @@ function refreshChatSettings() {
     chatRuntime.applySettings();
 }
 
-export { initChat, openChat, closeChat, refreshChatSettings, handleIncomingBeep, handleIncomingChatMessageId, handleIncomingChatTag, handleIncomingFriendRequestNotice, handleIncomingWhisper, handleIncomingWhisperDisplay, handleOutgoingServerSend, handleOnlineFriendsUpdate };
+export { initChat, openChat, closeChat, refreshChatSettings, handleIncomingBeep, handleIncomingBeepDisplay, handleIncomingPrivateChat, handleIncomingChatMessageId, handleIncomingChatTag, handleIncomingFriendRequestNotice, handleIncomingWhisper, handleIncomingWhisperDisplay, handleOutgoingServerSend, handleOnlineFriendsUpdate };

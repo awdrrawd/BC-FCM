@@ -384,5 +384,10 @@
   "chatProvLibre": "LibreTranslate",
   "chatProvCustom": "Benutzerdefiniert",
   "chatProvDeepl": "DeepL",
-  "chatProvGoogle": "Google Übersetzung"
+  "chatProvGoogle": "Google Übersetzung",
+  "chatClearSearch": "Suche leeren",
+  "chatSending": "Wird gesendet…",
+  "chatSendFailed": "Senden fehlgeschlagen. Der Text bleibt erhalten. Profiles können offline nicht geteilt werden; bitte Profildaten, Nachrichtenlänge und Sendeberechtigungen prüfen.",
+  "chatOfflineQueuePlaceholder": "Offline-Texte werden bei Rückkehr gesendet; Profiles bitte dann erneut teilen…",
+  "chatQueueSend": "Zum Senden vormerken"
 }

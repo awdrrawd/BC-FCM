@@ -384,5 +384,10 @@
   "chatProvLibre": "LibreTranslate",
   "chatProvCustom": "自定义",
   "chatProvDeepl": "DeepL",
-  "chatProvGoogle": "Google 翻译"
+  "chatProvGoogle": "Google 翻译",
+  "chatClearSearch": "清除搜索",
+  "chatSending": "发送中…",
+  "chatSendFailed": "发送失败，文字已保留。离线时无法分享 Profiles；请确认人物资料、消息长度及发送权限。",
+  "chatOfflineQueuePlaceholder": "离线文字将在上线后补发；Profiles 请上线后重新分享…",
+  "chatQueueSend": "离线发送"
 }

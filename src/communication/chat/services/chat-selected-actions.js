@@ -1,6 +1,6 @@
 import { forEachForwardedMessage, forwardedMessageText } from '../data/chat-selection.js';
 
-function createChatSelectedActions({ selection, getPlayer, getConversationMemberNumber, displayName, cleanContent, capability, isFriend, offlineQueue, recordMessage, runWithoutOutgoingCapture, sendWhisper, sendBeep, getRoom, sendRoomMessage, exportConversation, biography, avatarUrl, chatColors }) {
+function createChatSelectedActions({ selection, getPlayer, getConversationMemberNumber, displayName, cleanContent, capability, isFriend, sender, getRoom, sendRoomMessage, exportConversation, biography, avatarUrl, chatColors }) {
     function format(message) {
         return forwardedMessageText(message, {
             player: getPlayer(), conversationMemberNumber: getConversationMemberNumber(), displayName, cleanContent,
@@ -11,19 +11,11 @@ function createChatSelectedActions({ selection, getPlayer, getConversationMember
         const target = Number(memberNumber);
         const available = capability(target);
         if (!target || (available === 'none' && !isFriend(target))) return;
+        let failed = false;
         await forEachForwardedMessage(selection.records(), async message => {
-            const content = format(message);
-            if (available === 'none') {
-                const queued = offlineQueue.add(target, content);
-                await recordMessage({ memberNumber: target, direction: 'out', channel: 'beep', content, queued: true, queueId: queued.id }, { notify: false });
-                return;
-            }
-            const sent = runWithoutOutgoingCapture(() => available === 'whisper'
-                ? sendWhisper({ Type: 'Whisper', Target: target, Content: content })
-                : sendBeep({ MemberNumber: target, BeepType: '', Message: content }));
-            if (sent) await recordMessage({ memberNumber: target, direction: 'out', channel: available, content }, { notify: false });
+            if (!await sender.send({ memberNumber: target, channel: available, content: format(message) })) failed = true;
         });
-        selection.exit();
+        if (!failed) selection.exit();
     }
 
     async function forwardToRoom() {

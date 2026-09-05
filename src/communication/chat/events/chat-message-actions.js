@@ -37,7 +37,7 @@ function installMessageActions({ root, log, menu, isMultiSelectActive, selectedI
             return;
         }
         const profile = event.target.closest('[data-profile-member]');
-        if (profile) { openProfile(profile.dataset.profileMember); return; }
+        if (profile) { openProfile(profile.dataset.profileMember, message?.dataset.msgId); return; }
         const jump = event.target.closest('[data-reply-jump]');
         if (jump) {
             const targetMessage = log.querySelector(`[data-shared-msg-id="${CSS.escape(jump.dataset.replyJump)}"]`);

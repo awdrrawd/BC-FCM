@@ -384,5 +384,10 @@
   "chatProvLibre": "LibreTranslate",
   "chatProvCustom": "Свой",
   "chatProvDeepl": "DeepL",
-  "chatProvGoogle": "Google Переводчик"
+  "chatProvGoogle": "Google Переводчик",
+  "chatClearSearch": "Очистить поиск",
+  "chatSending": "Отправка…",
+  "chatSendFailed": "Не удалось отправить. Текст сохранён. Profiles нельзя отправлять офлайн; проверьте данные профиля, длину сообщения и разрешения на отправку.",
+  "chatOfflineQueuePlaceholder": "Текст будет отправлен, когда игрок вернётся в сеть; поделитесь Profiles повторно после его возвращения…",
+  "chatQueueSend": "Отправить при подключении"
 }

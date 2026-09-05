@@ -7,7 +7,7 @@ import { renderCurrent, panelOpen, panelMini, uiTab, buildPanel, togglePanel, cl
 import { _applyWhisperStyle, _updateWhisperAvatar, _drawWavOnCanvas } from '../chat/chat-fx.js';
 import { isProfileShareMessage, wpsHandleMessage, observeWpsOpenTokens } from '../chat/wps-share.js';
 import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSHARE_TAG } from '../chat/actions.js';
-import { handleIncomingBeep, handleIncomingChatMessageId, handleIncomingChatTag, handleIncomingFriendRequestNotice, handleIncomingWhisper, handleIncomingWhisperDisplay, handleOutgoingServerSend, handleOnlineFriendsUpdate } from '../communication/chat.js';
+import { handleIncomingBeep, handleIncomingBeepDisplay, handleIncomingPrivateChat, handleIncomingChatMessageId, handleIncomingChatTag, handleIncomingFriendRequestNotice, handleIncomingWhisper, handleIncomingWhisperDisplay, handleOutgoingServerSend, handleOnlineFriendsUpdate } from '../communication/chat.js';
 import { shouldBypassBcxReceiveRules } from '../communication/bcx-compat.js';
 import { warnLimited } from './logger.js';
 // ════════════════════════════════════════
@@ -96,6 +96,7 @@ import { warnLimited } from './logger.js';
             return;
         }
         if (data && shouldBypassBcxReceiveRules()) {
+            if (handleIncomingPrivateChat(data)) return;
             try { handleIncomingBeep(data); bypassedBeeps.add(data); } catch (error) { warnLimited('BCX bypass beep handling failed', error); }
         }
         return next(args);
@@ -105,8 +106,16 @@ import { warnLimited } from './logger.js';
     // used when the explicit bypass setting is enabled.
     modApi.hookFunction('ServerAccountBeep', 0, (args, next) => {
         const data = args[0];
+        if (handleIncomingPrivateChat(data)) return;
         if (data && !bypassedBeeps.has(data)) { try { handleIncomingBeep(data); } catch (error) { warnLimited('beep handling failed', error); } }
-        return next(args);
+        const log = document.getElementById('TextAreaChatLog');
+        const previous = log?.lastElementChild;
+        const result = next(args);
+        const added = log?.lastElementChild;
+        if (added && added !== previous) {
+            try { handleIncomingBeepDisplay(data, added); } catch (error) { warnLimited('private beep tags failed', error); }
+        }
+        return result;
     });
     modApi.hookFunction('ServerSend', 10, (args, next) => {
         try { handleOutgoingServerSend(args[0], args[1]); } catch (error) { warnLimited('outgoing chat capture failed', error); }
@@ -224,6 +233,7 @@ import { warnLimited } from './logger.js';
     // WPS hidden share messages
     modApi.hookFunction('ChatRoomMessage', 0, (args, next) => {
         const data = args[0];
+        if (handleIncomingPrivateChat(data)) return;
         if (data?.Type === 'Hidden' && data?.Content === 'FCM::CHAT::TAG' && handleIncomingChatTag(data)) return;
         if (data?.Type === 'Hidden' && data?.Content === 'FCM::CHAT::MESSAGE' && handleIncomingChatMessageId(data)) return;
         if (data?.Type === 'Hidden' && isProfileShareMessage(data)) {
@@ -240,7 +250,7 @@ import { warnLimited } from './logger.js';
     });
     modApi.hookFunction('ChatRoomMessageDisplay', 99, (args, next) => {
         const result = next(args);
-        try { handleIncomingWhisperDisplay(args[0], args[1], args[2]); } catch (error) { warnLimited('whisper display handling failed', error); }
+        try { handleIncomingWhisperDisplay(args[0], args[1], args[2], result); } catch (error) { warnLimited('whisper display handling failed', error); }
         return result;
     });
 

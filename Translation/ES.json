@@ -384,5 +384,10 @@
   "bcxBeepBlocked": "BCX te impide enviar mensajes privados",
   "chatTrustImageDomain": "Confiar en el dominio de imágenes",
   "chatTrustImagePrompt": "¿Confiar en «{0}» y mostrar sus imágenes durante esta sesión de juego? La confianza se restablece al recargar la página.",
-  "chatTrustImage": "Confiar"
+  "chatTrustImage": "Confiar",
+  "chatClearSearch": "Borrar búsqueda",
+  "chatSending": "Enviando…",
+  "chatSendFailed": "No se pudo enviar. El texto se ha conservado. No se pueden compartir Profiles sin conexión; revisa los datos del perfil, la longitud y los permisos de envío.",
+  "chatOfflineQueuePlaceholder": "El texto se enviará cuando vuelva a conectarse; comparte los Profiles de nuevo entonces…",
+  "chatQueueSend": "Enviar al conectarse"
 }

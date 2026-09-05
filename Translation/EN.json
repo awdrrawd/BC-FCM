@@ -330,6 +330,8 @@
   "chatSaveProfile": "Save Profile",
   "chatSearchPlayers": "Search players…",
   "chatClearSearch": "Clear search",
+  "chatSending": "Sending…",
+  "chatSendFailed": "Send failed. Your text was kept. Profiles cannot be shared offline; check profile availability, message length and send permissions.",
   "chatSelectPlayer": "Select a player to start chatting",
   "chatSend": "Send",
   "chatSettingsTab": "Settings",
@@ -385,5 +387,7 @@
   "chatProvLibre": "LibreTranslate",
   "chatProvCustom": "Custom",
   "chatProvDeepl": "DeepL",
-  "chatProvGoogle": "Google Translate"
+  "chatProvGoogle": "Google Translate",
+  "chatOfflineQueuePlaceholder": "Offline text will be sent when they return; share Profiles again when online…",
+  "chatQueueSend": "Queue send"
 }

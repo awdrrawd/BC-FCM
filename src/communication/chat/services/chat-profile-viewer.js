@@ -1,14 +1,14 @@
 function createChatProfileViewer({ findLiveCharacter, loadProfile, loadCharacter, showInformationSheet, warn }) {
-    async function open(memberNumber) {
+    async function open(memberNumber, sharedProfile = null) {
         const target = Number(memberNumber);
         if (!target) return false;
-        const live = findLiveCharacter(target);
+        const live = !sharedProfile && findLiveCharacter(target);
         if (live) {
             showInformationSheet?.(live);
             return true;
         }
         try {
-            const profile = await loadProfile(target);
+            const profile = sharedProfile || await loadProfile(target);
             if (!profile?.characterBundle) return false;
             const loaded = loadCharacter(JSON.parse(profile.characterBundle), target);
             if (!loaded) return false;

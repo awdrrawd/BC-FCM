@@ -9,6 +9,7 @@ function normalizeMessage(data, { displayName }) {
         queued: !!data.queued, queueId: data.queueId || '', nativeMsgId: data.nativeMsgId || '',
         translatedContent: cleanMessage(data.translatedContent || ''), replyPreview: cleanMessage(data.replyPreview || ''),
         replyToId: data.replyToId || '', sharedMsgId: data.sharedMsgId || '',
+        profiles: Array.isArray(data.profiles) ? data.profiles : [],
     };
 }
 

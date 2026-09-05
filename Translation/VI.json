@@ -384,5 +384,10 @@
   "bcxBeepBlocked": "BCX không cho phép bạn gửi tin nhắn riêng",
   "chatTrustImageDomain": "Tin cậy miền hình ảnh",
   "chatTrustImagePrompt": "Tin cậy “{0}” và hiển thị trực tiếp hình ảnh trong phiên chơi này? Quyền tin cậy sẽ được đặt lại khi tải lại trang.",
-  "chatTrustImage": "Tin cậy"
+  "chatTrustImage": "Tin cậy",
+  "chatClearSearch": "Xóa tìm kiếm",
+  "chatSending": "Đang gửi…",
+  "chatSendFailed": "Gửi thất bại. Nội dung đã được giữ lại. Không thể chia sẻ Profiles khi ngoại tuyến; hãy kiểm tra dữ liệu hồ sơ, độ dài tin nhắn và quyền gửi.",
+  "chatOfflineQueuePlaceholder": "Tin nhắn văn bản sẽ được gửi khi người chơi trực tuyến trở lại; hãy chia sẻ lại Profiles lúc đó…",
+  "chatQueueSend": "Gửi khi trực tuyến"
 }

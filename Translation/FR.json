@@ -384,5 +384,10 @@
   "chatProvLibre": "LibreTranslate",
   "chatProvCustom": "Personnalisé",
   "chatProvDeepl": "DeepL",
-  "chatProvGoogle": "Google Traduction"
+  "chatProvGoogle": "Google Traduction",
+  "chatClearSearch": "Effacer la recherche",
+  "chatSending": "Envoi…",
+  "chatSendFailed": "Échec de l’envoi. Le texte est conservé. Les Profiles ne peuvent pas être partagés hors ligne ; vérifiez les données du profil, la longueur et les autorisations d’envoi.",
+  "chatOfflineQueuePlaceholder": "Le texte sera envoyé au retour en ligne ; partagez à nouveau les Profiles à ce moment-là…",
+  "chatQueueSend": "Mettre en attente"
 }
