@@ -329,6 +329,7 @@
   "chatExportJson": "匯出 JSON",
   "chatSaveProfile": "保存個人資料",
   "chatSearchPlayers": "搜尋玩家…",
+  "chatClearSearch": "清除搜尋",
   "chatSelectPlayer": "選擇一位玩家開始對話",
   "chatSend": "發送",
   "chatSettingsTab": "設定",

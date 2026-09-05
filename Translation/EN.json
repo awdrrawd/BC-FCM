@@ -329,6 +329,7 @@
   "chatExportJson": "Export JSON",
   "chatSaveProfile": "Save Profile",
   "chatSearchPlayers": "Search players…",
+  "chatClearSearch": "Clear search",
   "chatSelectPlayer": "Select a player to start chatting",
   "chatSend": "Send",
   "chatSettingsTab": "Settings",

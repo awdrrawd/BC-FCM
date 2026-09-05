@@ -1,3 +1,5 @@
+import { searchHtml } from './chat-search-view.js';
+
 function contactRowsHtml(rows, { history = false, selectedMember, justOpenedMember, avatarHtml, displayName, biography, cleanMessage, esc, text }) {
     return rows.map(row => {
         const memberNumber = Number(row.memberNumber);
@@ -13,20 +15,20 @@ function contactRowsHtml(rows, { history = false, selectedMember, justOpenedMemb
 }
 
 function notificationsHtml({ rowsHtml, notificationTab, notificationSearch, esc, text }) {
-    return `<div class="fcm-chat-search"><input data-notification-search value="${esc(notificationSearch)}" placeholder="${text('chatSearchPlayers')}"></div>
+    return `${searchHtml(notificationSearch, esc, text)}
         <div class="fcm-chat-subtabs"><button class="${notificationTab === 'recent' ? 'active' : ''}" data-notification-tab="recent">${text('chatRecent')}</button><button class="${notificationTab === 'history' ? 'active' : ''}" data-notification-tab="history">${text('chatHistory')}</button></div>
         <div class="fcm-chat-scroll">${rowsHtml || `<div class="fcm-chat-empty">${text('chatNoRecord')}</div>`}</div>`;
 }
 
 function groupsHtml({ definitions, group, rowsHtml, groupMode, groupSearch, esc, text }) {
-    return `<div class="fcm-chat-search"><input data-group-search value="${esc(groupSearch)}" placeholder="${text('chatSearchPlayers')}"></div>
+    return `${searchHtml(groupSearch, esc, text)}
         <div class="fcm-chat-subtabs"><button class="${groupMode === 'room' ? 'active' : ''}" data-group-mode="room">${text('chatRoom')}</button><button class="${groupMode === 'groups' ? 'active' : ''}" data-group-mode="groups">${text('chatGroupsTab')}</button></div>
         ${groupMode === 'groups' ? `<div class="fcm-chat-group-tabs"><button class="fcm-chat-group-add" data-add-group>＋</button>${definitions.groups.map(item => `<button class="${item.id === group.id ? 'active' : ''}" data-group="${item.id}">${esc(item.label)}</button>`).join('')}</div>` : ''}
         <div class="fcm-chat-scroll">${rowsHtml || `<div class="fcm-chat-empty">${text('chatGroupEmpty')}</div>`}</div>`;
 }
 
 function chatListHtml({ rowsHtml, search, presenceFilter, relationFilter, esc, text }) {
-    return `<div class="fcm-chat-search"><input data-search value="${esc(search)}" placeholder="${text('chatSearchPlayers')}"></div>
+    return `${searchHtml(search, esc, text)}
         <div class="fcm-chat-subtabs"><button class="${presenceFilter === 'online' ? 'active' : ''}" data-presence="online">${text('chatPresenceOnline')}</button><button class="${presenceFilter === 'offline' ? 'active' : ''}" data-presence="offline">${text('chatPresenceOffline')}</button></div>
         <div class="fcm-chat-tags"><button class="${relationFilter === 'owner' ? 'active' : ''}" data-rel="owner">${text('chatRelOwnerLover')}</button><button class="${relationFilter === 'sub' ? 'active' : ''}" data-rel="sub">${text('chatRelSub')}</button><button class="${relationFilter === 'follow' ? 'active' : ''}" data-rel="follow">${text('chatRelFollow')}</button></div>
         <div class="fcm-chat-scroll">${rowsHtml || `<div class="fcm-chat-empty">${text('chatEmptyCategory')}</div>`}</div>`;

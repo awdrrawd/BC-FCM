@@ -1,25 +1,40 @@
 import { buildForwardTargetGroups } from '../data/chat-selection.js';
-import { bindForwardTargetEvents, forwardTargetsHtml } from '../views/chat-selection-view.js';
+import { bindForwardTargetEvents, forwardTargetRowsHtml, forwardTargetsHtml } from '../views/chat-selection-view.js';
+import { bindSearch } from '../views/chat-search-view.js';
 import { esc } from '../services/chat-content.js';
 
 function createChatForwardTargetsController({ getRoot, getRoomCharacters, getFriendRows, getSelfMemberNumber, getConversationMemberNumber, isFriend, isOnline, avatarHtml, displayName, text, hasSelection, isStackedDetail, refreshChatList, hydrateAvatars, onSelect }) {
     let active = false;
     let activeTab = 'room';
+    let search = '';
 
     function isActive() {
         return active;
     }
 
-    function html() {
+    function model() {
         const groups = buildForwardTargetGroups({
             roomCharacters: getRoomCharacters(), friendRows: getFriendRows(),
             selfMemberNumber: getSelfMemberNumber(), conversationMemberNumber: getConversationMemberNumber(),
             isFriend, isOnline,
         });
-        return forwardTargetsHtml({ groups, activeTab, avatarHtml, displayName, esc, text });
+        return { groups, activeTab, search, avatarHtml, displayName, esc, text };
+    }
+
+    function html() {
+        return forwardTargetsHtml(model());
     }
 
     function bind() {
+        bindSearch(getRoot()?.querySelector('.fcm-chat-list'), value => {
+            search = value;
+            const scroll = getRoot()?.querySelector('.fcm-chat-forward-targets');
+            if (!scroll || !active) return;
+            scroll.innerHTML = forwardTargetRowsHtml(model());
+            scroll.scrollTop = 0;
+            bindForwardTargetEvents(scroll, { onSelect });
+            hydrateAvatars();
+        });
         bindForwardTargetEvents(getRoot(), {
             onCancel: close,
             onSelect,
@@ -44,6 +59,7 @@ function createChatForwardTargetsController({ getRoot, getRoomCharacters, getFri
         if (!hasSelection() || !list || active) return;
         active = true;
         activeTab = 'room';
+        search = '';
         refresh();
         root.querySelector('.fcm-chat-body')?.classList.add('forward-target-mode');
         list.classList.remove('slide-out');
@@ -67,6 +83,7 @@ function createChatForwardTargetsController({ getRoot, getRoomCharacters, getFri
     function reset() {
         active = false;
         activeTab = 'room';
+        search = '';
     }
 
     return { bind, close, html, isActive, reset, show };

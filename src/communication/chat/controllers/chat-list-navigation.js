@@ -1,4 +1,6 @@
-function createChatListNavigation({ config, saveConfig, promptGroupName, refreshList, refreshVisible, bindMemberRows }) {
+import { bindSearch } from '../views/chat-search-view.js';
+
+function createChatListNavigation({ config, saveConfig, promptGroupName, refreshList, refreshVisible, bindMemberRows, getActiveView }) {
     const state = {
         search: '', presenceFilter: 'online', relationFilter: '', notificationTab: 'recent',
         notificationSearch: '', selectedGroup: 'room', groupMode: 'room', groupSearch: '',
@@ -36,16 +38,10 @@ function createChatListNavigation({ config, saveConfig, promptGroupName, refresh
             state.groupMode = button.dataset.groupMode;
             refreshList();
         }));
-        scope?.querySelector('[data-group-search]')?.addEventListener('input', event => {
-            state.groupSearch = event.target.value;
-            refreshVisible();
-        });
-        scope?.querySelector('[data-notification-search]')?.addEventListener('input', event => {
-            state.notificationSearch = event.target.value;
-            refreshVisible();
-        });
-        scope?.querySelector('[data-search]')?.addEventListener('input', event => {
-            state.search = event.target.value;
+        bindSearch(scope, value => {
+            const key = { notifications: 'notificationSearch', groups: 'groupSearch', chat: 'search' }[getActiveView()];
+            if (!key) return;
+            state[key] = value;
             refreshVisible();
         });
         scope?.querySelectorAll('[data-presence]').forEach(button => button.addEventListener('click', () => {

@@ -1,12 +1,21 @@
-function forwardTargetsHtml({ groups, activeTab, avatarHtml, displayName, esc, text }) {
+import { searchHtml } from './chat-search-view.js';
+
+function forwardTargetRowsHtml({ groups, activeTab, search = '', avatarHtml, displayName, esc, text }) {
     const rows = groups[activeTab] || groups.room || [];
-    const targetRows = rows.map(memberNumber => `<button class="fcm-chat-row fcm-chat-forward-target" data-forward-member="${memberNumber}">
+    const query = search.trim().toLocaleLowerCase();
+    const targetRows = rows.filter(memberNumber => `${displayName(memberNumber)} ${memberNumber}`.toLocaleLowerCase().includes(query)).map(memberNumber => `<button class="fcm-chat-row fcm-chat-forward-target" data-forward-member="${memberNumber}">
         ${avatarHtml(memberNumber)}
         <span class="fcm-chat-row-meta"><b>${esc(displayName(memberNumber))} (${memberNumber})</b></span>
     </button>`).join('');
+    return targetRows || `<div class="fcm-chat-empty">${text('chatNoRecord')}</div>`;
+}
+
+function forwardTargetsHtml(model) {
+    const { activeTab, search = '', esc, text } = model;
     return `<div class="fcm-chat-forward-header"><b>${text('chatForwardContact')}</b><button data-forward-cancel>${text('chatCancel')}</button></div>
+        ${searchHtml(search, esc, text)}
         <div class="fcm-chat-subtabs fcm-chat-forward-tabs"><button class="${activeTab === 'room' ? 'active' : ''}" data-forward-tab="room">${text('chatRoom')}</button><button class="${activeTab === 'friends' ? 'active' : ''}" data-forward-tab="friends">${text('chatFriends')}</button><button class="${activeTab === 'offline' ? 'active' : ''}" data-forward-tab="offline">${text('chatPresenceOffline')}</button></div>
-        <div class="fcm-chat-scroll fcm-chat-forward-targets">${targetRows || `<div class="fcm-chat-empty">${text('chatNoRecord')}</div>`}</div>`;
+        <div class="fcm-chat-scroll fcm-chat-forward-targets">${forwardTargetRowsHtml(model)}</div>`;
 }
 
 function bindForwardTargetEvents(scope, { onCancel, onSelect, onTab }) {
@@ -31,4 +40,4 @@ function updateMultiSelectUi(panel, { active, selectedIds, canForwardToRoom, sel
     });
 }
 
-export { bindForwardTargetEvents, forwardTargetsHtml, updateMultiSelectUi };
+export { bindForwardTargetEvents, forwardTargetRowsHtml, forwardTargetsHtml, updateMultiSelectUi };

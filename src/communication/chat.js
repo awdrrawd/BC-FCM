@@ -217,6 +217,7 @@ const memberSelection = createChatMemberSelection({
     refreshConversation: refreshConversationMain,
 });
 const listNavigation = createChatListNavigation({
+    getActiveView: () => activeView,
     config: cfg, saveConfig: saveCfg, promptGroupName: chatDialogs.promptGroupName,
     refreshList: options => chatList.refresh(options), refreshVisible: () => chatList.refreshVisible(),
     bindMemberRows: memberSelection.bind,

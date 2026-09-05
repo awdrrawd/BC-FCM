@@ -413,6 +413,7 @@ const FCM_FALLBACK = {
     "chatExportJson": { TW: "匯出 JSON", EN: "Export JSON" },
     "chatSaveProfile": { TW: "保存個人資料", EN: "Save Profile" },
     "chatSearchPlayers": { TW: "搜尋玩家…", EN: "Search players…" },
+    "chatClearSearch": { TW: "清除搜尋", EN: "Clear search" },
     "chatSelectPlayer": { TW: "選擇一位玩家開始對話", EN: "Select a player to start chatting" },
     "chatSend": { TW: "發送", EN: "Send" },
     "chatSettingsTab": { TW: "設定", EN: "Settings" },
