@@ -1,5 +1,6 @@
 function createChatListController({ getRoot, renderListHtml, renderVisibleScrollHtml, isForwardTargetsActive, bindForwardTargets, bindListEvents, bindMemberRows, hydrateAvatars, installDragScroll }) {
     function refreshVisible() {
+        if (isForwardTargetsActive()) return;
         const html = renderVisibleScrollHtml();
         const scroll = getRoot()?.querySelector('.fcm-chat-list .fcm-chat-scroll');
         if (html === null || !scroll) return;

@@ -1,11 +1,11 @@
 import { cleanMessage, parseRoomInvite } from './chat-content.js';
 
-function normalizeMessage(data, { displayName, selectedMember }) {
+function normalizeMessage(data, { displayName }) {
     return {
         id: data.id || `${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`,
         memberNumber: Number(data.memberNumber), direction: data.direction, channel: data.channel,
         content: cleanMessage(data.content), roomName: data.roomName || '', name: displayName(data.memberNumber),
-        timestamp: Number(data.timestamp) || Date.now(), read: data.direction === 'out' || Number(data.memberNumber) === Number(selectedMember),
+        timestamp: Number(data.timestamp) || Date.now(),
         queued: !!data.queued, queueId: data.queueId || '', nativeMsgId: data.nativeMsgId || '',
         translatedContent: cleanMessage(data.translatedContent || ''), replyPreview: cleanMessage(data.replyPreview || ''),
         replyToId: data.replyToId || '', sharedMsgId: data.sharedMsgId || '',

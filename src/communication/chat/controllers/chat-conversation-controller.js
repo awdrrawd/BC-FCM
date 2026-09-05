@@ -7,11 +7,13 @@ class ChatConversationController {
         this.messages = [];
         this.hasMore = false;
         this.loading = false;
+        this.loadVersion = 0;
         this.unread = 0;
         this.viewport = new ConversationViewport(bottomThreshold);
     }
 
     reset() {
+        this.loadVersion++;
         this.messages = [];
         this.hasMore = false;
         this.loading = false;
@@ -27,25 +29,27 @@ class ChatConversationController {
 
     async load(store, memberNumber, isCurrent) {
         const target = Number(memberNumber);
+        const version = ++this.loadVersion;
         this.loading = true;
         try {
             const page = await store.page(target, { limit: this.pageSize });
-            if (!isCurrent(target)) return false;
+            if (version !== this.loadVersion || !isCurrent(target)) return false;
             this.messages = normalizeConversationPage(page.messages);
             this.hasMore = page.hasMore;
             this.unread = 0;
             this.viewport.follow();
             return true;
-        } finally { this.loading = false; }
+        } finally { if (version === this.loadVersion) this.loading = false; }
     }
 
     async loadOlder(store, memberNumber, isCurrent) {
         if (this.loading || !this.hasMore || !this.messages.length) return null;
         const target = Number(memberNumber);
+        const version = ++this.loadVersion;
         this.loading = true;
         try {
             const page = await store.page(target, { before: this.messages[0].timestamp, limit: this.pageSize });
-            if (!isCurrent(target)) return null;
+            if (version !== this.loadVersion || !isCurrent(target)) return null;
             if (!page.messages.length) {
                 this.hasMore = false;
                 return null;
@@ -53,7 +57,7 @@ class ChatConversationController {
             this.messages = mergeOlderMessages(this.messages, page.messages);
             this.hasMore = page.hasMore;
             return this.messages;
-        } finally { this.loading = false; }
+        } finally { if (version === this.loadVersion) this.loading = false; }
     }
 }
 

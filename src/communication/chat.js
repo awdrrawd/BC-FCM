@@ -63,7 +63,7 @@ const runWithoutOutgoingCapture = callback => {
 };
 const messageRecorder = createChatMessageRecorder({
     config: cfg,
-    normalizeMessage: data => normalizeTransportMessage(data, { displayName: getDisplayName, selectedMember }),
+    normalizeMessage: data => normalizeTransportMessage(data, { displayName: getDisplayName }),
     chatStore: ChatStore,
     conversation,
     isPanelVisible: () => !!root?.isConnected && root.style.display !== 'none',
@@ -212,8 +212,9 @@ const memberSelection = createChatMemberSelection({
     resetSelection: resetMessageSelectionState, clearReply: replyController.clear, closeContactCard: contactCard.close,
     setStackedDetail: value => { stackedDetail = value; }, chatStore: ChatStore,
     setMessageIndex: value => { messages = value; }, loadConversation,
+    refreshList: () => chatList.refreshVisible(),
     refreshBadges: () => chatBalloons.refreshBadges(), getLayout: () => cfg.chatLayout,
-    refreshConversation: refreshConversationMain, unreadCount: () => listPresenter.unreadCount(),
+    refreshConversation: refreshConversationMain,
 });
 const listNavigation = createChatListNavigation({
     config: cfg, saveConfig: saveCfg, promptGroupName: chatDialogs.promptGroupName,

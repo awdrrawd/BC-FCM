@@ -18,6 +18,7 @@ function createChatComposer({ getRoot, getMemberNumber, displayName, capability,
 
     function handleKeydown(event) {
         event.stopPropagation();
+        if (event.isComposing || event.keyCode === 229) return;
         if (event.key !== 'Enter' || event.shiftKey) return;
         event.preventDefault();
         send();

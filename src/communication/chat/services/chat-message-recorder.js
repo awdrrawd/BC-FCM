@@ -3,6 +3,7 @@ function createChatMessageRecorder({ config, normalizeMessage, chatStore, conver
         if (!config.communicationEnabled || !data?.memberNumber) return null;
         const message = normalizeMessage(data);
         if (!message.content) return null;
+        message.read = message.direction === 'out' || (isPanelVisible() && isSelectedMember(message.memberNumber));
         await chatStore.put(message);
         setMessageIndex(await chatStore.recentIndex());
         if (isPanelVisible()) {
