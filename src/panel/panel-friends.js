@@ -67,12 +67,12 @@ async function renderFriends(container, _myToken) {
     const rBtn = mkBtn('↻', 'fcm-btn', () => {
         if (!refreshPanel()) { rBtn.style.opacity = '0.35'; setTimeout(() => { rBtn.style.opacity = ''; }, 600); }
     });
-    rBtn.title = T('btnRefresh'); rBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
+    rBtn.title = T('btnRefresh'); rBtn.classList.add('fcm-btn-round');
     toolbar.appendChild(rBtn);
     const avBtn = mkBtn('', 'fcm-btn', () => { const curMns = friends.map(f => f.mn); refreshSnapshotsForList(curMns); });
     avBtn.innerHTML = CAMERA_ICON;
     avBtn.title = T('btnSnapshotTitle');
-    avBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
+    avBtn.classList.add('fcm-btn-round');
     toolbar.appendChild(avBtn);
     container.appendChild(toolbar);
 

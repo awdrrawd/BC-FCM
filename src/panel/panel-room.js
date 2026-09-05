@@ -81,12 +81,12 @@ async function renderRoom(container) {
     const { lbl: rsl, sel: rsortSel } = makeSortSel(roomSortMode, [['name', T('sortName')], ['id', T('sortId')], ['rel', T('sortRel')], ['perm', T('permAdmin')]], v => { roomSortMode = v; if (roomSubTab !== 'members') roomPages[roomSubTab] = 0; renderRoom(container); });
     toolbar.appendChild(rsl); toolbar.appendChild(rsortSel);
     const rBtn = mkBtn('↻', 'fcm-btn', () => renderRoom(container));
-    rBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
+    rBtn.classList.add('fcm-btn-round');
     toolbar.appendChild(rBtn);
     const avBtnR = mkBtn('', 'fcm-btn', () => { refreshSnapshotsForList(mns); });
     avBtnR.innerHTML = CAMERA_ICON;
     avBtnR.title = T('btnSnapshotTitle');
-    avBtnR.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
+    avBtnR.classList.add('fcm-btn-round');
     toolbar.appendChild(avBtnR);
     container.appendChild(toolbar);
 

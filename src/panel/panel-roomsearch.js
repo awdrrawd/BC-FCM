@@ -69,7 +69,7 @@ async function renderRoomSearch(container) {
     sortSel.addEventListener('change', () => { _roomSortMode = sortSel.value; renderResults(); });
     tb.appendChild(sortSel);
     const rBtn = mkBtn('↻', 'fcm-btn', () => runSearch());
-    rBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
+    rBtn.classList.add('fcm-btn-round');
     tb.appendChild(rBtn);
     wrap.appendChild(tb);
 

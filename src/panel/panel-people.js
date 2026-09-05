@@ -41,7 +41,7 @@ async function renderPeople(container, _myToken) {
     toolbar.appendChild(srchBtn);
     toolbar.appendChild(Object.assign(document.createElement('span'), { className: 'fcm-spacer' }));
     const rBtn = mkBtn('↻', 'fcm-btn', () => { _peoplePage = 0; runSearch(inp.value); });
-    rBtn.style.cssText = 'padding:4px 7px;border-radius:50%;font-size:13px;flex-shrink:0;';
+    rBtn.classList.add('fcm-btn-round');
     toolbar.appendChild(rBtn);
     container.appendChild(toolbar);
 

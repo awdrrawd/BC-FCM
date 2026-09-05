@@ -247,6 +247,8 @@ import { chatFontFamily } from '../communication/chat-font.js';
 .fcm-perm-visit{background:#1c1830;color:#9878b8;border:1px solid #483868;}
 .fcm-btns{display:flex;gap:3px;flex-wrap:nowrap;align-items:center;}
 .fcm-btn{padding:3px 6px;border-radius:6px;border:1px solid #4838a0;background:#1e1635;color:#b098d0;font-size:10px;cursor:pointer;transition:all .15s;white-space:nowrap;font-weight:600;}
+.fcm-btn.fcm-btn-round{box-sizing:border-box;width:32px;height:32px;min-width:32px;min-height:32px;flex:0 0 32px;padding:0;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:16px;line-height:1;}
+.fcm-btn-round>svg{display:block;width:20px;height:20px;flex:none;}
 .fcm-btn:hover{background:#2a1e50;border-color:#9070c8;color:#e8d0ff;}
 .fcm-btn:disabled{opacity:.35;cursor:not-allowed;pointer-events:none;}
 .fcm-btn-red   {border-color:#801010;color:#f08080;}.fcm-btn-red:hover{background:#2a0808;border-color:#d04040;color:#ffb0b0;}
