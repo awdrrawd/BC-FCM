@@ -76,7 +76,7 @@ function createChatTransportHandler({ getPlayer, getMessages, getRoot, recordMes
         const payload = bypassPayloads.get(data) || inlinePayload(data);
         bypassPayloads.delete(data);
         const peer = Number(data.Sender) === Number(getPlayer()?.MemberNumber) ? Number(data.Target) : Number(data.Sender);
-        if (payload) nativeTags.decorate(element, payload, peer);
+        if (payload?.profiles?.length) nativeTags.decorate(element, payload, peer);
         if (whisperMetadata.consumeBypassed(data)) return;
         const idEntry = Array.isArray(data.Dictionary) ? data.Dictionary.find(entry => entry?.Tag === 'MsgId' && entry.MsgId) : null;
         if (Number(data.Sender) === Number(getPlayer()?.MemberNumber)) {

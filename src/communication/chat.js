@@ -98,7 +98,6 @@ const offlineDelivery = createOfflineDeliveryService({
 const chatSender = createChatSender({
     offlineQueue: OfflineQueue, isFriend: isFriendOf,
     warn: warnLimited,
-    onNativeMessage: (...args) => nativeTags.appendBeep(...args),
     loadSharedProfile: async memberNumber => {
         const saved = await PDB.get(memberNumber);
         if (saved?.characterBundle) return { memberNumber, seen: saved.seen, characterBundle: saved.characterBundle };
@@ -137,7 +136,7 @@ const profileViewer = createChatProfileViewer({
     loadCharacter: (bundle, memberNumber) => globalThis.CharacterLoadOnline(bundle, memberNumber),
     showInformationSheet: characterValue => globalThis.InformationSheetLoadCharacter?.(characterValue), warn: warnLimited,
 });
-const nativeTags = createNativeChatTags({ getSelf: () => Player?.MemberNumber, openProfile: profileViewer.open, displayName: getDisplayName, text: T });
+const nativeTags = createNativeChatTags({ getSelf: () => Player?.MemberNumber, openProfile: profileViewer.open, displayName: getDisplayName });
 const contactCard = createChatContactCardController({
     getRoot: () => root, getMemberNumber: () => selectedMember, loadProfile: memberNumber => PDB.get(memberNumber),
     renderHtml: () => conversationPresenter.contactCardHtml(), hydrateAvatars: hydrateChatAvatars, findLiveCharacter: character,

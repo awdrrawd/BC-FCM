@@ -1,4 +1,4 @@
-function createNativeChatTags({ getSelf, openProfile, displayName, text }) {
+function createNativeChatTags({ getSelf, openProfile, displayName }) {
     function jump(peer, id) {
         const rows = document.querySelectorAll('#TextAreaChatLog [data-fcm-message-id]');
         const target = [...rows].find(row => row.dataset.fcmPeer === String(peer) && row.dataset.fcmMessageId === id);
@@ -8,7 +8,7 @@ function createNativeChatTags({ getSelf, openProfile, displayName, text }) {
     }
 
     function decorate(element, payload, peer) {
-        if (!element || !payload?.id || element.dataset.fcmMessageId) return;
+        if (!element || !payload?.id || !payload.profiles?.length || element.dataset.fcmMessageId) return;
         element.dataset.fcmMessageId = payload.id;
         element.dataset.fcmPeer = String(peer);
         const content = element.querySelector('.chat-room-message-content');
@@ -48,26 +48,8 @@ function createNativeChatTags({ getSelf, openProfile, displayName, text }) {
         }
     }
 
-    function appendBeep(payload, peer, outgoing = false) {
-        const log = document.getElementById('TextAreaChatLog');
-        if (!log) return;
-        if ([...log.querySelectorAll('[data-fcm-message-id]')].some(row => row.dataset.fcmPeer === String(peer) && row.dataset.fcmMessageId === payload.id)) return;
-        const row = document.createElement('div');
-        row.className = 'ChatMessage ChatMessageLocalMessage ChatMessageNonDialogue ChatMessageBeep';
-        row.dataset.sender = String(outgoing ? getSelf() : peer);
-        row.dataset.target = String(outgoing ? peer : getSelf());
-        row.append(`${text(outgoing ? 'chatSent' : 'chatReceived')} · ${displayName(peer)} (${peer}): `);
-        const content = document.createElement('span');
-        content.className = 'chat-room-message-content';
-        content.textContent = payload.content;
-        row.append(content);
-        decorate(row, payload, peer);
-        if (typeof globalThis.ChatRoomAppendChat === 'function') globalThis.ChatRoomAppendChat(row);
-        else log.append(row);
-    }
-
     function decorateBeep(element, payload, peer) {
-        if (!element?.classList.contains('ChatMessageBeep') || Number(element.dataset.sender) !== peer
+        if (!payload?.profiles?.length || !element?.classList.contains('ChatMessageBeep') || Number(element.dataset.sender) !== peer
             || Number(element.dataset.target) !== Number(getSelf())) return;
         const preview = element.querySelector('.beep-link');
         if (preview) {
@@ -79,7 +61,7 @@ function createNativeChatTags({ getSelf, openProfile, displayName, text }) {
         decorate(element, payload, peer);
     }
 
-    return { decorate, decorateBeep, appendBeep };
+    return { decorate, decorateBeep };
 }
 
 export { createNativeChatTags };

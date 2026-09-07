@@ -1,6 +1,6 @@
 import { META_TAG, PRIVATE_TAG, PRIVATE_BEEP, privatePackets, profileMentionIds } from './chat-private-payload.js';
 
-function createChatSender({ offlineQueue, isFriend, canSendWhisper, sendServer, sendBeep, recordMessage, runWithoutOutgoingCapture, loadSharedProfile, onNativeMessage, warn, getSelf = () => globalThis.Player?.MemberNumber, wait = () => new Promise(resolve => setTimeout(resolve, 350)) }) {
+function createChatSender({ offlineQueue, isFriend, canSendWhisper, sendServer, sendBeep, recordMessage, runWithoutOutgoingCapture, loadSharedProfile, warn, getSelf = () => globalThis.Player?.MemberNumber, wait = () => new Promise(resolve => setTimeout(resolve, 350)) }) {
     const outgoing = new Map();
     function remember(payload) {
         outgoing.set(payload.id, payload);
@@ -32,11 +32,10 @@ function createChatSender({ offlineQueue, isFriend, canSendWhisper, sendServer, 
         if (channel === 'whisper') {
             data.Target = target;
             data.Dictionary ||= [];
-            data.Dictionary.push({ Tag: META_TAG, MessageId: payload.id, Target: target, ReplyPreview: payload.replyPreview, ReplyToId: payload.replyToId });
+            if (enhanced) data.Dictionary.push({ Tag: META_TAG, MessageId: payload.id, Target: target, ReplyPreview: payload.replyPreview, ReplyToId: payload.replyToId });
             runWithoutOutgoingCapture(() => sendServer('ChatRoomChat', data));
         } else {
             if (!runWithoutOutgoingCapture(() => sendBeep({ MemberNumber: target, BeepType: '', Message: payload.content }))) return false;
-            onNativeMessage?.(payload, target, true);
         }
         return true;
     }

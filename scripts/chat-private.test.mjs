@@ -233,3 +233,33 @@ test('forwarding uses the shared sender and retains selection if sharing fails',
     assert.ok(calls[0].content.includes('@77'));
     assert.equal(exitCount, 0);
 });
+
+test('ordinary whispers use native reply metadata without FCM decoration', async () => {
+    const context = senderContext();
+    await context.sender.send({ memberNumber: 2, channel: 'whisper', content: 'hello',
+        replyTarget: { nativeMsgId: 'native-reply', sharedMsgId: 'shared-reply', preview: 'prior' } });
+    assert.equal(context.server.length, 1);
+    const data = context.server[0].value;
+    assert.equal(data.Content, 'hello');
+    assert.deepEqual(data.Dictionary, [{ Tag: 'ReplyId', ReplyId: 'native-reply' }]);
+    const { handler, records, native } = receiverContext();
+    handler.incomingWhisperDisplay({ ...data, Sender: 1 }, 'hello', null, 'native-row');
+    assert.equal(records.length, 1);
+    assert.equal(native.length, 0);
+});
+
+test('ordinary Beeps never append a synthetic native chat row', async () => {
+    const context = senderContext({ onNativeMessage: () => assert.fail('must not append a synthetic row') });
+    assert.equal(await context.sender.send({ memberNumber: 2, channel: 'beep', content: 'hello' }), true);
+    assert.equal(context.beeps.length, 1);
+    assert.equal(context.records.length, 1);
+});
+
+test('legacy ordinary whisper metadata is recorded without decorating native chat', () => {
+    const { handler, records, native } = receiverContext();
+    handler.incomingWhisperDisplay({ Type: 'Whisper', Sender: 1, Target: 2, Content: 'hello', Dictionary: [
+        { Tag: META_TAG, MessageId: 'legacy-123', Target: 2, ReplyPreview: 'prior', ReplyToId: 'earlier-123' },
+    ] }, 'hello', null, 'native-row');
+    assert.equal(records.length, 1);
+    assert.equal(native.length, 0);
+});
