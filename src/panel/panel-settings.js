@@ -317,12 +317,10 @@ function renderSettings(container) {
         b.style.cssText = 'flex:1;padding:8px;font-size:11px;'; b.addEventListener('click', cb); return b;
     }
     exportRow.appendChild(mkActionBtn(T('exportProfiles'), T('exportNote'), 'fcm-btn-blue', async () => {
-        if (!PDB.db) return;
         const n = await exportProfiles();
         if (n > 0 && typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('exportDone', n), 5000);
     }));
     exportRow.appendChild(mkActionBtn(T('importProfiles'), T('importNote'), 'fcm-btn-green', () => {
-        if (!PDB.db) return;
         const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
         inp.onchange = async () => { const f = inp.files[0]; if (!f) return; const r = await importProfiles(f); if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('importDone', r.pc, r.nc), 5000); renderCurrent(); };
         inp.click();

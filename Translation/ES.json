@@ -137,7 +137,7 @@
   "saveModeLabel": "Modo de guardado",
   "saveModeOff": "Desactivado",
   "saveModeName": "Solo nombre",
-  "saveModeAvatar": "Nombre + avatar",
+  "saveModeAvatar": "Solo avatar",
   "saveModeFull": "Perfil completo (WCE)",
   "saveModeDesc_off": "No guarda datos. Si usas los perfiles de WCE, elige esta opción para evitar duplicados (WCE ya los guarda).",
   "saveModeDesc_name": "Guarda solo el número de miembro, nombre de BC y apodo. Ocupa lo mínimo y permite mostrar los nombres de amigas desconectadas.",

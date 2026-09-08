@@ -137,7 +137,7 @@
   "saveModeLabel": "저장 모드",
   "saveModeOff": "저장 안 함",
   "saveModeName": "이름만",
-  "saveModeAvatar": "이름＋아바타",
+  "saveModeAvatar": "아바타만",
   "saveModeFull": "전체 프로필 (WCE)",
   "saveModeDesc_off": "어떤 데이터도 저장하지 않습니다. WCE의 Profiles 기능을 사용 중이면 중복을 피하기 위해 이 옵션 권장 (WCE가 이미 저장함).",
   "saveModeDesc_name": "멤버 번호, BC 이름, 닉네임만 저장. 용량 거의 없음, 오프라인 친구 이름 표시에 사용.",

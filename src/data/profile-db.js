@@ -10,15 +10,46 @@ import { warnLimited } from '../core/logger.js';
 
     const PDB = {
         db: null,
+        opening: null,
         async init() {
-            return new Promise(res => {
+            if (this.db) return true;
+            if (this.opening) return this.opening;
+            this.opening = new Promise(res => {
                 try {
+                    // Shared with WCE/LCE: omit the version to retain the existing DB version.
+                    // Never raise it without explicit user direction; discuss schema changes first,
+                    // since a higher version breaks plugins that still request an older version.
+                    // Liko.LCE.profileDatabase exposes compatibility metadata, not upgrade authority.
                     const req = indexedDB.open('bce-past-profiles');
-                    req.onsuccess = () => { this.db = req.result; res(this.db.objectStoreNames.contains('profiles')); };
+                    req.onsuccess = () => {
+                        const db = req.result;
+                        if (!db.objectStoreNames.contains('profiles')) { db.close(); res(false); return; }
+                        this.db = db;
+                        db.onversionchange = () => {
+                            db.close();
+                            if (this.db === db) this.db = null;
+                            for (const key of Object.keys(_pc)) delete _pc[key];
+                            // Reopen without a version after yielding to the pending upgrade.
+                            setTimeout(() => { void this.init(); }, 0);
+                        };
+                        res(true);
+                    };
                     req.onerror = () => res(false);
                     req.onupgradeneeded = e => { const db = e.target.result; if (!db.objectStoreNames.contains('profiles')) db.createObjectStore('profiles', { keyPath: 'memberNumber' }); };
                 } catch (error) { warnLimited('profile database open failed', error); res(false); }
             });
+            try { return await this.opening; }
+            finally { this.opening = null; }
+        },
+        capture(raw) {
+            if (cfg.saveMode !== 'full' || !raw?.MemberNumber) return null;
+            try {
+                const bundle = { ...raw };
+                ['ActivePose', 'Inventory', 'BlockItems', 'LimitedItems', 'FavoriteItems',
+                    'ArousalSettings', 'OnlineSharedSettings', 'WhiteList', 'BlackList', 'Crafting',
+                    'ItemPermission', 'InventoryData'].forEach(key => delete bundle[key]);
+                return JSON.stringify(bundle);
+            } catch (error) { warnLimited('profile capture failed', error); return null; }
         },
         _face(C, sz = 100) {
             try {
@@ -33,68 +64,120 @@ import { warnLimited } from '../core/logger.js';
                 return cv.toDataURL('image/webp', 0.9);
             } catch (error) { warnLimited('profile avatar rendering failed', error); return ''; }
         },
-        save(C, raw) {
-            if (cfg.saveMode === 'off' || !this.db || !C || !C.MemberNumber) return;
+        async save(C, characterBundle) {
+            const mode = cfg.saveMode;
+            if (mode === 'off' || !C?.MemberNumber) return;
+            // Avatar persistence is independent of profile serialization and its DB connection.
+            if (mode === 'avatar' || mode === 'full') {
+                try {
+                    if (!await Snapshot.get(C.MemberNumber)) {
+                        const url = this._face(C);
+                        if (url) await Snapshot.save(C.MemberNumber, url, { source: 'profile-capture' });
+                    }
+                } catch (error) { warnLimited('profile avatar save failed', error); }
+            }
+            if (mode === 'avatar' || (mode === 'full' && typeof characterBundle !== 'string')) return;
             try {
+                if (!await this.init()) return;
                 const nick = (typeof CharacterNickname === 'function' ? CharacterNickname(C) : '') || C.Nickname || C.Name || '';
                 const now = Date.now();
                 const prof = { memberNumber: C.MemberNumber, name: C.Name || '', lastNick: nick, seen: now };
-                if (cfg.saveMode === 'full') {
-                    const src = raw || { MemberNumber: C.MemberNumber, Name: C.Name || '', Nickname: C.Nickname || '',
-                                        LabelColor: C.LabelColor || '#fff', Description: C.Description || '',
-                                        Title: C.Title || '', Appearance: C.Appearance || [],
-                                        Lovership: C.Lovership || [], Reputation: C.Reputation || [] };
-                    const b = { ...src };
-                    ['ActivePose','Inventory','BlockItems','LimitedItems','FavoriteItems',
-                     'ArousalSettings','OnlineSharedSettings','WhiteList','BlackList','Crafting',
-                     'ItemPermission','InventoryData'].forEach(k => delete b[k]);
-                    prof.characterBundle = JSON.stringify(b);
-                }
-                _pc[C.MemberNumber] = prof;
-                this.db.transaction('profiles', 'readwrite').objectStore('profiles').put(prof);
-                if (cfg.saveMode === 'avatar' || cfg.saveMode === 'full') {
-                    // Do not regenerate a face merely because the profile was saved again.
-                    // IndexedDB is authoritative; manual refresh remains the overwrite path.
-                    Snapshot.get(C.MemberNumber).then(existing => {
-                        if (existing) return;
-                        const url = this._face(C);
-                        if (url) Snapshot.save(C.MemberNumber, url, { source: 'profile-capture' });
-                    });
-                }
+                if (mode === 'full') prof.characterBundle = characterBundle;
+                await new Promise((resolve, reject) => {
+                    const tx = this.db.transaction('profiles', 'readwrite');
+                    const store = tx.objectStore('profiles');
+                    const req = store.get(C.MemberNumber);
+                    let saved;
+                    req.onsuccess = () => {
+                        saved = { ...req.result, ...prof };
+                        // A name-only observation must not make an old full bundle look newer.
+                        if (mode === 'name' && req.result?.characterBundle) saved.seen = req.result.seen;
+                        store.put(saved);
+                    };
+                    tx.oncomplete = () => { _pc[C.MemberNumber] = saved; resolve(); };
+                    tx.onerror = tx.onabort = () => reject(tx.error);
+                });
             } catch (error) { warnLimited('profile cache write failed', error); }
         },
-        async receiveShared(profile) {
+        async receiveShared(profile, { allowNameOnly = false } = {}) {
             const memberNumber = Number(profile?.memberNumber);
-            if (!Number.isSafeInteger(memberNumber) || memberNumber <= 0 || !Number.isFinite(profile?.seen) || profile.seen <= 0 || typeof profile?.characterBundle !== 'string') return false;
+            if (!Number.isSafeInteger(memberNumber) || memberNumber <= 0 || !Number.isFinite(profile?.seen) || profile.seen <= 0) return false;
             try {
-                const bundle = JSON.parse(profile.characterBundle);
-                if (Number(bundle?.MemberNumber) !== memberNumber || !Array.isArray(bundle.Appearance)) return false;
+                const bundle = typeof profile.characterBundle === 'string' ? JSON.parse(profile.characterBundle) : null;
+                if (typeof profile.characterBundle === 'string' && (!bundle || typeof bundle !== 'object')) return false;
+                if ([profile.name, profile.lastNick, bundle?.Name, bundle?.Nickname].some(value => value !== undefined && typeof value !== 'string')) return false;
+                if (bundle ? Number(bundle.MemberNumber) !== memberNumber || !Array.isArray(bundle.Appearance)
+                    : !allowNameOnly || typeof profile.name !== 'string') return false;
                 if (!this.db) await this.init();
                 if (!this.db?.objectStoreNames.contains('profiles')) return false;
                 return await new Promise(resolve => {
                     const tx = this.db.transaction('profiles', 'readwrite');
                     const store = tx.objectStore('profiles');
                     const req = store.get(memberNumber);
-                    let saved;
+                    let saved, changed = false;
                     req.onsuccess = () => {
                         const existing = req.result;
                         // Compare observation times, never the time the share arrived.
                         saved = existing && Number(existing.seen) >= profile.seen ? existing : {
-                            ...existing, memberNumber, name: bundle.Name || '', lastNick: bundle.Nickname || bundle.Name || '',
-                            seen: profile.seen, characterBundle: profile.characterBundle,
+                            ...existing, memberNumber, name: bundle?.Name || profile.name || '', lastNick: bundle?.Nickname || profile.lastNick || bundle?.Name || profile.name || '',
+                            seen: !bundle && existing?.characterBundle ? existing.seen : profile.seen,
+                            ...(bundle ? { characterBundle: profile.characterBundle } : {}),
                         };
-                        if (saved !== existing) store.put(saved);
+                        if (saved !== existing) { store.put(saved); changed = true; }
                     };
-                    tx.oncomplete = () => { _pc[memberNumber] = saved; resolve(true); };
+                    tx.oncomplete = () => { _pc[memberNumber] = saved; resolve(changed); };
                     tx.onerror = tx.onabort = () => { warnLimited('shared profile save failed', tx.error); resolve(false); };
                 });
             } catch (error) { warnLimited('shared profile save failed', error); return false; }
         },
-        get(mn) {
-            mn = parseInt(mn); if (_pc[mn] !== undefined) return Promise.resolve(_pc[mn]); if (!this.db) { _pc[mn] = null; return Promise.resolve(null); }
+        async get(mn) {
+            mn = parseInt(mn);
+            if (!await this.init()) return null;
             return new Promise(res => { try { const req = this.db.transaction('profiles', 'readonly').objectStore('profiles').get(mn); req.onsuccess = () => { _pc[mn] = req.result || null; res(_pc[mn]); }; req.onerror = () => { warnLimited('profile cache read failed', req.error); _pc[mn] = null; res(null); }; } catch (error) { warnLimited('profile cache read failed', error); _pc[mn] = null; res(null); } });
         },
-        async batchGet(mns) { for (const mn of mns) if (_pc[parseInt(mn)] === undefined) await this.get(mn); },
+        async batchGet(mns) { await Promise.all([...new Set(mns)].map(mn => this.get(mn))); },
+        async getAll(storeName = 'profiles') {
+            if (!['profiles', 'notes'].includes(storeName)) throw new Error('Unsupported profile store');
+            if (!await this.init()) throw new Error('Profile database unavailable');
+            if (!this.db.objectStoreNames.contains(storeName)) return [];
+            return new Promise((resolve, reject) => {
+                const req = this.db.transaction(storeName, 'readonly').objectStore(storeName).getAll();
+                req.onsuccess = () => {
+                    const rows = req.result || [];
+                    if (storeName === 'profiles') {
+                        for (const key of Object.keys(_pc)) delete _pc[key];
+                        for (const row of rows) _pc[row.memberNumber] = row;
+                    }
+                    resolve(rows);
+                };
+                req.onerror = () => reject(req.error);
+            });
+        },
+        async exportBackup() {
+            const profiles = await this.getAll();
+            const notes = await this.getAll('notes');
+            return { exportedAt: new Date().toISOString(), dbVersion: this.db.version, profiles, notes };
+        },
+        async importBackup(data) {
+            if (!data || typeof data !== 'object' || !await this.init()) throw new Error('Invalid profile backup or unavailable database');
+            let pc = 0, nc = 0;
+            // Backup dbVersion is informational only. Never upgrade or create stores for an import.
+            for (const profile of Array.isArray(data.profiles) ? data.profiles : []) {
+                if (await this.receiveShared({ ...profile, seen: profile?.seen || profile?.savedAt }, { allowNameOnly: true })) pc++;
+            }
+            if (Array.isArray(data.notes) && this.db.objectStoreNames.contains('notes')) {
+                const notes = data.notes.filter(note => Number.isSafeInteger(note?.memberNumber) && note.memberNumber > 0
+                    && typeof note.note === 'string' && Number.isFinite(note.updatedAt));
+                await new Promise((resolve, reject) => {
+                    const tx = this.db.transaction('notes', 'readwrite');
+                    const store = tx.objectStore('notes');
+                    for (const note of notes) store.put({ memberNumber: note.memberNumber, note: note.note, updatedAt: note.updatedAt });
+                    tx.oncomplete = () => { nc = notes.length; resolve(); };
+                    tx.onerror = tx.onabort = () => reject(tx.error);
+                });
+            }
+            return { pc, nc };
+        },
     };
     const Snapshot = {
         db: null,
@@ -319,9 +402,14 @@ import { warnLimited } from '../core/logger.js';
     let _avStatusEl = null;
 
     async function detectWCESave() {
-        try { if (typeof fbcSettings !== 'undefined' && fbcSettings.pastProfiles === true) return true; } catch {}
-        try { if (PDB.db && PDB.db.objectStoreNames.contains('notes')) return true; } catch {}
-        try { if (window.BCE_VERSION || window.FBC_VERSION) return true; } catch {}
+        try {
+            if (globalThis.FBC_VERSION && typeof globalThis.fbcSettingValue === 'function'
+                && globalThis.fbcSettingValue('pastProfiles') === true) return true;
+        } catch {}
+        try {
+            const lce = window.Liko?.LCE;
+            if (typeof lce?.pastProfiles?.get === 'function' && lce.getFeature?.('pastProfiles') === true) return true;
+        } catch {}
         return false;
     }
 

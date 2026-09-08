@@ -137,7 +137,7 @@
   "saveModeLabel": "儲存模式",
   "saveModeOff": "不儲存",
   "saveModeName": "僅名稱",
-  "saveModeAvatar": "名稱與頭像",
+  "saveModeAvatar": "僅頭像",
   "saveModeFull": "完整資料（WCE 相容）",
   "saveModeDesc_off": "不儲存任何資料。如果你有安裝 WCE 並啟用其 Profiles 功能，建議選此選項避免重複儲存（WCE 已幫你存好了）。",
   "saveModeDesc_name": "只儲存成員編號、BC 名稱、暱稱。幾乎不佔空間，可用來顯示離線好友名稱。",

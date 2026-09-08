@@ -135,30 +135,33 @@ import { warnLimited } from './logger.js';
         return r;
     });
     modApi.hookFunction('ChatRoomSync', 0, (args, next) => {
+        const profiles = (args[0]?.Character || []).map(raw => ({
+            memberNumber: raw.MemberNumber, bundle: PDB.capture(raw),
+        }));
         const r = next(args);
         // 初始化提示：ChatRoomSendLocal 只在房內生效，故延到首次進房時顯示一次
         if (!_introShown) {
             _introShown = true;
             if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('initHint', MOD_VER), 0);
         }
-        const raws = (args[0] && args[0].Character) || [];
-        setTimeout(() => raws.forEach(raw => {
-            const C = ChatRoomCharacter && ChatRoomCharacter.find(c => c.MemberNumber === raw.MemberNumber);
+        setTimeout(() => profiles.forEach(profile => {
+            const C = ChatRoomCharacter && ChatRoomCharacter.find(c => c.MemberNumber === profile.memberNumber);
             if (C) {
-                if (cfg.saveMode !== 'off') PDB.save(C, raw);
+                if (cfg.saveMode !== 'off') void PDB.save(C, profile.bundle);
                 if (cfg.avatars) syncRoomAvatar(C);
             }
         }), 800);
         return r;
     });
     modApi.hookFunction('ChatRoomSyncMemberJoin', 0, (args, next) => {
+        const memberNumber = args[0]?.Character?.MemberNumber;
+        const bundle = PDB.capture(args[0]?.Character);
         const r = next(args);
-        if (args[0] && args[0].Character) {
-            const raw = args[0].Character;
+        if (memberNumber) {
             setTimeout(() => {
-                const C = ChatRoomCharacter && ChatRoomCharacter.find(c => c.MemberNumber === raw.MemberNumber);
+                const C = ChatRoomCharacter && ChatRoomCharacter.find(c => c.MemberNumber === memberNumber);
                 if (C) {
-                    if (cfg.saveMode !== 'off') PDB.save(C, raw);
+                    if (cfg.saveMode !== 'off') void PDB.save(C, bundle);
                     if (cfg.avatars) syncRoomAvatar(C);
                 }
             }, 800);

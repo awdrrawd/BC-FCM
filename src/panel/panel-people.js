@@ -23,7 +23,7 @@ function setPeopleQuery(id) { _peopleQ = String(id); _peoplePage = 0; }
 
 async function renderPeople(container, _myToken) {
     container.innerHTML = '';
-    if (!PDB.db) {
+    if (!await PDB.init()) {
         const em = document.createElement('div'); em.className = 'fcm-empty';
         em.textContent = T('peopleDbNotConnected');
         container.appendChild(em); return;
@@ -40,7 +40,7 @@ async function renderPeople(container, _myToken) {
     srchBtn.style.cssText = 'padding:5px 12px;font-size:12px;flex-shrink:0;';
     toolbar.appendChild(srchBtn);
     toolbar.appendChild(Object.assign(document.createElement('span'), { className: 'fcm-spacer' }));
-    const rBtn = mkBtn('↻', 'fcm-btn', () => { _peoplePage = 0; runSearch(inp.value); });
+    const rBtn = mkBtn('↻', 'fcm-btn', () => { _peoplePage = 0; _peopleQ = inp.value; void renderPeople(container, getRenderToken()); });
     rBtn.classList.add('fcm-btn-round');
     toolbar.appendChild(rBtn);
     container.appendChild(toolbar);
@@ -48,12 +48,7 @@ async function renderPeople(container, _myToken) {
     const hint = document.createElement('div'); hint.className = 'fcm-people-hint'; hint.textContent = T('peopleSearchHint');
     container.appendChild(hint);
 
-    const allProfiles = await new Promise(res => {
-        if (!PDB.db) return res([]);
-        const req = PDB.db.transaction('profiles', 'readonly').objectStore('profiles').getAll();
-        req.onsuccess = () => res(req.result || []);
-        req.onerror = () => res([]);
-    });
+    const allProfiles = await PDB.getAll().catch(error => { warnLimited('profile list read failed', error); return []; });
     if (_myToken !== getRenderToken()) return;
     allProfiles.sort((a, b) => (b.seen || b.savedAt || 0) - (a.seen || a.savedAt || 0));
 
@@ -220,39 +215,18 @@ async function renderPeople(container, _myToken) {
 
 async function exportProfiles() {
     try {
-        const allProfiles = await new Promise((res, rej) => {
-            const req = PDB.db.transaction('profiles','readonly').objectStore('profiles').getAll();
-            req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error);
-        });
-        let notes = [];
-        try { if (PDB.db.objectStoreNames.contains('notes')) { notes = await new Promise((res,rej) => { const req = PDB.db.transaction('notes','readonly').objectStore('notes').getAll(); req.onsuccess = () => res(req.result); req.onerror = () => rej(req.error); }); } } catch (error) { warnLimited('profile notes export failed', error); }
-        const data = { exportedAt: new Date().toISOString(), dbVersion: PDB.db.version, profiles: allProfiles, notes };
+        const data = await PDB.exportBackup();
         const today = new Date(); const ymd = today.getFullYear() + String(today.getMonth()+1).padStart(2,'0') + String(today.getDate()).padStart(2,'0');
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `bce-past-profiles-${ymd}.json`; a.click(); URL.revokeObjectURL(a.href);
-        return allProfiles.length;
+        return data.profiles.length;
     } catch(e) { console.error('🐈‍⬛ [FCM] export error:', e); return 0; }
 }
 
 async function importProfiles(file) {
     try {
         const data = JSON.parse(await file.text());
-        let pc = 0, nc = 0;
-        if (Array.isArray(data.profiles) && PDB.db) {
-            const tx = PDB.db.transaction('profiles','readwrite'); const store = tx.objectStore('profiles');
-            for (const p of data.profiles) {
-                delete p.avatarDataUrl;
-                const existing = await new Promise(res => { const r = store.get(p.memberNumber); r.onsuccess = () => res(r.result); r.onerror = () => res(null); });
-                const existSeen = existing?.seen || existing?.savedAt || 0;
-                const newSeen = p.seen || p.savedAt || 0;
-                if (!existing || newSeen >= existSeen) { store.put(p); _pc[p.memberNumber] = p; pc++; }
-            }
-        }
-        if (Array.isArray(data.notes) && PDB.db && PDB.db.objectStoreNames.contains('notes')) {
-            const tx2 = PDB.db.transaction('notes','readwrite'); const store2 = tx2.objectStore('notes');
-            for (const n of data.notes) { store2.put(n); nc++; }
-        }
-        return { pc, nc };
+        return await PDB.importBackup(data);
     } catch(e) { console.error('🐈‍⬛ [FCM] import error:', e); return { pc:0, nc:0 }; }
 }
 

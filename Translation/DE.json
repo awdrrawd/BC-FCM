@@ -137,7 +137,7 @@
   "saveModeLabel": "Speichermodus",
   "saveModeOff": "Aus",
   "saveModeName": "Nur Name",
-  "saveModeAvatar": "Name + Avatar",
+  "saveModeAvatar": "Nur Avatar",
   "saveModeFull": "Vollständiges Profil (WCE)",
   "saveModeDesc_off": "Keine Daten speichern. Wenn WCE mit Profilen aktiv ist, wähle dies, um Duplikate zu vermeiden (WCE speichert bereits).",
   "saveModeDesc_name": "Nur Mitgliedsnummer, BC-Name und Spitzname speichern. Minimal, zeigt Namen von Offline-Freunden.",

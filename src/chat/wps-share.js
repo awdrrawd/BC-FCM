@@ -50,7 +50,7 @@ import { warnLimited } from '../core/logger.js';
     }
     async function wpsShareProfile(memberNumber) {
         const inChatRoom = typeof ChatRoomData !== 'undefined' && !!ChatRoomData;
-        if (!PDB.db || !inChatRoom || typeof ServerSend !== 'function') return false;
+        if (!inChatRoom || typeof ServerSend !== 'function') return false;
         try {
             const mn = parseInt(memberNumber);
             if (!Number.isSafeInteger(mn) || mn <= 0) return false;
@@ -126,12 +126,7 @@ import { warnLimited } from '../core/logger.js';
                 }
                 // 只在有啟用儲存（saveMode !== 'off'）時才寫入 DB；未開 Profiles 者仍可透過
                 // 記憶體快取（_wpsCache）＋下方的「開啟」按鈕檢視分享內容，但不落地儲存。
-                if (PDB.db && cfg.saveMode !== 'off') {
-                    const tx = PDB.db.transaction('profiles', 'readwrite');
-                    const store = tx.objectStore('profiles');
-                    const req = store.get(p.memberNumber);
-                    req.onsuccess = () => { const local = req.result; if (!local || p.seen > local.seen) store.put(p); };
-                }
+                if (cfg.saveMode !== 'off') void PDB.receiveShared(p);
             }
         } catch(e) { console.warn('🐈‍⬛ [FCM] WPS parse error', e); }
         return true;
@@ -165,7 +160,7 @@ import { warnLimited } from '../core/logger.js';
                     const p = payload.profile;
                     try { const C = CharacterLoadOnline(JSON.parse(p.characterBundle), p.memberNumber); InformationSheetLoadCharacter(C); } catch (error) { warnLimited('WPS shared profile open failed', error); }
                     // 檢視恆可（資料已在分享時完整送達、存於記憶體）；僅在啟用儲存時才落地寫入 DB
-                    if (PDB.db && cfg.saveMode !== 'off') { const tx = PDB.db.transaction('profiles', 'readwrite'); const store = tx.objectStore('profiles'); const req = store.get(p.memberNumber); req.onsuccess = () => { const local = req.result; if (!local || p.seen > local.seen) store.put(p); }; }
+                    if (cfg.saveMode !== 'off') void PDB.receiveShared(p);
                 });
             });
         }

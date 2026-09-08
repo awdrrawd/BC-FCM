@@ -137,7 +137,7 @@
   "saveModeLabel": "Mode d'enregistrement",
   "saveModeOff": "Désactivé",
   "saveModeName": "Nom seul",
-  "saveModeAvatar": "Nom + avatar",
+  "saveModeAvatar": "Avatar uniquement",
   "saveModeFull": "Profil complet (WCE)",
   "saveModeDesc_off": "Ne rien enregistrer. Si WCE avec Profils est activé, choisissez ceci pour éviter les doublons (WCE enregistre déjà).",
   "saveModeDesc_name": "Enregistrer seulement le numéro, le nom BC et le surnom. Peu d'espace, affiche les noms d'amis hors ligne.",

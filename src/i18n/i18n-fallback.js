@@ -168,7 +168,7 @@ const FCM_FALLBACK = {
     "saveModeLabel": { TW: "儲存模式", EN: "Save Mode" },
     "saveModeOff": { TW: "不儲存", EN: "Off" },
     "saveModeName": { TW: "僅名稱", EN: "Name only" },
-    "saveModeAvatar": { TW: "名稱與頭像", EN: "Name + Avatar" },
+    "saveModeAvatar": { TW: "僅頭像", EN: "Avatar only" },
     "saveModeFull": { TW: "完整資料（WCE 相容）", EN: "Full profile (WCE)" },
     "saveModeDesc_off": { TW: "不儲存任何資料。如果你有安裝 WCE 並啟用其 Profiles 功能，建議選此選項避免重複儲存（WCE 已幫你存好了）。", EN: "Don't save any data. If you have WCE with Profiles enabled, choose this to avoid duplicates (WCE already saves for you)." },
     "saveModeDesc_name": { TW: "只儲存成員編號、BC 名稱、暱稱。幾乎不佔空間，可用來顯示離線好友名稱。", EN: "Save member number, BC name, and nickname only. Minimal space, used for displaying offline friend names." },
