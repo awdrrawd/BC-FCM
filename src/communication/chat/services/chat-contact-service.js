@@ -3,6 +3,7 @@ import { esc } from './chat-content.js';
 function createChatContactService({ config, snapshot, syncRoomAvatar, displayName, inRoom, isFriend, getPlayer, getRoomCharacters, getOnlineFriends, getRemoteProfiles }) {
     const readyAvatars = new Map();
     const pendingAvatars = new Map();
+    const pendingMembers = new Map();
     const character = memberNumber => getRoomCharacters()?.find(item => Number(item.MemberNumber) === Number(memberNumber));
     const getDisplayName = memberNumber => displayName(memberNumber, true);
     const isOnline = memberNumber => {
@@ -44,6 +45,7 @@ function createChatContactService({ config, snapshot, syncRoomAvatar, displayNam
     const updateAvatar = async memberNumber => {
         const url = avatarUrl(memberNumber);
         if (!url) return;
+        snapshot.retainUrl(url);
         try {
             if (readyAvatars.get(memberNumber) !== url) {
                 if (!pendingAvatars.has(url)) {
@@ -55,7 +57,11 @@ function createChatContactService({ config, snapshot, syncRoomAvatar, displayNam
                 await pendingAvatars.get(url);
             }
             if (avatarUrl(memberNumber) !== url) return;
-            readyAvatars.set(memberNumber, url);
+            const previousUrl = readyAvatars.get(memberNumber);
+            if (previousUrl !== url) {
+                snapshot.retainUrl(url);
+                readyAvatars.set(memberNumber, url);
+            }
             // Balloons live outside the chat root, but share the same avatar components.
             document.querySelectorAll(`.fcm-chat-avatar[data-avatar-member="${memberNumber}"]`).forEach(element => {
                 const previous = element.querySelector('img');
@@ -67,18 +73,26 @@ function createChatContactService({ config, snapshot, syncRoomAvatar, displayNam
                 else element.insertBefore(image, element.firstChild);
                 [...element.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).forEach(node => node.remove());
             });
+            if (previousUrl !== url) snapshot.releaseUrl(previousUrl);
         } catch { /* Keep the last decoded image if the new source cannot load. */ }
+        finally { snapshot.releaseUrl(url); }
     };
     const hydrateAvatars = async () => {
         const members = [...new Set([...document.querySelectorAll('.fcm-chat-avatar[data-avatar-member]')]
             .map(element => Number(element.dataset.avatarMember)).filter(Boolean))];
-        await Promise.all(members.map(async memberNumber => {
-            try {
-                const liveCharacter = character(memberNumber);
-                if (liveCharacter) await syncRoomAvatar(liveCharacter);
-                await snapshot.get(memberNumber);
-                await updateAvatar(memberNumber);
-            } catch { /* Retain existing avatars while storage or network is unavailable. */ }
+        await Promise.all(members.map(memberNumber => {
+            if (!pendingMembers.has(memberNumber)) {
+                const pending = (async () => {
+                    try {
+                        const liveCharacter = character(memberNumber);
+                        if (liveCharacter) await syncRoomAvatar(liveCharacter);
+                        await snapshot.get(memberNumber);
+                        await updateAvatar(memberNumber);
+                    } catch { /* Retain existing avatars while storage or network is unavailable. */ }
+                })().finally(() => pendingMembers.delete(memberNumber));
+                pendingMembers.set(memberNumber, pending);
+            }
+            return pendingMembers.get(memberNumber);
         }));
     };
     window.addEventListener('fcm-avatar-updated', event => {

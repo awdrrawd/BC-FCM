@@ -56,6 +56,42 @@ const character = { MemberNumber: 7, Name: 'New name' };
 const old = { memberNumber: 7, name: 'Old name', seen: 123, characterBundle: '{"MemberNumber":7,"Appearance":[]}' };
 Snapshot.get = async () => 'existing-avatar';
 
+test('retired blob URLs survive until both decoding and displayed-image users release them', t => {
+    const revoked = [];
+    t.mock.method(URL, 'revokeObjectURL', url => revoked.push(url));
+    const url = 'blob:old-avatar';
+    Snapshot.retainUrl(url);
+    Snapshot.retainUrl(url);
+    Snapshot._retireUrl(url);
+    assert.deepEqual(revoked, []);
+    Snapshot.releaseUrl(url);
+    assert.deepEqual(revoked, []);
+    Snapshot.releaseUrl(url);
+    assert.deepEqual(revoked, [url]);
+    Snapshot.releaseUrl(url);
+    assert.deepEqual(revoked, [url]);
+    Snapshot._retireUrl('blob:unused');
+    assert.deepEqual(revoked, [url, 'blob:unused']);
+});
+
+test('captureFace centralizes warmup, redraw resets and timeout', async t => {
+    let now = 0, draws = 0;
+    const C = { MustDraw: false };
+    t.mock.method(Date, 'now', () => now);
+    t.mock.method(globalThis, 'setTimeout', callback => { now += 500; queueMicrotask(callback); });
+    const originalCanvas = globalThis.CharacterLoadCanvas;
+    globalThis.CharacterLoadCanvas = target => { draws++; target.MustDraw = false; };
+    t.after(() => { if (originalCanvas) globalThis.CharacterLoadCanvas = originalCanvas; else delete globalThis.CharacterLoadCanvas; });
+    t.mock.method(PDB, '_face', () => 'x'.repeat(900));
+    const image = await PDB.captureFace(C, 100, { warmup: 2000, timeout: 6000 });
+    assert.equal(image.length, 900);
+    assert.equal(now, 3500);
+    assert.equal(draws, 1);
+    t.mock.method(PDB, '_face', () => { C.MustDraw = true; return 'x'.repeat(900); });
+    assert.equal(await PDB.captureFace(C, 100, { warmup: 0, timeout: 2000 }), null);
+    assert.ok(draws > 2);
+});
+
 test('captured JSON remains valid after the game introduces an Asset/Group cycle', async () => {
     cfg.saveMode = 'full';
     const raw = { ...character, Appearance: [], Inventory: ['unused'] };

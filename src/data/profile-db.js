@@ -64,11 +64,13 @@ import { warnLimited } from '../core/logger.js';
                 return cv.toDataURL('image/webp', 0.9);
             } catch (error) { warnLimited('profile avatar rendering failed', error); return ''; }
         },
-        async captureFace(C, size = 100) {
+        async captureFace(C, size = 100, { warmup = 2500, timeout = 10000 } = {}) {
             // A canvas can exist before its textures finish loading. Require a warm-up and
             // repeated stable captures, resetting whenever BC requests another redraw.
             let previous = '', stable = 0;
-            for (let attempt = 0; attempt < 20; attempt++) {
+            globalThis.CharacterLoadCanvas?.(C);
+            const started = Date.now();
+            while (Date.now() - started < timeout) {
                 await new Promise(resolve => setTimeout(resolve, 500));
                 if (C?.MustDraw) {
                     globalThis.CharacterLoadCanvas?.(C);
@@ -76,7 +78,7 @@ import { warnLimited } from '../core/logger.js';
                     continue;
                 }
                 const url = this._face(C, size);
-                if (attempt < 4 || !url || url.length <= 800) { previous = ''; stable = 0; continue; }
+                if (Date.now() - started < warmup || !url || url.length <= 800) { previous = ''; stable = 0; continue; }
                 stable = url === previous ? stable + 1 : 0;
                 previous = url;
                 if (stable >= 3) return url;
@@ -199,6 +201,22 @@ import { warnLimited } from '../core/logger.js';
         },
     };
     const Snapshot = {
+        _urlUsers: new Map(),
+        _retiredUrls: new Set(),
+        retainUrl(url) {
+            if (url?.startsWith('blob:')) this._urlUsers.set(url, (this._urlUsers.get(url) || 0) + 1);
+        },
+        releaseUrl(url) {
+            const count = this._urlUsers.get(url) || 0;
+            if (count > 1) { this._urlUsers.set(url, count - 1); return; }
+            this._urlUsers.delete(url);
+            if (this._retiredUrls.delete(url)) URL.revokeObjectURL(url);
+        },
+        _retireUrl(url) {
+            if (!url?.startsWith('blob:')) return;
+            if (this._urlUsers.has(url)) this._retiredUrls.add(url);
+            else URL.revokeObjectURL(url);
+        },
         db: null,
         _cache: {},
         _records: {},
@@ -228,7 +246,7 @@ import { warnLimited } from '../core/logger.js';
             }
             if (!(blob instanceof Blob)) return;
             const oldUrl = this._cache[mn];
-            if (typeof oldUrl === 'string' && oldUrl.startsWith('blob:')) URL.revokeObjectURL(oldUrl);
+            this._retireUrl(oldUrl);
             const rec = {
                 memberNumber: mn,
                 blob,
@@ -285,7 +303,7 @@ import { warnLimited } from '../core/logger.js';
         async delete(mn) {
             mn = parseInt(mn);
             const url = this._cache[mn];
-            if (typeof url === 'string' && url.startsWith('blob:')) URL.revokeObjectURL(url);
+            this._retireUrl(url);
             delete this._cache[mn];
             delete this._records[mn];
             if (!this.db) return;
@@ -297,7 +315,7 @@ import { warnLimited } from '../core/logger.js';
             });
         },
         async clear() {
-            Object.values(this._cache).forEach(url => { if (typeof url === 'string' && url.startsWith('blob:')) URL.revokeObjectURL(url); });
+            Object.values(this._cache).forEach(url => this._retireUrl(url));
             Object.keys(this._cache).forEach(k => delete this._cache[k]);
             Object.keys(this._records).forEach(k => delete this._records[k]);
             if (!this.db) return;
@@ -470,27 +488,10 @@ import { warnLimited } from '../core/logger.js';
             // A newly reconstructed character needs time for BC's image/texture cache to finish.
             // Loaded assets mark C.MustDraw; rebuild on that signal, then require several identical
             // captures after the warm-up period. A timeout prevents a failed asset from blocking forever.
-            const startedAt = Date.now();
-            const minimumWarmup = existedBefore ? 500 : 5000;
-            const timeout = existedBefore ? 7000 : 12000;
-            let prev = '', stable = 0, url = '';
-            while (Date.now() - startedAt < timeout) {
-                await new Promise(r => setTimeout(r, 500));
-                if (C.MustDraw && typeof globalThis.CharacterLoadCanvas === 'function') {
-                    globalThis.CharacterLoadCanvas(C);
-                    stable = 0;
-                    prev = '';
-                }
-                const cur = PDB._face(C, 100);
-                if (Date.now() - startedAt >= minimumWarmup && cur && cur.length > 800) {
-                    if (cur === prev) {
-                        stable++;
-                        if (stable >= 3) { url = cur; break; }
-                    } else {
-                        stable = 0; prev = cur;
-                    }
-                }
-            }
+            const url = await PDB.captureFace(C, 100, {
+                warmup: existedBefore ? 500 : 5000,
+                timeout: existedBefore ? 7000 : 12000,
+            });
             if (url && url.length > 800) await Snapshot.save(mn, url, { source: 'manual' });
             return url || null;
         } catch (error) { warnLimited(`avatar reconstruction failed (${mn})`, error); return null; }

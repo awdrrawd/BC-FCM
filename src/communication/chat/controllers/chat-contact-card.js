@@ -1,4 +1,4 @@
-function createChatContactCardController({ getRoot, getMemberNumber, loadProfile, renderHtml, hydrateAvatars, findLiveCharacter, loadCharacterCanvas, nextPaint, createFaceSnapshot, saveSnapshot, loadAvatarFromBundle, addFriend, displayName, openProfile }) {
+function createChatContactCardController({ getRoot, getMemberNumber, loadProfile, renderHtml, hydrateAvatars, findLiveCharacter, createFaceSnapshot, saveSnapshot, loadAvatarFromBundle, addFriend, displayName, openProfile }) {
     let openMemberNumber = null;
 
     function isOpen() {
@@ -52,8 +52,6 @@ function createChatContactCardController({ getRoot, getMemberNumber, loadProfile
         try {
             const live = findLiveCharacter(memberNumber);
             if (live) {
-                if (live.MustDraw) loadCharacterCanvas?.(live);
-                await nextPaint();
                 const fresh = await createFaceSnapshot(live, 100);
                 if (fresh) await saveSnapshot(memberNumber, fresh, { source: 'manual-room-refresh', sourceUpdatedAt: Date.now() });
             } else {

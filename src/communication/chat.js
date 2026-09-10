@@ -140,8 +140,6 @@ const nativeTags = createNativeChatTags({ getSelf: () => Player?.MemberNumber, o
 const contactCard = createChatContactCardController({
     getRoot: () => root, getMemberNumber: () => selectedMember, loadProfile: memberNumber => PDB.get(memberNumber),
     renderHtml: () => conversationPresenter.contactCardHtml(), hydrateAvatars: hydrateChatAvatars, findLiveCharacter: character,
-    loadCharacterCanvas: characterValue => globalThis.CharacterLoadCanvas?.(characterValue),
-    nextPaint: () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))),
     createFaceSnapshot: (characterValue, size) => PDB.captureFace(characterValue, size),
     saveSnapshot: (...args) => Snapshot.save(...args), loadAvatarFromBundle,
     addFriend: showAddFriendConfirm, displayName: getDisplayName, openProfile: profileViewer.open,
