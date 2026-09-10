@@ -78,7 +78,15 @@ import { warnLimited } from './logger.js';
         statusMessage: '',
     };
     function loadCfg() {
-        try { const s = Player?.ExtensionSettings?.FCM?.settings; if (s && typeof s === 'object') Object.assign(cfg, s); } catch (error) { warnLimited('settings load failed', error); }
+        let savedLayout;
+        try {
+            const s = Player?.ExtensionSettings?.FCM?.settings;
+            if (s && typeof s === 'object') { Object.assign(cfg, s); savedLayout = s.chatLayout; }
+        } catch (error) { warnLimited('settings load failed', error); }
+        // Resolve the device default at load time, once BC's mobile detector is available.
+        // A valid saved layout remains the user's choice on either device.
+        cfg.chatLayout = ['split', 'stacked'].includes(savedLayout) ? savedLayout
+            : typeof globalThis.CommonIsMobile === 'function' && globalThis.CommonIsMobile() ? 'stacked' : 'split';
         // Settings belong to the BC account. The former localStorage mirror was
         // shared by every account in the same browser and is intentionally not
         // migrated because its owner cannot be identified safely.
