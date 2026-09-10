@@ -1,4 +1,4 @@
-function createChatContactCardController({ getRoot, getMemberNumber, loadProfile, renderHtml, hydrateAvatars, findLiveCharacter, deleteSnapshot, loadCharacterCanvas, nextPaint, createFaceSnapshot, saveSnapshot, loadAvatarFromBundle, addFriend, displayName, openProfile }) {
+function createChatContactCardController({ getRoot, getMemberNumber, loadProfile, renderHtml, hydrateAvatars, findLiveCharacter, loadCharacterCanvas, nextPaint, createFaceSnapshot, saveSnapshot, loadAvatarFromBundle, addFriend, displayName, openProfile }) {
     let openMemberNumber = null;
 
     function isOpen() {
@@ -50,12 +50,11 @@ function createChatContactCardController({ getRoot, getMemberNumber, loadProfile
         avatar?.classList.add('fcm-avatar-loading');
         avatar?.setAttribute('aria-busy', 'true');
         try {
-            await deleteSnapshot(memberNumber);
             const live = findLiveCharacter(memberNumber);
             if (live) {
                 if (live.MustDraw) loadCharacterCanvas?.(live);
                 await nextPaint();
-                const fresh = createFaceSnapshot(live, 100);
+                const fresh = await createFaceSnapshot(live, 100);
                 if (fresh) await saveSnapshot(memberNumber, fresh, { source: 'manual-room-refresh', sourceUpdatedAt: Date.now() });
             } else {
                 await loadAvatarFromBundle(memberNumber, await loadProfile(memberNumber));

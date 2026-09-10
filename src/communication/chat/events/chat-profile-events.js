@@ -37,24 +37,9 @@ function bindChatProfileEvents({ root, getPlayer, renderChat, saveProfile, setSt
         renderChat();
     });
     root.querySelector('[data-profile-snapshot]')?.addEventListener('click', async event => {
-        const player = getPlayer();
         const button = event.currentTarget;
         button.disabled = true;
         const updated = await updateOwnAvatarSnapshot();
-        if (updated) {
-            const snapshot = player?.OnlineSharedSettings?.FCM?.avatarSnapshot || '';
-            const avatar = root.querySelector(`.fcm-chat-profile [data-avatar-member="${Number(player?.MemberNumber)}"]`);
-            if (snapshot && avatar) {
-                let image = avatar.querySelector('img');
-                if (!image) {
-                    image = document.createElement('img');
-                    image.draggable = false;
-                    avatar.insertBefore(image, avatar.firstChild);
-                }
-                image.src = snapshot;
-                [...avatar.childNodes].filter(node => node.nodeType === Node.TEXT_NODE).forEach(node => node.remove());
-            }
-        }
         button.textContent = updated ? T('chatProfileSnapshotDone') : T('ownAvatarUpdateFailed');
         setTimeout(() => {
             if (button.isConnected) {

@@ -44,7 +44,7 @@ async function refreshAvatar(memberNumber) {
         try {
             globalThis.CharacterLoadCanvas?.(live);
             await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-            const dataUrl = PDB._face(live, 100);
+            const dataUrl = await PDB.captureFace(live, 100);
             if (dataUrl?.length > 800) {
                 await Snapshot.save(target, dataUrl, { source: 'api-refresh' });
                 return Snapshot.get(target);

@@ -1,5 +1,4 @@
 import { cfg } from '../../../core/config.js';
-import { Snapshot } from '../../../data/profile-db.js';
 import { FCM_ICON_SVG } from '../../../ui/icons.js';
 import { esc } from '../services/chat-content.js';
 import { installChatDrag, resolveBalloonCollision } from './chat-drag.js';
@@ -116,7 +115,7 @@ function createChatBalloonController(context) {
             const content = () => `${context.waterShapeHtml()}${context.avatarHtml(message.memberNumber, 50)}${context.unreadBadge(message.memberNumber)}<span class="fcm-balloon-preview"><strong>${esc(context.getDisplayName(message.memberNumber))}</strong>${esc(context.balloonPreviewText(message.content))}</span>`;
             balloon.innerHTML = content();
             requestAnimationFrame(() => resolveBalloonCollision(balloon));
-            if (!context.avatarUrl(message.memberNumber)) Snapshot.get(message.memberNumber).then(url => { if (url && balloon.isConnected) balloon.innerHTML = content(); });
+            void context.hydrateAvatars();
             animate(balloon);
         } else if (cfg.balloonPlacement !== 'off') {
             ensure();

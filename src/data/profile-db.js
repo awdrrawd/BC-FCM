@@ -64,6 +64,25 @@ import { warnLimited } from '../core/logger.js';
                 return cv.toDataURL('image/webp', 0.9);
             } catch (error) { warnLimited('profile avatar rendering failed', error); return ''; }
         },
+        async captureFace(C, size = 100) {
+            // A canvas can exist before its textures finish loading. Require a warm-up and
+            // repeated stable captures, resetting whenever BC requests another redraw.
+            let previous = '', stable = 0;
+            for (let attempt = 0; attempt < 20; attempt++) {
+                await new Promise(resolve => setTimeout(resolve, 500));
+                if (C?.MustDraw) {
+                    globalThis.CharacterLoadCanvas?.(C);
+                    previous = ''; stable = 0;
+                    continue;
+                }
+                const url = this._face(C, size);
+                if (attempt < 4 || !url || url.length <= 800) { previous = ''; stable = 0; continue; }
+                stable = url === previous ? stable + 1 : 0;
+                previous = url;
+                if (stable >= 3) return url;
+            }
+            return null;
+        },
         async save(C, characterBundle) {
             const mode = cfg.saveMode;
             if (mode === 'off' || !C?.MemberNumber) return;
@@ -71,8 +90,8 @@ import { warnLimited } from '../core/logger.js';
             if (mode === 'avatar' || mode === 'full') {
                 try {
                     if (!await Snapshot.get(C.MemberNumber)) {
-                        const url = this._face(C);
-                        if (url) await Snapshot.save(C.MemberNumber, url, { source: 'profile-capture' });
+                        const url = await this.captureFace(C);
+                        if (url && !await Snapshot.get(C.MemberNumber)) await Snapshot.save(C.MemberNumber, url, { source: 'profile-capture' });
                     }
                 } catch (error) { warnLimited('profile avatar save failed', error); }
             }
@@ -220,6 +239,7 @@ import { warnLimited } from '../core/logger.js';
             };
             this._records[mn] = rec;
             this._cache[mn] = URL.createObjectURL(blob);
+            window.dispatchEvent(new CustomEvent('fcm-avatar-updated', { detail: { memberNumber: mn } }));
             try { this.db.transaction('avatars', 'readwrite').objectStore('avatars').put(rec); } catch (error) { warnLimited('avatar cache write failed', error); }
         },
         getRecord(mn) {
@@ -331,7 +351,7 @@ import { warnLimited } from '../core/logger.js';
                 const lowResolution = bitmap.width < 90 || bitmap.height < 90;
                 bitmap.close();
                 if (lowResolution) {
-                    const upgraded = PDB._face(C, 100);
+                    const upgraded = await PDB.captureFace(C, 100);
                     if (upgraded) {
                         await Snapshot.save(mn, upgraded, { source: 'resolution-upgrade', sourceUpdatedAt: remoteTime });
                         record = await Snapshot.getRecord(mn);
@@ -374,10 +394,12 @@ import { warnLimited } from '../core/logger.js';
     async function updateOwnAvatarSnapshot() {
         const shared = ensureOwnSharedProfile();
         if (!shared || !Player?.Canvas?.width) return false;
-        const dataUrl = PDB._face(Player, 100);
+        const dataUrl = await PDB.captureFace(Player, 100);
         if (!dataUrl) return false;
         shared.avatarSnapshot = dataUrl;
         shared.avatarUpdatedAt = Date.now();
+        if (!Snapshot.db) await Snapshot.init();
+        await Snapshot.save(Player.MemberNumber, dataUrl, { source: 'manual-self', sourceUpdatedAt: shared.avatarUpdatedAt });
         try { ServerAccountUpdate.QueueData({ OnlineSharedSettings: Player.OnlineSharedSettings }); } catch (error) { warnLimited('avatar snapshot sync failed', error); return false; }
         return true;
     }
@@ -483,23 +505,17 @@ import { warnLimited } from '../core/logger.js';
             } catch (error) { warnLimited(`temporary avatar character cleanup failed (${mn})`, error); }
         }
     }
+    const pendingRoomCaptures = new Set();
     function _captureSnapshotDelayed(C) {
         if (!C || !C.MemberNumber || C.MemberNumber === parseInt(Player?.MemberNumber)) return;
         if (Snapshot._cache[C.MemberNumber]) return;
         const mn = C.MemberNumber;
-        let stable = 0, attempts = 0, prev = '';
-        const check = () => {
-            if (Snapshot._cache[mn] || attempts++ >= 40) return;
-            const url = PDB._face(C, 100);
-            if (url && url.length > 800) {
-                if (url === prev) {
-                    stable++;
-                    if (stable >= 3) { Snapshot.save(mn, url, { source: 'room-capture' }); return; }
-                } else { stable = 0; prev = url; }
-            }
-            setTimeout(check, 600);
-        };
-        setTimeout(check, 1500);
+        if (pendingRoomCaptures.has(mn)) return;
+        pendingRoomCaptures.add(mn);
+        void PDB.captureFace(C, 100).then(async url => {
+            if (url && !await Snapshot.get(mn)) await Snapshot.save(mn, url, { source: 'room-capture' });
+        }).catch(error => warnLimited('room avatar capture failed', error))
+            .finally(() => pendingRoomCaptures.delete(mn));
     }
     function setAvStatusEl(v) { _avStatusEl = v; }
 

@@ -54,7 +54,7 @@ function resetMessageSelectionState() {
 const contactService = createChatContactService({
     config: cfg, snapshot: Snapshot, syncRoomAvatar, displayName: getSharedDisplayName, inRoom: inRoomFn, isFriend: isFriendOf,
     getPlayer: () => Player, getRoomCharacters: () => ChatRoomCharacter, getOnlineFriends: () => onlineFriends,
-    getRemoteProfiles: () => remoteProfiles, getRoot: () => root,
+    getRemoteProfiles: () => remoteProfiles,
 });
 const { avatarHtml, avatarUrl, biography, capability, character, getDisplayName, hydrateAvatars: hydrateChatAvatars, isOnline, sharedProfile } = contactService;
 const runWithoutOutgoingCapture = callback => {
@@ -140,10 +140,9 @@ const nativeTags = createNativeChatTags({ getSelf: () => Player?.MemberNumber, o
 const contactCard = createChatContactCardController({
     getRoot: () => root, getMemberNumber: () => selectedMember, loadProfile: memberNumber => PDB.get(memberNumber),
     renderHtml: () => conversationPresenter.contactCardHtml(), hydrateAvatars: hydrateChatAvatars, findLiveCharacter: character,
-    deleteSnapshot: memberNumber => Snapshot.delete(memberNumber),
     loadCharacterCanvas: characterValue => globalThis.CharacterLoadCanvas?.(characterValue),
     nextPaint: () => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))),
-    createFaceSnapshot: (characterValue, size) => PDB._face(characterValue, size),
+    createFaceSnapshot: (characterValue, size) => PDB.captureFace(characterValue, size),
     saveSnapshot: (...args) => Snapshot.save(...args), loadAvatarFromBundle,
     addFriend: showAddFriendConfirm, displayName: getDisplayName, openProfile: profileViewer.open,
 });
@@ -268,7 +267,7 @@ const handleOutgoingServerSend = transportHandler.outgoing;
 const waterShapeHtml = () => `<span class="fcm-water-shape" aria-hidden="true">${WATER_ICON}</span>`;
 const chatBalloons = createChatBalloonController({
     avatarHtml: (...args) => avatarHtml(...args),
-    avatarUrl: memberNumber => avatarUrl(memberNumber),
+    hydrateAvatars: hydrateChatAvatars,
     balloonPreviewText,
     chatColors: () => chatColors(),
     getDisplayName,
