@@ -1,4 +1,11 @@
 {
+  "roomTab_order": "玩家排序",
+  "roomOrderMode": "排列方式：",
+  "roomOrder_swap": "交换",
+  "roomOrder_insert": "插入",
+  "roomOrderChanged": "房间人员或顺序已变更，请刷新后操作。",
+  "roomOrderWaiting": "已发送，等待房间同步；若未更新，可按 ↻ 重新读取。",
+  "roomOrderFailed": "排序发送失败，请刷新后重试。",
   "initHint": "🐈‍⬛ FCM v{0} 已初始化，点「SVG」图标可进行好友与房间管理；初次使用可先到设置页做简单设置。\n⚠ 注意：新增好友时可能出现「单向好友」，可尝试删除后重新添加；此问题已反馈社区。",
   "panelTitle": "🎛 FCM ─ 好友与房间管理",
   "tabFriends": "个人关系",

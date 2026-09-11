@@ -6,10 +6,11 @@ import { renderPeople, resetPeopleSearch, setPeopleQuery } from './panel-people.
 import { renderSettings } from './panel-settings.js';
 import { renderFriends, resetFriendsSearch } from './panel-friends.js';
 import { renderRoom, resetRoomAdminSearch } from './panel-room.js';
+import { updateRoomOrder, disposeRoomOrder } from './panel-room-order.js';
 import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
 import { installDragScroll } from '../ui/drag-scroll.js';
 import { setPanelController } from './panel-controller.js';
-import { requestOnlineFriends } from '../data/data.js';
+import { requestOnlineFriends, onlineFriends, buildFriendList, inRoomFn } from '../data/data.js';
 // ════════════════════════════════════════
 //  FCM module: panel.js  (orchestration core — split from Plugins/liko-FCM.user.js)
 //  面板骨架與生命週期：建立/開關/拖曳、頁籤切換、renderCurrent 分派。
@@ -26,6 +27,39 @@ import { requestOnlineFriends } from '../data/data.js';
     // 面板開啟／還原時只主動查詢一次，不另設短週期輪詢。
     let _lastRefresh = 0;
     let _commandRegistered = false;
+    let eventRefresh = null;
+    let renderedState = '';
+    function panelState() {
+        if (uiTab === 'friends') {
+            const online = new Set(onlineFriends.map(row => Number(row.MemberNumber)));
+            return JSON.stringify(buildFriendList().map(row => [row.mn, inRoomFn(row.mn) || online.has(Number(row.mn))]).sort((a, b) => a[0] - b[0]));
+        }
+        if (uiTab === 'room') {
+            const room = globalThis.ChatRoomData;
+            if (!room) return 'no-room';
+            return JSON.stringify([room.Name, room.Description, room.Background, room.Admin, room.Whitelist, room.Ban,
+                room.Limit, room.Private, room.Locked, room.Language, room.Space, room.Game, room.BlockCategory,
+                room.Access, room.Visibility, room.MapType,
+                (globalThis.ChatRoomCharacter || []).map(c => [c.MemberNumber, c.Name, c.Nickname])]);
+        }
+        return '';
+    }
+    // Coalesce a burst of native room-order acknowledgements; never poll or rebuild unrelated pages.
+    function notifyPanelChange(kind) {
+        if (!panelOpen || panelMini) return;
+        const relevant = kind === 'relations' ? ['friends', 'room'].includes(uiTab)
+            : kind === 'presence' ? uiTab === 'friends' : kind === 'room' && uiTab === 'room';
+        if (!relevant) return;
+        if (kind !== 'relations' && panelState() === renderedState) return;
+        if (kind === 'room' && uiTab === 'room' && updateRoomOrder(panelEl?.querySelector('#fcm-content'))) {
+            renderedState = panelState();
+            clearTimeout(eventRefresh); eventRefresh = null;
+            return;
+        }
+        clearTimeout(eventRefresh);
+        const tab = uiTab;
+        eventRefresh = setTimeout(() => { eventRefresh = null; if (uiTab === tab) renderCurrent(); }, 60);
+    }
 
     // ═══════════════════════════════════════════════════════════
     //  PANEL BUILD
@@ -80,7 +114,10 @@ import { requestOnlineFriends } from '../data/data.js';
     // ═══════════════════════════════════════════════════════════
     function renderCurrent() {
         if (!panelEl || !panelOpen || panelMini) return;
+        clearTimeout(eventRefresh); eventRefresh = null;
+        renderedState = panelState();
         const content = panelEl.querySelector('#fcm-content'); if (!content) return;
+        disposeRoomOrder(content);
         // 同步頁籤高亮：外部入口（/profiles 指令、關係網人員查詢、設定按鈕）直接改 uiTab
         //  後只呼叫 renderCurrent，頁籤列的 active 狀態需在此一併更新，否則會停在上次頁籤。
         panelEl.querySelectorAll('.fcm-tab').forEach(x => x.classList.toggle('active', x.dataset.tab === uiTab));
@@ -107,7 +144,7 @@ import { requestOnlineFriends } from '../data/data.js';
     }
 
     // 手動刷新：即刻請求最新線上好友資料，5 秒冷卻防連點狂發。回來的重繪由
-    // hooks.js 的 AccountQueryResult hook 銜接；此處先以現有資料立即重繪一次。
+    // hooks.js 的 AccountQueryResult hook 在上下線狀態改變時銜接；此處先以現有資料立即重繪一次。
     // 回傳 false = 冷卻中（供按鈕給視覺提示）。
     function refreshPanel() {
         const now = Date.now();
@@ -154,7 +191,7 @@ import { requestOnlineFriends } from '../data/data.js';
     // CHAT 端切換語言時會廣播同一事件；FCM 面板若已開啟，就地刷新即可，不需重建。
     window.addEventListener('fcm-language-change', refreshChrome);
 
-    function minimizePanel() { if (!panelEl) return; panelEl.classList.add('hidden'); if (miniEl) miniEl.classList.add('visible'); panelMini = true; _removeWhisperAvatar(); }
+    function minimizePanel() { if (!panelEl) return; disposeRoomOrder(panelEl.querySelector('#fcm-content')); panelEl.classList.add('hidden'); if (miniEl) miniEl.classList.add('visible'); panelMini = true; _removeWhisperAvatar(); }
     function restorePanel() {
         if (!panelEl) buildPanel();
         panelEl.classList.remove('hidden');
@@ -164,6 +201,8 @@ import { requestOnlineFriends } from '../data/data.js';
         renderCurrent();
     }
     function closePanel() {
+        disposeRoomOrder(panelEl?.querySelector('#fcm-content'));
+        clearTimeout(eventRefresh); eventRefresh = null; ++_renderToken;
         if (panelEl) panelEl.classList.add('hidden');
         if (miniEl) miniEl.classList.remove('visible');
         panelOpen = false; panelMini = false;
@@ -198,6 +237,6 @@ import { requestOnlineFriends } from '../data/data.js';
         openPanel();
     }
 
-    setPanelController({ renderCurrent, refreshPanel, minimizePanel, closePanel, reopenForLang, getRenderToken });
+    setPanelController({ renderCurrent, refreshPanel, minimizePanel, closePanel, reopenForLang, getRenderToken, notifyPanelChange });
 
-export { renderCurrent, refreshPanel, buildPanel, openPanel, closePanel, minimizePanel, togglePanel, registerCommand, openPeopleSearch, getRenderToken, reopenForLang, panelOpen, panelMini, uiTab };
+export { renderCurrent, refreshPanel, buildPanel, openPanel, closePanel, minimizePanel, togglePanel, registerCommand, openPeopleSearch, getRenderToken, reopenForLang, panelOpen, panelMini, uiTab, notifyPanelChange };

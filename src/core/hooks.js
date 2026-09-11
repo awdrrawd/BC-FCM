@@ -3,7 +3,7 @@ import { fcmIconImage } from '../ui/fcm-icon.js';
 import { T } from '../i18n/i18n.js';
 import { setOnlineFriends } from '../data/data.js';
 import { PDB, syncRoomAvatar } from '../data/profile-db.js';
-import { renderCurrent, panelOpen, panelMini, uiTab, buildPanel, togglePanel, closePanel, openPanel, openPeopleSearch } from '../panel/panel.js';
+import { notifyPanelChange, panelOpen, panelMini, buildPanel, togglePanel, closePanel, openPanel, openPeopleSearch } from '../panel/panel.js';
 import { _applyWhisperStyle, _updateWhisperAvatar, _drawWavOnCanvas } from '../chat/chat-fx.js';
 import { isProfileShareMessage, wpsHandleMessage, observeWpsOpenTokens } from '../chat/wps-share.js';
 import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSHARE_TAG } from '../chat/actions.js';
@@ -128,10 +128,7 @@ import { warnLimited } from './logger.js';
             handleOnlineFriendsUpdate(data.Result);
         }
         const r = next(args);
-        // 任何來源取得的 OnlineFriends 結果都直接更新已開啟的關係／房間頁，不另設計時器。
-        if (data?.Query === 'OnlineFriends' && panelOpen && !panelMini && (uiTab === 'friends' || uiTab === 'room')) {
-            renderCurrent();
-        }
+        if (data?.Query === 'OnlineFriends') notifyPanelChange('presence');
         return r;
     });
     modApi.hookFunction('ChatRoomSync', 0, (args, next) => {
@@ -140,6 +137,7 @@ import { warnLimited } from './logger.js';
         }));
         const r = next(args);
         // 初始化提示：ChatRoomSendLocal 只在房內生效，故延到首次進房時顯示一次
+        notifyPanelChange('room'); notifyPanelChange('presence');
         if (!_introShown) {
             _introShown = true;
             if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('initHint', MOD_VER), 0);
@@ -157,6 +155,7 @@ import { warnLimited } from './logger.js';
         const memberNumber = args[0]?.Character?.MemberNumber;
         const bundle = PDB.capture(args[0]?.Character);
         const r = next(args);
+        notifyPanelChange('room'); notifyPanelChange('presence');
         if (memberNumber) {
             setTimeout(() => {
                 const C = ChatRoomCharacter && ChatRoomCharacter.find(c => c.MemberNumber === memberNumber);
@@ -170,13 +169,19 @@ import { warnLimited } from './logger.js';
     });
     modApi.hookFunction('ChatRoomSyncRoomProperties', 0, (args, next) => {
         let r; try { r = next(args); } catch(e) { console.warn('🐈‍⬛ [FCM] SyncRoomProperties:', e); }
-        try { if (panelOpen && !panelMini && uiTab === 'room') renderCurrent(); } catch (error) { warnLimited('room panel refresh failed', error); }
+        try { notifyPanelChange('room'); } catch (error) { warnLimited('room panel refresh failed', error); }
         return r;
     });
     modApi.hookFunction('ChatRoomSyncMemberLeave', 0, (args, next) => {
         const r = next(args);
-        if (panelOpen && !panelMini && uiTab === 'room') renderCurrent();
+        notifyPanelChange('room'); notifyPanelChange('presence');
         return r;
+    });
+    modApi.hookFunction('ChatRoomSyncReorderPlayers', 0, (args, next) => {
+        const result = next(args); notifyPanelChange('room'); return result;
+    });
+    modApi.hookFunction('ChatRoomSyncSingle', 0, (args, next) => {
+        const result = next(args); notifyPanelChange('room'); return result;
     });
     let _whisperDrawCount = 0;
 

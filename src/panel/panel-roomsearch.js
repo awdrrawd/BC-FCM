@@ -5,6 +5,7 @@ import { showRoomJoinConfirm, roomInfoFromResult, shareRoomToChat } from '../cha
 import { mkBtn } from './panel-widgets.js';
 import { getRoomResults, setRoomResults, doRoomSearch } from './panel-rooms-data.js';
 import { cfg, saveCfg } from '../core/config.js';
+import { getRenderToken } from './panel-controller.js';
 // ════════════════════════════════════════
 //  FCM module: panel-roomsearch.js  (split from panel.js)
 //  房間搜尋頁。_roomZoneFilter / _roomSearchQ2 / _roomSortMode / _favRooms 為本頁狀態；
@@ -20,6 +21,7 @@ function saveFavRooms() { cfg.favoriteRooms = [..._favRooms]; saveCfg(); }
 function resetRoomSearchQuery() { _roomSearchQ2 = ''; }
 
 async function renderRoomSearch(container) {
+    const token = getRenderToken();
     _favRooms ??= new Set(Array.isArray(cfg.favoriteRooms) ? cfg.favoriteRooms : []);
     container.innerHTML = '';
     const wrap = document.createElement('div'); wrap.style.cssText = 'display:flex;flex-direction:column;height:100%;';
@@ -81,10 +83,14 @@ async function renderRoomSearch(container) {
     // Bug fix: stopPropagation on room search input
     inp.addEventListener('keydown', e => { e.stopPropagation(); if (e.key === 'Enter') runSearch(); });
 
+    let searchRevision = 0;
     async function runSearch() {
+        const revision = ++searchRevision;
         _roomSearchQ2 = inp.value;
         srchBtn.textContent = T('roomSearching'); srchBtn.disabled = true;
-        setRoomResults(await doRoomSearch(_roomSearchQ2, _roomZoneFilter));
+        const results = await doRoomSearch(_roomSearchQ2, _roomZoneFilter);
+        if (revision !== searchRevision || token !== getRenderToken() || !wrap.isConnected) return;
+        setRoomResults(results);
         srchBtn.textContent = T('roomSearchBtn'); srchBtn.disabled = false;
         renderResults();
     }
@@ -185,7 +191,7 @@ async function renderRoomSearch(container) {
         });
     }
 
-    if (getRoomResults().length === 0) runSearch(); else renderResults();
+    await runSearch();
 }
 
 export { renderRoomSearch, resetRoomSearchQuery };

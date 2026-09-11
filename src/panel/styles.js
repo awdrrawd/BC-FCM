@@ -289,6 +289,22 @@ import { chatFontFamily } from '../communication/chat-font.js';
 .fcm-unknown-id-title{color:#d0a8f0;font-size:13px;font-weight:700;}
 .fcm-seen-date{font-size:10px;color:#6050a0;margin-top:2px;}
 .fcm-empty-value{font-size:11px;}
+/* Two groups of ten preserve BC's positional order: 1–5/6–10 | 11–15/16–20. */
+.fcm-room-order{position:relative;overflow:auto;flex:1;min-height:0;padding:4px 8px 16px;}
+.fcm-order-board{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;min-width:630px;}
+.fcm-order-group{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;align-content:start;}
+.fcm-order-group+.fcm-order-group{border-left:1px solid var(--ac,#a078e8);padding-left:12px;}
+.fcm-order-card{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0;min-height:128px;padding:7px 3px;border:1px solid var(--ac,#a078e8);border-radius:8px;background:var(--surface-alt,#211b2a);color:var(--tx,#eee);cursor:grab;touch-action:none;user-select:none;}
+.fcm-order-card>span{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;}
+.fcm-order-card .fcm-av{pointer-events:none;}
+.fcm-order-avatar{position:relative;flex:none}.fcm-order-crown{position:absolute;left:50%;top:-14px;transform:translateX(-50%);width:22px;height:17px;color:#f1c75b;pointer-events:none}.fcm-order-crown svg{display:block;width:100%;height:100%}
+.fcm-order-slot{min-width:0;min-height:128px;position:relative}.fcm-order-slot>.fcm-order-card{width:100%;height:100%;transition:transform .16s ease;position:relative;z-index:1}
+.fcm-order-card.drag-source{opacity:.22}.fcm-order-card.drag-ghost{position:absolute;z-index:100;opacity:.72;pointer-events:none;box-shadow:0 12px 24px #0008;cursor:grabbing;transition:none}
+@media(prefers-reduced-motion:reduce){.fcm-order-slot>.fcm-order-card{transition:none}}
+.fcm-order-card small{font-size:10px;opacity:.75;}.fcm-order-card strong{align-self:flex-start;color:var(--ac,#a078e8);}
+.fcm-order-card.selected{outline:3px solid var(--ac,#a078e8);background:color-mix(in srgb,var(--ac,#a078e8) 25%,var(--surface-alt,#211b2a));}
+.fcm-order-card:disabled{cursor:default;}.fcm-order-card.empty{opacity:.3;border-style:dashed;}
+@media(max-width:700px){.fcm-order-board{grid-template-columns:minmax(0,1fr);min-width:0;}.fcm-order-group+.fcm-order-group{border-left:0;padding-left:0;border-top:1px solid var(--ac,#a078e8);padding-top:12px;}}
 /* Whisper avatar: drawn on BC canvas, no DOM overlay needed */
 /* OOC flash */
 @keyframes fcm-ooc-flash{0%{box-shadow:0 0 0 3px #ff4040cc,0 0 16px #ff404088;border-color:#ff4040;}50%{box-shadow:0 0 0 6px #ff404066,0 0 24px #ff404044;border-color:#ff8080;}100%{box-shadow:0 0 0 3px #ff4040cc,0 0 16px #ff404088;border-color:#ff4040;}}

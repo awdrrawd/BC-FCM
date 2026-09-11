@@ -1,4 +1,11 @@
 {
+  "roomTab_order": "Player order",
+  "roomOrderMode": "Reorder mode: ",
+  "roomOrder_swap": "Swap",
+  "roomOrder_insert": "Insert",
+  "roomOrderChanged": "Room membership or order changed. Refresh before reordering.",
+  "roomOrderWaiting": "Sent; waiting for room sync. Use ↻ to reload if needed.",
+  "roomOrderFailed": "Could not send the reorder request. Refresh and try again.",
   "initHint": "🐈‍⬛ FCM v{0} initialized. Click the \"SVG\" icon to manage friends and rooms; first-time users may want a quick setup on the Settings page.\n⚠ Note: newly added friends may show as \"one-way\" — try removing and re-adding them. This issue has been reported to the community.",
   "panelTitle": "🎛 FCM ─ Friends and ChatRoom Manager",
   "tabFriends": "Relations",

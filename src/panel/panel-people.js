@@ -23,7 +23,9 @@ function setPeopleQuery(id) { _peopleQ = String(id); _peoplePage = 0; }
 
 async function renderPeople(container, _myToken) {
     container.innerHTML = '';
-    if (!await PDB.init()) {
+    const ready = await PDB.init();
+    if (_myToken !== getRenderToken() || !container.isConnected) return;
+    if (!ready) {
         const em = document.createElement('div'); em.className = 'fcm-empty';
         em.textContent = T('peopleDbNotConnected');
         container.appendChild(em); return;
@@ -59,7 +61,9 @@ async function renderPeople(container, _myToken) {
     wrapper.appendChild(scroll); wrapper.appendChild(countBar); wrapper.appendChild(pageBar);
     container.appendChild(wrapper);
 
+    let searchRevision = 0;
     async function runSearch(q) {
+        const revision = ++searchRevision;
         _peopleQ = q; q = q.trim();
         scroll.innerHTML = ''; pageBar.innerHTML = '';
         const numericQuery = q.replace(/^[@#]/, '');
@@ -128,6 +132,7 @@ async function renderPeople(container, _myToken) {
             return;
         }
         await PDB.batchGet(show.map(p => p.memberNumber));
+        if (revision !== searchRevision || _myToken !== getRenderToken() || !scroll.isConnected) return;
         const tbl = document.createElement('table'); tbl.className = 'fcm-tbl';
         const thead = document.createElement('thead');
         const thRow = document.createElement('tr');

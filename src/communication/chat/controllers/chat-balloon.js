@@ -1,7 +1,7 @@
 import { cfg } from '../../../core/config.js';
 import { FCM_ICON_SVG } from '../../../ui/icons.js';
 import { esc } from '../services/chat-content.js';
-import { installChatDrag, resolveBalloonCollision } from './chat-drag.js';
+import { installChatDrag, resolveBalloonCollision, updateBalloonPreviewSide } from './chat-drag.js';
 
 function createChatBalloonController(context) {
     function paint(element) {
@@ -18,6 +18,8 @@ function createChatBalloonController(context) {
         document.querySelectorAll('#fcm-chat-balloon,.fcm-chat-user-balloon').forEach(balloon => {
             balloon.classList.toggle('fcm-hidden-by-chat-maximized', hidden);
             balloon.setAttribute('aria-hidden', hidden ? 'true' : 'false');
+            // Placement/restoration must initialize the preview side even without a drag or collision.
+            if (!hidden) updateBalloonPreviewSide(balloon);
         });
     }
 

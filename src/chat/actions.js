@@ -1,6 +1,6 @@
 import { T } from '../i18n/i18n.js';
 import { amAdmin, inRoomFn, getDisplayName, isFriendOf } from '../data/data.js';
-import { renderCurrent, minimizePanel, closePanel } from '../panel/panel-controller.js';
+import { notifyPanelChange, minimizePanel, closePanel } from '../panel/panel-controller.js';
 import { sendBcxAwareBeep } from '../communication/bcx-compat.js';
 import { warnLimited } from '../core/logger.js';
 import { closeDialog, createDialogHost } from '../ui/dialog.js';
@@ -35,8 +35,7 @@ import { openProfile } from '../api/public-api.js';
             case 'unban':    ServerSend('ChatRoomAdmin', { MemberNumber: mn, Action: 'Unban' }); break;
             case 'kick':     ServerSend('ChatRoomAdmin', { MemberNumber: mn, Action: 'Kick' }); break;
         }
-        renderCurrent();
-        setTimeout(renderCurrent, 1200);
+        // Wait for the authoritative room sync event before rebuilding room management.
     }
 
     // ═══════════════════════════════════════════════════════════
@@ -101,7 +100,7 @@ import { openProfile } from '../api/public-api.js';
     }
 
     function doWhisper(mn) { const el = document.getElementById('InputChat'); if (el) { el.value = `/w ${mn} `; el.focus(); } minimizePanel(); }
-    function doAddFriend(mn) { mn = parseInt(mn); if (!isFriendOf(mn) && typeof ChatRoomListManipulation === 'function') { ChatRoomListManipulation(Player.FriendList, true, mn.toString()); setTimeout(renderCurrent, 400); } }
+    function doAddFriend(mn) { mn = parseInt(mn); if (!isFriendOf(mn) && typeof ChatRoomListManipulation === 'function') { ChatRoomListManipulation(Player.FriendList, true, mn.toString()); notifyPanelChange('relations'); } }
 
     // ── Bug fix: doToggleList no longer calls showConfirm internally ──
     // All confirmation is handled exclusively at the call site.
@@ -122,9 +121,9 @@ import { openProfile } from '../api/public-api.js';
                 if (typeof ServerAccountUpdate !== 'undefined') ServerAccountUpdate.QueueData(d);
             }
         } catch(e) { console.warn('🐈‍⬛ [FCM] doToggleList:', e); }
-        setTimeout(renderCurrent, 400);
+        notifyPanelChange('relations');
     }
-    function doRemoveFriend(mn) { mn = parseInt(mn); if (typeof ChatRoomListManipulation === 'function') { ChatRoomListManipulation(Player.FriendList, false, mn.toString()); setTimeout(renderCurrent, 400); } }
+    function doRemoveFriend(mn) { mn = parseInt(mn); if (typeof ChatRoomListManipulation === 'function') { ChatRoomListManipulation(Player.FriendList, false, mn.toString()); notifyPanelChange('relations'); } }
 
     // 實際加入房間（無確認），由詳細資訊確認流程共用。
     function _doJoinRoom(roomName) {

@@ -6,9 +6,11 @@ import { showNickname, setShowNickname, getDisplayName, matchesSearch, searchSco
 import { roomOp, makeIdCell } from '../chat/actions.js';
 import { makeAvEl, makeRelEl, makePermEl, mkBtn, makeSearchWrap, makeSortSel, makeCountBar, paginate, makePageBar, buildMgmtBtns, buildPersonOps, _autoQueueVisible, refreshSnapshotsForList } from './panel-widgets.js';
 import { wpsShareProfile } from '../chat/wps-share.js';
+import { renderRoomOrder, disposeRoomOrder } from './panel-room-order.js';
+import { getRenderToken } from './panel-controller.js';
 // ════════════════════════════════════════
 //  FCM module: panel-room.js  (split from panel.js)
-//  房間管理頁（房內人員／管理員／白名單／黑名單四個子頁）。
+//  房間管理頁（房內人員／玩家排序／管理員／白名單／黑名單）。
 //  roomSubTab / roomSearchQ / roomSortMode 為本頁狀態；closePanel 透過
 //  resetRoomAdminSearch 清空搜尋字串。renderRoom 以自身遞迴重繪，不需 renderCurrent。
 // ════════════════════════════════════════
@@ -18,21 +20,28 @@ let roomSearchQ = '', roomSortMode = 'name';
 let roomSearchDebounce = null;
 const ROOM_LIST_PAGE_SIZE = 100;
 const roomPages = { admin: 0, white: 0, ban: 0 };
+const roomRenders = new WeakMap();
 
-function resetRoomAdminSearch() { roomSearchQ = ''; Object.keys(roomPages).forEach(key => { roomPages[key] = 0; }); }
+function resetRoomAdminSearch() { clearTimeout(roomSearchDebounce); roomSearchQ = ''; Object.keys(roomPages).forEach(key => { roomPages[key] = 0; }); }
 
 async function renderRoom(container) {
+    disposeRoomOrder(container);
+    const revision = (roomRenders.get(container) || 0) + 1;
+    roomRenders.set(container, revision);
+    const token = getRenderToken();
+    clearTimeout(roomSearchDebounce);
     container.innerHTML = '';
     if (typeof ChatRoomData === 'undefined' || !ChatRoomData) { const em = document.createElement('div'); em.className = 'fcm-empty'; em.textContent = T('notInRoom'); container.appendChild(em); return; }
     const isAdmin = amAdmin();
     if (!isAdmin) { const w = document.createElement('div'); w.className = 'fcm-warn'; w.textContent = T('noAdminWarn'); container.appendChild(w); }
 
     const stabs = document.createElement('div'); stabs.className = 'fcm-subtabs';
-    ['members', 'admin', 'white', 'ban'].forEach(key => {
+    ['members', 'order', 'admin', 'white', 'ban'].forEach(key => {
         const t = document.createElement('div'); t.className = 'fcm-stab' + (roomSubTab === key ? ' active' : ''); t.textContent = T('roomTab_' + key);
         t.addEventListener('click', () => { roomSubTab = key; renderRoom(container); }); stabs.appendChild(t);
     });
     container.appendChild(stabs);
+    if (roomSubTab === 'order') { renderRoomOrder(container); return; }
 
     const canAddHere = isAdmin && roomSubTab !== 'members';
     const toolbar = document.createElement('div'); toolbar.className = 'fcm-toolbar';
@@ -46,8 +55,10 @@ async function renderRoom(container) {
         if (addBtn) addBtn.disabled = !(canAddHere && isNumericQ(val));
         clearTimeout(roomSearchDebounce);
         roomSearchDebounce = setTimeout(async () => {
+            if (token !== getRenderToken() || revision !== roomRenders.get(container)) return;
             const pos = roomSearchQ.length;
             await renderRoom(container);
+            if (token !== getRenderToken()) return;
             const ns = container.querySelector('.fcm-room-search');
             const na = container.querySelector('.fcm-add-btn');
             if (ns) { ns.focus(); try { ns.setSelectionRange(pos, pos); } catch {} }
@@ -119,6 +130,7 @@ async function renderRoom(container) {
     if (!mns.length) { const em = document.createElement('div'); em.className = 'fcm-empty'; em.textContent = T('noData'); scroll.appendChild(em); wrapper.appendChild(scroll); wrapper.appendChild(makeCountBar(0)); container.appendChild(wrapper); return; }
 
     await PDB.batchGet(mns);
+    if (token !== getRenderToken() || roomRenders.get(container) !== revision || !container.isConnected) return;
 
     const tbl = document.createElement('table'); tbl.className = 'fcm-tbl';
     const thRow = document.createElement('tr');

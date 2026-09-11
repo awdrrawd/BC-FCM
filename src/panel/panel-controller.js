@@ -5,6 +5,7 @@ let controller = {
     closePanel: () => {},
     reopenForLang: () => {},
     getRenderToken: () => 0,
+    notifyPanelChange: () => {},
 };
 
 function setPanelController(next) {
@@ -17,5 +18,6 @@ const minimizePanel = (...args) => controller.minimizePanel(...args);
 const closePanel = (...args) => controller.closePanel(...args);
 const reopenForLang = (...args) => controller.reopenForLang(...args);
 const getRenderToken = (...args) => controller.getRenderToken(...args);
+const notifyPanelChange = (...args) => controller.notifyPanelChange(...args);
 
-export { setPanelController, renderCurrent, refreshPanel, minimizePanel, closePanel, reopenForLang, getRenderToken };
+export { setPanelController, renderCurrent, refreshPanel, minimizePanel, closePanel, reopenForLang, getRenderToken, notifyPanelChange };
