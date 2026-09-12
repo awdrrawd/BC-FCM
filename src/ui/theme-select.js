@@ -61,7 +61,9 @@ function syncButton(control) {
     control.wrapper.style.setProperty('--tx', colors.text);
     control.wrapper.style.setProperty('--dim', colors.dim);
     control.wrapper.style.fontSize = `${Math.max(10, (Number(cfg.chatFontSize) || 13) - 1)}px`;
-    control.label.textContent = option ? optionLabel(option) : '';
+    const label = option ? optionLabel(option) : '';
+    if (window.Liko?.__Sys_Flags__?.renderLabel) window.Liko.__Sys_Flags__.renderLabel(control.label, label);
+    else control.label.textContent = label;
     control.button.disabled = control.select.disabled;
 }
 
@@ -111,7 +113,8 @@ function openMenu(control) {
         const item = document.createElement('button');
         item.type = 'button';
         item.className = 'fcm-theme-select-option';
-        item.textContent = optionLabel(option);
+        if (window.Liko?.__Sys_Flags__?.renderLabel) window.Liko.__Sys_Flags__.renderLabel(item, optionLabel(option));
+        else item.textContent = optionLabel(option);
         item.disabled = option.disabled;
         item.setAttribute('role', 'option');
         item.setAttribute('aria-selected', String(option.selected));
