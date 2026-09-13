@@ -1,4 +1,11 @@
 {
+  "roomTab_order": "Spielerreihenfolge",
+  "roomOrderMode": "Sortiermodus: ",
+  "roomOrder_swap": "Tauschen",
+  "roomOrder_insert": "Einfügen",
+  "roomOrderChanged": "Die Spieler oder ihre Reihenfolge haben sich geändert. Bitte vor dem Sortieren aktualisieren.",
+  "roomOrderWaiting": "Gesendet; warte auf die Raumsynchronisierung. Bei Bedarf mit ↻ neu laden.",
+  "roomOrderFailed": "Die Sortieranfrage konnte nicht gesendet werden. Bitte aktualisieren und erneut versuchen.",
   "initHint": "🐈‍⬛ FCM v{0} initialisiert. Klicke auf das „SVG“-Symbol, um Freunde und Räume zu verwalten; beim ersten Mal empfiehlt sich eine kurze Einrichtung auf der Einstellungsseite.\n⚠ Hinweis: Neu hinzugefügte Freunde können als „einseitig“ erscheinen – entferne sie und füge sie erneut hinzu. Dieses Problem wurde der Community gemeldet.",
   "panelTitle": "🎛 FCM ─ Freunde- und Raum-Manager",
   "tabFriends": "Beziehungen",

@@ -37,13 +37,10 @@ function visit(file, chain = []) {
 sources.forEach(file => visit(file));
 
 const english = JSON.parse(read('Translation/EN.json'));
-// Existing fallback-only room-order strings: fail new gaps, report this known backlog.
-const backlog = new Set(['roomTab_order','roomOrderMode','roomOrder_swap','roomOrder_insert','roomOrderChanged','roomOrderWaiting','roomOrderFailed']);
 for (const file of files('Translation').filter(file => file.endsWith('.json'))) {
     const data = JSON.parse(read(file));
     const missing = Object.keys(english).filter(key => !(key in data));
-    for (const key of missing) if (!backlog.has(key) || /\/(TW|CN)\.json$/.test(file)) errors.push(`${file}: missing translation ${key}`);
-    if (missing.length) console.warn(`${file}: ${missing.length} known room-order keys use English fallback`);
+    for (const key of missing) errors.push(`${file}: missing translation ${key}`);
 }
 if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1; }
 else console.log(`Project validation passed: ${links} references, ${sources.length} modules, translation gaps checked.`);

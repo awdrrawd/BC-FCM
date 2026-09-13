@@ -1,4 +1,11 @@
 {
+  "roomTab_order": "Orden de jugadores",
+  "roomOrderMode": "Modo de ordenación: ",
+  "roomOrder_swap": "Intercambiar",
+  "roomOrder_insert": "Insertar",
+  "roomOrderChanged": "Los jugadores o su orden han cambiado. Actualiza antes de reordenar.",
+  "roomOrderWaiting": "Enviado; esperando la sincronización de la sala. Usa ↻ para recargar si es necesario.",
+  "roomOrderFailed": "No se pudo enviar la solicitud de ordenación. Actualiza e inténtalo de nuevo.",
   "initHint": "🐈‍⬛ FCM v{0} inicializado. Haz clic en el icono «SVG» para gestionar amistades y salas; en el primer uso conviene una configuración sencilla en la página de Ajustes.\n⚠ Nota: las amistades recién añadidas pueden aparecer como «unilaterales» — prueba a eliminarlas y añadirlas de nuevo. Este problema ya se ha reportado a la comunidad.",
   "panelTitle": "🎛 FCM ─ Gestor de amistades y salas",
   "tabFriends": "Relaciones",
