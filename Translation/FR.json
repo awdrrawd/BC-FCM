@@ -1,4 +1,11 @@
 {
+  "roomTab_order": "Ordre des joueurs",
+  "roomOrderMode": "Mode de réorganisation : ",
+  "roomOrder_swap": "Échanger",
+  "roomOrder_insert": "Insérer",
+  "roomOrderChanged": "Les joueurs ou leur ordre ont changé. Actualisez avant de réorganiser.",
+  "roomOrderWaiting": "Envoyé ; en attente de la synchronisation du salon. Utilisez ↻ pour actualiser si nécessaire.",
+  "roomOrderFailed": "Impossible d’envoyer la demande de réorganisation. Actualisez et réessayez.",
   "initHint": "🐈‍⬛ FCM v{0} initialisé. Cliquez sur l'icône « SVG » pour gérer amis et salons ; à la première utilisation, une configuration rapide sur la page Paramètres est conseillée.\n⚠ Remarque : les amis récemment ajoutés peuvent apparaître comme « unilatéraux » — essayez de les supprimer puis de les rajouter. Ce problème a été signalé à la communauté.",
   "panelTitle": "🎛 FCM ─ Gestionnaire d'amis et de salons",
   "tabFriends": "Relations",

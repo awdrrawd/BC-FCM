@@ -1,4 +1,11 @@
 {
+  "roomTab_order": "Thứ tự người chơi",
+  "roomOrderMode": "Cách sắp xếp: ",
+  "roomOrder_swap": "Hoán đổi",
+  "roomOrder_insert": "Chèn",
+  "roomOrderChanged": "Danh sách hoặc thứ tự người chơi trong phòng đã thay đổi. Hãy tải lại trước khi sắp xếp.",
+  "roomOrderWaiting": "Đã gửi; đang chờ đồng bộ phòng. Nhấn ↻ để tải lại nếu cần.",
+  "roomOrderFailed": "Không thể gửi yêu cầu sắp xếp. Hãy tải lại rồi thử lại.",
   "initHint": "🐈‍⬛ FCM v{0} đã khởi tạo. Nhấp vào biểu tượng «SVG» để quản lý bạn bè và phòng; lần đầu sử dụng nên thiết lập đơn giản ở trang Cài đặt.\n⚠ Lưu ý: bạn mới thêm có thể hiển thị là «một chiều» — hãy thử xóa rồi thêm lại. Vấn đề này đã được báo cáo cho cộng đồng.",
   "panelTitle": "🎛 FCM ─ Quản lý bạn bè và phòng chat",
   "tabFriends": "Quan hệ",
