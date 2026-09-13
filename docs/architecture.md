@@ -32,6 +32,8 @@
 
 `core/hooks.js` 接收 BC 的線上名單、人員進出、房間資料及順序同步；`panel.js` 的 `notifyPanelChange` 統一判斷目前分頁與顯示資料是否有變化，不輪詢重建 DOM。
 
+`panel-refresh.js` 提供可直接測試的資料快照與事件合併策略，以依賴注入取得資料與計時器；測試不再截取原始碼或依賴註解。`panel-lifecycle.js` 以容器管理當前頁面的更新、清理與有效範圍，主面板不再直接辨識玩家排序的清理函式。人員查詢每次載入都建立新範圍，資料就緒後才顯示搜尋／刷新控制，避免慢速讀取時重複渲染或操作尚未初始化的狀態。
+
 | 分頁 | 自動更新條件 |
 | --- | --- |
 | 個人關係 | 訪問、相關玩家上下線變化、使用者修改關係 |
@@ -48,8 +50,8 @@
 - `reordered`：交換／插入的純函式，預覽與放下後顯示共用同一規則。
 - `orderCommands`：轉成原生 `Swap` 或連續 `MoveLeft`／`MoveRight`。封包帶 `Publish: false`，要求伺服器不公告移動。
 - `renderRoomOrder`：建立固定位置與卡片引用；拖曳以位置命中判斷，避免移動中的卡片造成預覽反覆切換。點選與拖曳共用送出流程。
-- `updateRoomOrder`：同步就地確認；忽略插入過程中的中間位置，保留已預覽的最終順序。
-- `disposeRoomOrder`：在重建、換頁、關閉、最小化時明確清除拖曳影像、ResizeObserver 與待確認計時器；不依賴 observer 推測頁面是否被移除。
+- 透過 `beginPanelView` 註冊 `update`：同步就地確認；忽略插入過程中的中間位置，保留已預覽的最終順序。
+- 註冊 `dispose`：由共用生命週期在重建、換頁、關閉、最小化時清除拖曳影像、ResizeObserver 與待確認計時器。
 
 只有房管能操作，送出前再次確認權限及名單順序。放下後先更新 FCM 卡片，不修改 BC 遊戲陣列；等待確認期間禁止重複送出，3 秒未確認則依遊戲實際順序回復。計時器是單次確認期限，不是刷新輪詢。
 
@@ -65,12 +67,13 @@
 ## 驗證與相關文件
 
 ```sh
-npm test
-npm run lint
-npm run build
+npm run check
+npm run test:browser
 ```
 
 `scripts/panel-room.test.mjs` 驗證排列、拖曳預覽、權限、同步／回復、清理及面板刷新；`scripts/chat-balloon.test.mjs` 驗證初始位置與恢復顯示的方向。其他測試涵蓋 Profile DB、頭像、聊天及私密分享。這些是自動化邏輯測試，不取代實際遊戲的觸控、視覺與伺服器相容性驗證。
+
+`tests/browser` 用真實的正式版 view、styles、拖曳與生命週期，替換遊戲／資料邊界。測試伺服器只綁定 loopback，阻止外部請求，不登入遊戲、不發送真實封包。正式 Vite 建置不使用這個測試配置。設定與排程另見 [自動化維護](./automation.md)。
 
 - [公開 API](./public-api.md)
 - [私密 Profile 分享](./chat-private-sharing.md)

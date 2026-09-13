@@ -12,10 +12,14 @@
     "build": "vite build",
     "validate:icons": "node scripts/validate-icons.mjs",
     "lint": "eslint .",
-    "test": "node --test scripts/*.test.mjs"
+    "test": "node --test scripts/*.test.mjs",
+    "test:browser": "playwright test",
+    "validate:project": "node scripts/validate-project.mjs",
+    "check": "npm run validate:project && npm run lint && npm test && npm run build"
   },
   "devDependencies": {
     "@eslint/js": "^9.30.1",
+    "@playwright/test": "^1.63.0",
     "concurrently": "^9.1.0",
     "eslint": "^9.30.1",
     "globals": "^16.3.0",

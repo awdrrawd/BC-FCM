@@ -2,9 +2,9 @@ import { T } from '../i18n/i18n.js';
 import { amAdmin, getDisplayName } from '../data/data.js';
 import { makeAvEl } from './panel-widgets.js';
 import { CROWN_ICON } from '../ui/icons.js';
+import { beginPanelView, disposePanelView } from './panel-lifecycle.js';
 
 let mode = 'swap';
-const boards = new WeakMap();
 const readOrder = () => (globalThis.ChatRoomCharacter || []).map(c => c.MemberNumber);
 const sameOrder = (a, b) => a.length === b.length && a.every((member, i) => member === b[i]);
 
@@ -28,11 +28,9 @@ function orderCommands(order, source, target, method, playerId) {
     }));
 }
 
-function updateRoomOrder(container) { return boards.get(container)?.sync() || false; }
-function disposeRoomOrder(container) { boards.get(container)?.dispose(); }
 
 function renderRoomOrder(container) {
-    disposeRoomOrder(container);
+    disposePanelView(container);
     let order = readOrder(), displayed = order;
     const room = globalThis.ChatRoomData, allowed = amAdmin();
     const section = document.createElement('section'); section.className = 'fcm-room-order';
@@ -196,10 +194,10 @@ function renderRoomOrder(container) {
     function dispose() {
         if (disposed) return;
         disposed = true;
-        clearTimeout(pendingTimer); resize?.disconnect(); endDrag(); boards.delete(container);
+        clearTimeout(pendingTimer); resize?.disconnect(); endDrag();
     }
     container.append(section); paint(order); resize?.observe(board);
-    boards.set(container, { sync, dispose });
+    beginPanelView(container, { update: sync, dispose });
 }
 
-export { renderRoomOrder, updateRoomOrder, disposeRoomOrder, orderCommands, reordered };
+export { renderRoomOrder, orderCommands, reordered };

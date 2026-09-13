@@ -6,7 +6,8 @@ import { showNickname, setShowNickname, getDisplayName, matchesSearch, searchSco
 import { roomOp, makeIdCell } from '../chat/actions.js';
 import { makeAvEl, makeRelEl, makePermEl, mkBtn, makeSearchWrap, makeSortSel, makeCountBar, paginate, makePageBar, buildMgmtBtns, buildPersonOps, _autoQueueVisible, refreshSnapshotsForList } from './panel-widgets.js';
 import { wpsShareProfile } from '../chat/wps-share.js';
-import { renderRoomOrder, disposeRoomOrder } from './panel-room-order.js';
+import { renderRoomOrder } from './panel-room-order.js';
+import { disposePanelView } from './panel-lifecycle.js';
 import { getRenderToken } from './panel-controller.js';
 // ════════════════════════════════════════
 //  FCM module: panel-room.js  (split from panel.js)
@@ -25,7 +26,7 @@ const roomRenders = new WeakMap();
 function resetRoomAdminSearch() { clearTimeout(roomSearchDebounce); roomSearchQ = ''; Object.keys(roomPages).forEach(key => { roomPages[key] = 0; }); }
 
 async function renderRoom(container) {
-    disposeRoomOrder(container);
+    disposePanelView(container);
     const revision = (roomRenders.get(container) || 0) + 1;
     roomRenders.set(container, revision);
     const token = getRenderToken();

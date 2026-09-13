@@ -26,6 +26,10 @@ export default [
   { ignores: ['dist/**', 'node_modules/**', 'public/**', 'Plugins/**', 'Translation/**', 'loader.user.js', 'loader.local.user.js', 'scripts/**'] },
   js.configs.recommended,
   {
+    files: ['tests/browser/**', 'playwright.config.mjs'],
+    languageOptions: { globals: { ...globals.node, ...globals.browser, fixture: 'readonly', sent: 'readonly', loads: 'readonly', admin: 'writable', ChatRoomCharacter: 'readonly' } },
+  },
+  {
     // Node-side build/config files.
     files: ['vite.config.js', 'eslint.config.js'],
     languageOptions: { globals: { ...globals.node } },

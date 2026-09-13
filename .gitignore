@@ -8,4 +8,6 @@ dist/assets/*
 # public/ 由 scripts/copy-assets.mjs 於 build 前從 Translation/ 產生
 public/
 *.log
+playwright-report/
+test-results/
 .DS_Store

@@ -7,6 +7,7 @@ import { makeIdCell } from '../chat/actions.js';
 import { wpsShareProfile } from '../chat/wps-share.js';
 import { getRenderToken } from './panel-controller.js';
 import { warnLimited } from '../core/logger.js';
+import { beginPanelView } from './panel-lifecycle.js';
 // ════════════════════════════════════════
 //  FCM module: panel-people.js  (split from panel.js)
 //  人員查詢頁（renderPeople）＋ Profile 匯出/匯入。
@@ -22,15 +23,21 @@ function resetPeopleSearch() { _peopleQ = ''; _peoplePage = 0; }
 function setPeopleQuery(id) { _peopleQ = String(id); _peoplePage = 0; }
 
 async function renderPeople(container, _myToken) {
+    const active = beginPanelView(container);
+    const isCurrent = () => active() && _myToken === getRenderToken();
     container.innerHTML = '';
     const ready = await PDB.init();
-    if (_myToken !== getRenderToken() || !container.isConnected) return;
+    if (!isCurrent()) return;
     if (!ready) {
         const em = document.createElement('div'); em.className = 'fcm-empty';
         em.textContent = T('peopleDbNotConnected');
         container.appendChild(em); return;
     }
 
+    // Finish loading before exposing search/refresh callbacks; a new visit invalidates this scope.
+    const allProfiles = await PDB.getAll().catch(error => { warnLimited('profile list read failed', error); return []; });
+    if (!isCurrent()) return;
+    allProfiles.sort((a, b) => (b.seen || b.savedAt || 0) - (a.seen || a.savedAt || 0));
     const toolbar = document.createElement('div'); toolbar.className = 'fcm-toolbar';
     const sw = document.createElement('div'); sw.style.cssText = 'position:relative;display:inline-flex;align-items:center;flex:1;min-width:180px;max-width:320px;';
     const inp = document.createElement('input'); inp.className = 'fcm-search'; inp.style.width = '100%';
@@ -50,9 +57,6 @@ async function renderPeople(container, _myToken) {
     const hint = document.createElement('div'); hint.className = 'fcm-people-hint'; hint.textContent = T('peopleSearchHint');
     container.appendChild(hint);
 
-    const allProfiles = await PDB.getAll().catch(error => { warnLimited('profile list read failed', error); return []; });
-    if (_myToken !== getRenderToken()) return;
-    allProfiles.sort((a, b) => (b.seen || b.savedAt || 0) - (a.seen || a.savedAt || 0));
 
     const wrapper = document.createElement('div'); wrapper.className = 'fcm-scroll-wrap';
     const scroll = document.createElement('div'); scroll.className = 'fcm-scroll';
@@ -132,7 +136,7 @@ async function renderPeople(container, _myToken) {
             return;
         }
         await PDB.batchGet(show.map(p => p.memberNumber));
-        if (revision !== searchRevision || _myToken !== getRenderToken() || !scroll.isConnected) return;
+        if (revision !== searchRevision || !isCurrent() || !scroll.isConnected) return;
         const tbl = document.createElement('table'); tbl.className = 'fcm-tbl';
         const thead = document.createElement('thead');
         const thRow = document.createElement('tr');

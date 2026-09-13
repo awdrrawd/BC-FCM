@@ -1,8 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { registerHooks } from 'node:module';
-import { readFileSync } from 'node:fs';
-import vm from 'node:vm';
+import { createPanelRefresh, panelSnapshot } from '../src/panel/panel-refresh.js';
+import { updatePanelView as updateRoomOrder, disposePanelView as disposeRoomOrder } from '../src/panel/panel-lifecycle.js';
 
 const hooks = registerHooks({ load(url, context, next) {
     const source = url.endsWith('/i18n/i18n.js') ? 'export const T = key => key;'
@@ -11,7 +11,7 @@ const hooks = registerHooks({ load(url, context, next) {
         : url.endsWith('/panel/panel-widgets.js') ? 'export const makeAvEl = () => document.createElement("div");' : null;
     return source ? { format: 'module', source, shortCircuit: true } : next(url, context);
 } });
-const { orderCommands, renderRoomOrder, updateRoomOrder, disposeRoomOrder, reordered } = await import('../src/panel/panel-room-order.js');
+const { orderCommands, renderRoomOrder, reordered } = await import('../src/panel/panel-room-order.js');
 hooks.deregister();
 
 function applyCommands(order, commands) {
@@ -191,18 +191,19 @@ test('rejected move rolls back on timeout; Escape and outside drop cancel withou
     }
 });
 
-// Exercise the coordinator's actual refresh policy without loading the game's UI graph.
-const panelSource = readFileSync(new URL('../src/panel/panel.js', import.meta.url), 'utf8');
-const policy = panelSource.slice(panelSource.indexOf('    let eventRefresh'), panelSource.indexOf('    // ═', panelSource.indexOf('    let eventRefresh')));
 function refreshFixture(tab) {
     const timers = new Map(); let timer = 0;
-    const ctx = vm.createContext({ uiTab: tab, panelOpen: true, panelMini: false, renders: 0,
-        panelEl: null, updateRoomOrder: () => false,
-        onlineFriends: [{ MemberNumber: 1 }], buildFriendList: () => [{ mn: 1 }, { mn: 2 }], inRoomFn: () => false,
-        ChatRoomData: { Name: 'room', Admin: [1] }, ChatRoomCharacter: [{ MemberNumber: 1, Name: 'Alice' }],
-        setTimeout: fn => { timers.set(++timer, fn); return timer; }, clearTimeout: id => timers.delete(id) });
-    vm.runInContext(policy + '\nfunction renderCurrent() { renders++; renderedState = panelState(); } renderedState = panelState();', ctx);
-    return { ctx, timers, notify: kind => vm.runInContext(`notifyPanelChange(${JSON.stringify(kind)})`, ctx),
+    const ctx = { uiTab: tab, panelMini: false, renders: 0, onlineFriends: [{ MemberNumber: 1 }],
+        ChatRoomData: { Name: 'room', Admin: [1] }, ChatRoomCharacter: [{ MemberNumber: 1, Name: 'Alice' }] };
+    const policy = createPanelRefresh({
+        getView: () => ({ tab: ctx.uiTab, visible: !ctx.panelMini }),
+        snapshot: () => panelSnapshot(ctx.uiTab, { room: ctx.ChatRoomData, characters: ctx.ChatRoomCharacter,
+            friends: [{ mn: 1 }, { mn: 2 }], online: ctx.onlineFriends }),
+        render: () => { ctx.renders++; policy.capture(); }, update: () => false,
+        schedule: fn => { timers.set(++timer, fn); return timer; }, cancel: id => timers.delete(id),
+    });
+    policy.capture();
+    return { ctx, timers, notify: policy.notify,
         flush() { const callbacks = [...timers.values()]; timers.clear(); callbacks.forEach(fn => fn()); } };
 }
 test('identical presence and appearance updates do not redraw; room changes coalesce', () => {
@@ -229,19 +230,4 @@ test('friends redraw only on relevant presence changes; query pages ignore backg
     }
     f.notify('relations'); f.ctx.uiTab = 'people'; f.flush(); assert.equal(f.ctx.renders, 2);
     f.ctx.uiTab = 'friends'; f.ctx.panelMini = true; f.notify('relations'); assert.equal(f.timers.size, 0);
-});
-
-test('leaving people search during database initialization cannot append stale UI', async () => {
-    const source = readFileSync(new URL('../src/panel/panel-people.js', import.meta.url), 'utf8')
-        .replace(/^import .*;\r?$/gm, '').replace(/^export .*;\r?$/gm, '');
-    for (const ready of [true, false]) {
-        let resolve;
-        const ctx = vm.createContext({ PDB: { init: () => new Promise(done => { resolve = done; }) },
-            getRenderToken: () => 2,
-            document: { createElement() { assert.fail('stale render touched the DOM'); } } });
-        vm.runInContext(source, ctx);
-        const pending = ctx.renderPeople({ isConnected: true }, 1);
-        resolve(ready);
-        await pending;
-    }
 });
