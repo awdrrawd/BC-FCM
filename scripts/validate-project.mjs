@@ -41,6 +41,13 @@ for (const file of files('Translation').filter(file => file.endsWith('.json'))) 
     const data = JSON.parse(read(file));
     const missing = Object.keys(english).filter(key => !(key in data));
     for (const key of missing) errors.push(`${file}: missing translation ${key}`);
+    for (const [key, value] of Object.entries(data)) {
+        // Public rooms deliberately have no badge; all other UI text must be nonempty.
+        if (typeof value !== 'string' || (!value.trim() && key !== 'roomPublic')) { errors.push(`${file}: empty/invalid translation ${key}`); continue; }
+        if (!(key in english)) continue;
+        const placeholders = text => [...new Set(text.match(/\{\d+\}/g) || [])].sort().join(',');
+        if (placeholders(value) !== placeholders(english[key])) errors.push(`${file}: placeholder mismatch ${key}`);
+    }
 }
 if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1; }
 else console.log(`Project validation passed: ${links} references, ${sources.length} modules, translation gaps checked.`);

@@ -1,6 +1,6 @@
 import { attachSearchClear } from '../ui/search-clear.js';
 import { cfg } from '../core/config.js';
-import { T, isZh } from '../i18n/i18n.js';
+import { T } from '../i18n/i18n.js';
 import { PDB, _pc, Snapshot, _avQueue, _avBusy, _processAvQueue, loadAvatarFromBundle, _captureSnapshotDelayed, syncRoomAvatar } from '../data/profile-db.js';
 import { getDisplayName, REL_ORDER, getRel, isFriendOf, canBeep, inRoomFn, isFav, toggleFav } from '../data/data.js';
 import { roomOp, doView, doBeep, doWhisper, doToggleList, doRemoveFriend, showConfirm, showAddFriendConfirm } from '../chat/actions.js';
@@ -79,7 +79,7 @@ function makeFavStar(mn, onToggle) {
     const s = document.createElement('span');
     const paint = () => { const on = isFav(mn); s.className = 'fcm-fav' + (on ? ' on' : ''); s.textContent = on ? '★' : '☆'; };
     paint();
-    s.title = isZh() ? '設為關注（點擊切換）' : 'Follow (click to toggle)';
+    s.title = T('followToggleHint');
     s.addEventListener('click', e => { e.stopPropagation(); const now = toggleFav(mn); paint(); if (onToggle) onToggle(now); });
     return s;
 }

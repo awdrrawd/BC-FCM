@@ -151,7 +151,7 @@ function renderSettings(container) {
     const avDisplayNote = document.createElement('div'); avDisplayNote.className = 'fcm-set-note'; avDisplayNote.textContent = T('setAvatarsNote');
     avDisplayInfo.appendChild(avDisplayLabel); avDisplayInfo.appendChild(avDisplayNote); avRow.appendChild(avDisplayInfo);
     const avDisplaySelect = document.createElement('select'); avDisplaySelect.className = 'fcm-sel';
-    [['none', '不顯示'], ['round', '圓形'], ['square', '方形']].forEach(([value, label]) => {
+    [['none', T('off')], ['round', T('chatAvatarShapeRound')], ['square', T('chatAvatarShapeSquare')]].forEach(([value, label]) => {
         const option = document.createElement('option'); option.value = value; option.textContent = label;
         option.selected = value === (cfg.avatars ? (cfg.avatarShape || 'square') : 'none'); avDisplaySelect.appendChild(option);
     });

@@ -72,9 +72,6 @@ function fcmLang() {
     } catch { return 'EN'; }
 }
 
-// 中文語系（TW/CN）→ 供大量 inline 三元判斷使用（其餘語言走英文分支）
-function isZh() { const l = fcmLang(); return l === 'TW' || l === 'CN'; }
-
 // 取翻譯：走共用引擎 t()，args 以陣列傳入走位置式 {0}{1}，並把 FCM 算好的語言（含手動選擇）
 //  以第 4 參 forceLang 傳入；缺 key 時引擎回傳 key 本身（並 console.warn）。
 function T(key, ...args) {
@@ -91,4 +88,4 @@ function TH(key, ...args) {
     })[char]);
 }
 
-export { isZh, T, TH, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, ensureI18n, ensureLang };
+export { T, TH, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, ensureI18n, ensureLang };
