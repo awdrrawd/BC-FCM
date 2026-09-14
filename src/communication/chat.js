@@ -1,4 +1,4 @@
-import { cfg, saveCfg } from '../core/config.js';
+import { cfg, saveCfg, isMobile } from '../core/config.js';
 import { getDisplayName as getSharedDisplayName, getRoomInfo, inRoomFn, onlineFriends, requestOnlineFriends, buildFriendList, getAllRels, isFav, isFriendOf } from '../data/data.js';
 import { getCachedRoomInfo, queryRoomInfo } from '../panel/panel-rooms-data.js';
 import { PDB, _pc, Snapshot, loadAvatarFromBundle, syncRoomAvatar } from '../data/profile-db.js';
@@ -166,7 +166,7 @@ const messageActions = createChatMessageActionsController({
     openProfile: (memberNumber, messageId) => profileViewer.open(memberNumber,
         conversation.messages.find(message => message.id === messageId)?.profiles?.find(profile => profile.memberNumber === Number(memberNumber))),
     replyToMessage: replyController.select,
-    isMobile: () => typeof globalThis.CommonIsMobile === 'function' && globalThis.CommonIsMobile(),
+    isMobile,
 });
 const conversationPresenter = createChatConversationPresenter({
     getMemberNumber: () => selectedMember, getConfig: () => cfg, getRoom: () => ChatRoomData,
@@ -303,7 +303,7 @@ const chatRenderer = createChatRenderer({
     colors: chatColors, fontFamily: chatFontFamily, panelSession: chatPanelSession,
     profileSuggestion, historyViewport, forwardTargets, avatarHtml, unreadBadgeHtml: unreadBadge,
     listHtml: sidebarView.html, conversationHtml: conversationPresenter.html, shellHtml: chatShellHtml,
-    bindShellEvents: shellEvents.bind, bindConversationEvents: conversationEvents.bind, installDragScroll,
+    bindShellEvents: shellEvents.bind, bindConversationEvents: conversationEvents.bind, installDragScroll, isMobile,
     conversationPresence, hydrateAvatars: hydrateChatAvatars, messageImages, conversation,
     syncBalloonVisibility: chatBalloons.syncVisibility, text: TH,
 });

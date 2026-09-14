@@ -6,6 +6,9 @@
 import { MOD_VER } from './version.js';
 import { warnLimited } from './logger.js';
 
+// BC exposes a boolean flag, populated during game startup.
+function isMobile() { return globalThis.CommonIsMobile === true; }
+
     const existingFcmMod = bcModSdk.getModsInfo?.().find(mod => mod.name === 'Liko - FCM');
     if (existingFcmMod) {
         console.warn('🐈‍⬛ [FCM] Already registered with Mod SDK, aborting duplicate init.');
@@ -86,7 +89,7 @@ import { warnLimited } from './logger.js';
         // Resolve the device default at load time, once BC's mobile detector is available.
         // A valid saved layout remains the user's choice on either device.
         cfg.chatLayout = ['split', 'stacked'].includes(savedLayout) ? savedLayout
-            : typeof globalThis.CommonIsMobile === 'function' && globalThis.CommonIsMobile() ? 'stacked' : 'split';
+            : isMobile() ? 'stacked' : 'split';
         // Settings belong to the BC account. The former localStorage mirror was
         // shared by every account in the same browser and is intentionally not
         // migrated because its owner cannot be identified safely.
@@ -117,4 +120,4 @@ import { warnLimited } from './logger.js';
         } catch (error) { warnLimited('settings sync failed', error); }
     }
 
-export { MOD_VER, modApi, BTN_X, BTN_Y, BTN_W, BTN_H, cfg, loadCfg, saveCfg, THEME_DEFAULTS };
+export { MOD_VER, modApi, BTN_X, BTN_Y, BTN_W, BTN_H, cfg, loadCfg, saveCfg, THEME_DEFAULTS, isMobile };

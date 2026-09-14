@@ -1,6 +1,6 @@
 import { positionPanel } from './chat-panel-layout.js';
 
-function createChatRenderer({ getRoot, getActiveView, getMaximized, getStackedDetail, getConfig, getPlayer, colors, fontFamily, panelSession, profileSuggestion, historyViewport, forwardTargets, avatarHtml, unreadBadgeHtml, listHtml, conversationHtml, shellHtml, bindShellEvents, bindConversationEvents, installDragScroll, conversationPresence, hydrateAvatars, messageImages, conversation, syncBalloonVisibility, text }) {
+function createChatRenderer({ getRoot, getActiveView, getMaximized, getStackedDetail, getConfig, getPlayer, colors, fontFamily, panelSession, profileSuggestion, historyViewport, forwardTargets, avatarHtml, unreadBadgeHtml, listHtml, conversationHtml, shellHtml, bindShellEvents, bindConversationEvents, installDragScroll, isMobile, conversationPresence, hydrateAvatars, messageImages, conversation, syncBalloonVisibility, text }) {
     function updateBiographyMarquee(scope) {
         requestAnimationFrame(() => {
             const biography = scope.querySelector('.fcm-chat-bio');
@@ -29,7 +29,8 @@ function createChatRenderer({ getRoot, getActiveView, getMaximized, getStackedDe
         positionPanel(root.querySelector('#fcm-chat-panel'), getMaximized(), config.chatPanelPosition);
         syncBalloonVisibility();
         bindShellEvents();
-        installDragScroll(root, '.fcm-chat-scroll,.fcm-chat-messages,.fcm-chat-profile,.fcm-chat-body.view-settings .fcm-chat-list');
+        installDragScroll(root, '.fcm-chat-scroll,.fcm-chat-profile,.fcm-chat-body.view-settings .fcm-chat-list');
+        installDragScroll(root, '.fcm-chat-messages', { enabled: isMobile });
         conversationPresence.refreshRoomMeta();
         hydrateAvatars();
         const log = root.querySelector('.fcm-chat-messages');
@@ -52,7 +53,7 @@ function createChatRenderer({ getRoot, getActiveView, getMaximized, getStackedDe
         historyViewport.reset();
         main.innerHTML = conversationHtml();
         bindConversationEvents();
-        installDragScroll(main, '.fcm-chat-messages');
+        installDragScroll(main, '.fcm-chat-messages', { enabled: isMobile });
         conversationPresence.refreshRoomMeta();
         hydrateAvatars();
         const log = main.querySelector('.fcm-chat-messages');
