@@ -1,15 +1,15 @@
 const installedScopes = new WeakMap();
 
-function installDragScroll(scope, selector) {
+function installDragScroll(scope, selector, { enabled = () => true } = {}) {
     if (!(scope instanceof Element)) return;
     const existing = installedScopes.get(scope);
-    if (existing) { existing.selectors.add(selector); return; }
+    if (existing) { existing.selectors.set(selector, enabled); return; }
 
-    const state = { selectors: new Set([selector]), drag: null, suppressArea: null };
+    const state = { selectors: new Map([[selector, enabled]]), drag: null, suppressArea: null };
     installedScopes.set(scope, state);
     const findArea = target => {
         for (let node = target; node instanceof Element; node = node.parentElement) {
-            if ([...state.selectors].some(value => value === ':scope' ? node === scope : node.matches(value))) return node;
+            if ([...state.selectors].some(([value, isEnabled]) => isEnabled() && (value === ':scope' ? node === scope : node.matches(value)))) return node;
             if (node === scope) break;
         }
         return null;
