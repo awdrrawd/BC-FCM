@@ -7,6 +7,17 @@
 import './i18n-engine.js';   // 確保 window.Liko.__Sys_i18n__ 存在（引擎自帶防重載）
 
 const FCM_FALLBACK = {
+    "followToggleHint": { TW: "設為關注（點擊切換）", EN: "Follow (click to toggle)" },
+    "helpIntroTitle": { TW: "FCM 是什麼？", EN: "What is FCM?" },
+    "helpIntroText": { TW: "FCM 是好友與聊天室管理工具：查看好友狀態、管理房間成員、搜尋公開房間，以及查詢曾遇過的角色。", EN: "FCM manages friends and chatrooms: view friend status, manage members, search public rooms, and look up characters you have encountered." },
+    "helpSettingsTitle": { TW: "請在設定中啟用需要的功能", EN: "Enable optional features in Settings" },
+    "helpSaveText": { TW: "儲存模式預設關閉。選擇「僅名稱」可保留離線好友名稱，選擇「完整資料」可分享 Profile。頭像快照另行儲存。", EN: "Save Mode defaults to Off. Choose Name only to retain offline friend names, or Full profile for profile sharing. Avatar snapshots are stored separately." },
+    "helpRelationsTitle": { TW: "為什麼好友顯示為單向好友？", EN: "Why does a friend appear as one-way?" },
+    "helpRelationsText": { TW: "BC 可能尚未同步新建立的好友關係。請等待伺服器同步或重新登入。", EN: "BC may not have synced a new friendship yet. Wait for server sync or sign in again." },
+    "helpRoomText": { TW: "房間管理需在房內使用；管理操作需要房管權限。房間搜尋可查找公開房間，並以星號標記最愛。", EN: "Room management requires being in a room; admin actions require room admin rights. Use Room Search to find public rooms and star favorites." },
+    "helpSummonText": { TW: "召喚會傳送含目前房間資訊的 BEEP。你必須在房內；對方需有相符的 BC 召喚規則才能自動傳送，否則只會收到「summon」文字。", EN: "Summon sends a BEEP with your current room information. You must be in a room; the recipient needs a matching BC summon rule to teleport, otherwise they receive only the text “summon”." },
+    "helpPeopleText": { TW: "啟用儲存後，人員查詢會列出曾遇過的角色，完整 Profile 可分享。FCM 與 WCE／LCE 共用個人資料庫；若 WCE 已儲存 Profile，可關閉 FCM 儲存以避免重複寫入。", EN: "People lists previously encountered characters when saving is enabled. Full profiles can be shared. FCM shares the profiles database with WCE/LCE; if WCE already saves profiles, turn FCM saving off to avoid duplicate writes." },
+    "helpAvatarsText": { TW: "遊戲頭像取自完整載入的 BC 角色畫布臉部快照。點擊列表頭像可重試載入；設定中的頭像快取管理可清除或批次載入快照。", EN: "Game avatars are face snapshots from a fully loaded BC character canvas. Click a list avatar to retry loading; use Avatar Cache in Settings to clear or batch-load snapshots." },
     "roomTab_order": { TW: "玩家排序", EN: "Player order" },
     "roomOrderMode": { TW: "排列方式：", EN: "Reorder mode: " },
     "roomOrder_swap": { TW: "交換", EN: "Swap" },

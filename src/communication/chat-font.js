@@ -1,4 +1,5 @@
 import { cfg } from '../core/config.js';
+import { T } from '../i18n/i18n.js';
 // ════════════════════════════════════════
 //  共用字型對照表：FCM 面板與 CHAT 面板共用同一份 cfg.chatFontFamily 設定，
 //  避免兩邊各自維護一份對照表而字型逐漸跑掉不一致。
@@ -21,23 +22,24 @@ const FONT_STACKS = {
 };
 
 const FONT_CHOICES = [
-    ['system', '系統字型', null], ['heiti', '黑體', null], ['ming', '細明體', null], ['kai', '標楷體', null], ['mono', '等寬字體', null],
-    ['jhenghei', 'Microsoft 正黑體', 'Microsoft JhengHei'], ['yahei', 'Microsoft YaHei', 'Microsoft YaHei'],
-    ['pmingliu', '新細明體', 'PMingLiU'], ['mingliu', '細明體', 'MingLiU'], ['dfkai', '標楷體', 'DFKai-SB'],
+    ['system', 'chatFontSystem', null], ['heiti', 'chatFontHeiti', null], ['ming', 'chatFontMing', null], ['kai', 'chatFontKai', null], ['mono', 'chatFontMono', null],
+    ['jhenghei', 'Microsoft JhengHei', 'Microsoft JhengHei'], ['yahei', 'Microsoft YaHei', 'Microsoft YaHei'],
+    ['pmingliu', 'PMingLiU', 'PMingLiU'], ['mingliu', 'MingLiU', 'MingLiU'], ['dfkai', 'DFKai-SB', 'DFKai-SB'],
     ['notoSansTC', 'Noto Sans TC', 'Noto Sans TC'], ['notoSerifTC', 'Noto Serif TC', 'Noto Serif TC'],
-    ['sourceHanSans', '思源黑體', 'Source Han Sans TC'], ['sourceHanSerif', '思源宋體', 'Source Han Serif TC'],
+    ['sourceHanSans', 'Source Han Sans TC', 'Source Han Sans TC'], ['sourceHanSerif', 'Source Han Serif TC', 'Source Han Serif TC'],
 ];
 
 function availableFontChoices() {
-    if (typeof document === 'undefined') return FONT_CHOICES.filter(([, , probe]) => !probe);
+    const choices = FONT_CHOICES.map(([value, label, probe]) => [value, probe ? label : T(label), probe]);
+    if (typeof document === 'undefined') return choices.filter(([, , probe]) => !probe);
     const context = document.createElement('canvas').getContext('2d');
-    if (!context) return FONT_CHOICES.filter(([, , probe]) => !probe);
+    if (!context) return choices.filter(([, , probe]) => !probe);
     const sample = 'mmmmmmmmmm漢字測試iiiiiiiiii';
     const installed = family => ['monospace', 'serif', 'sans-serif'].some(base => {
         context.font = `72px ${base}`; const fallbackWidth = context.measureText(sample).width;
         context.font = `72px "${family}",${base}`; return context.measureText(sample).width !== fallbackWidth;
     });
-    return FONT_CHOICES.filter(([, , probe]) => !probe || installed(probe));
+    return choices.filter(([, , probe]) => !probe || installed(probe));
 }
 
 function chatFontFamily() {
