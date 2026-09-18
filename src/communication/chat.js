@@ -36,6 +36,9 @@ import { bindChatProfileEvents, bindChatSettingsEvents, createChatMessageActions
 import { WATER_ICON } from '../ui/icons.js';
 import { createNativeChatTags } from './chat/controllers/chat-native-tags.js';
 
+import { createChatTranslationService } from './chat/services/chat-translation.js';
+import { createChatTranslationController } from './chat/controllers/chat-translation.js';
+
 let root = null;
 let selectedMember = null;
 let messages = [];
@@ -161,7 +164,12 @@ const messageSelection = createChatMessageSelectionController({
     canForwardToRoom: () => !!ChatRoomData, renderUi: syncMultiSelectUi,
     selectedCountText: count => TH('chatSelectedCount', count), onExit: forwardTargets.close,
 });
+const translationService = createChatTranslationService();
+const translationController = createChatTranslationController({
+    getRoot: () => root, getMemberNumber: () => selectedMember, translate: translationService.translate, text: T,
+});
 const messageActions = createChatMessageActionsController({
+    translateMessage: translationController.show, closeTranslation: translationController.close,
     getRoot: () => root, messageSelection,
     openProfile: (memberNumber, messageId) => profileViewer.open(memberNumber,
         conversation.messages.find(message => message.id === messageId)?.profiles?.find(profile => profile.memberNumber === Number(memberNumber))),

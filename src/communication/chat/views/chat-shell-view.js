@@ -1,3 +1,4 @@
+import { hasMAT } from '../services/chat-translation.js';
 import { esc } from '../services/chat-content.js';
 import { profileHtml } from './chat-profile-view.js';
 import { settingsHtml } from './chat-settings-view.js';
@@ -34,7 +35,7 @@ function chatShellHtml(model) {
             <main class="fcm-chat-main ${detailVisible ? 'slide-in' : ''}">${model.conversationHtml}</main>
         </div>
         <div class="fcm-chat-status-menu"><button data-status-value="online"><i class="online"></i>${model.text('chatStatusOnline')}</button><button data-status-value="busy"><i class="busy"></i>${model.text('chatStatusBusy')}</button><button data-status-value="afk"><i class="afk"></i>${model.text('chatStatusAFK')}</button></div>
-        <div class="fcm-chat-context-menu" hidden><button data-context-select>${model.text('chatSelectMessage')}</button><button data-context-copy>${model.text('chatCopy')}</button><button data-context-multi>${model.text('chatMultiSelect')}</button><button data-context-reply>${model.text('chatReply')}</button><button data-context-cancel>${model.text('chatCancel')}</button></div>
+        <div class="fcm-chat-context-menu" hidden><button data-context-select>${model.text('chatSelectMessage')}</button><button data-context-copy>${model.text('chatCopy')}</button><button data-context-multi>${model.text('chatMultiSelect')}</button><button data-context-reply>${model.text('chatReply')}</button><button data-context-translate ${hasMAT() ? '' : 'hidden'}>${model.text('chatTranslate')}</button><button data-context-cancel>${model.text('chatCancel')}</button></div>
     </div>`;
 }
 
