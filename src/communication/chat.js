@@ -170,7 +170,7 @@ const messageActions = createChatMessageActionsController({
 });
 const conversationPresenter = createChatConversationPresenter({
     getMemberNumber: () => selectedMember, getConfig: () => cfg, getRoom: () => ChatRoomData,
-    getRoomCharacters: () => ChatRoomCharacter, getCachedRoomInfo, capability, roomState,
+    getRoomCharacters: () => ChatRoomCharacter, getCachedRoomInfo, capability: composer.getChannel, roomState,
     isFriend: isFriendOf, inRoom: inRoomFn, avatarHtml, displayName: getDisplayName, biography,
     hasSavedProfile: memberNumber => !!_pc[memberNumber]?.characterBundle,
     isContactCardOpen: contactCard.isOpen, getMessages: () => conversation.messages,
@@ -179,7 +179,8 @@ const conversationPresenter = createChatConversationPresenter({
 });
 const conversationPresence = createChatConversationPresence({
     getRoot: () => root, getMemberNumber: () => selectedMember, getRoom: () => ChatRoomData,
-    getOnlineFriends: () => onlineFriends, roomState, capability, inRoom: inRoomFn, sharedProfile,
+    getOnlineFriends: () => onlineFriends, roomState, capability: composer.getChannel, inRoom: inRoomFn, sharedProfile,
+    getRoomCharacters: () => ChatRoomCharacter, getCachedRoomInfo,
     text: T, queryRoomInfo,
 });
 const selectedActions = createChatSelectedActions({
@@ -271,7 +272,7 @@ const chatBalloons = createChatBalloonController({
     getDisplayName,
     getRoot: () => root,
     isMaximized: () => maximized,
-    toggleChat: memberNumber => toggleChat(memberNumber),
+    toggleChat: memberNumber => { listNavigation.getState().notificationTab = 'recent'; toggleChat(memberNumber); },
     unreadBadge: memberNumber => unreadBadge(memberNumber),
     unreadCount: memberNumber => listPresenter.unreadCount(memberNumber),
     waterShapeHtml,

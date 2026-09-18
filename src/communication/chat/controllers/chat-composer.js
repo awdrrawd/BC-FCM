@@ -1,5 +1,16 @@
 function createChatComposer({ getRoot, getMemberNumber, displayName, capability, isFriend, sender, getReplyTarget, clearReplyTarget, text = key => key }) {
     let sending = false;
+    const channels = new Map();
+    function getChannel(memberNumber = getMemberNumber()) {
+        const available = capability(memberNumber);
+        return available === 'whisper' && channels.get(Number(memberNumber)) === 'beep' ? 'beep' : available;
+    }
+    function selectChannel(channel) {
+        const memberNumber = Number(getMemberNumber());
+        const available = capability(memberNumber);
+        if (channel !== available && !(available === 'whisper' && channel === 'beep')) return;
+        channels.set(memberNumber, channel);
+    }
     function expandProfileMentions(content) {
         return String(content).replace(/@(\d+)/gu, (all, id) => `@${displayName(Number(id))} (${id})`);
     }
@@ -10,7 +21,7 @@ function createChatComposer({ getRoot, getMemberNumber, displayName, capability,
         const memberNumber = Number(getMemberNumber());
         const content = expandProfileMentions(input?.value.trim() || '');
         if (!input || !content || !memberNumber) return;
-        const available = capability(memberNumber);
+        const available = getChannel(memberNumber);
         if (available === 'none' && !isFriend(memberNumber)) return;
         const original = input.value;
         const reply = getReplyTarget();
@@ -43,7 +54,7 @@ function createChatComposer({ getRoot, getMemberNumber, displayName, capability,
         return send();
     }
 
-    return { handleKeydown, send };
+    return { getChannel, selectChannel, handleKeydown, send };
 }
 
 export { createChatComposer };

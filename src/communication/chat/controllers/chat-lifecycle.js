@@ -45,9 +45,9 @@ function createChatLifecycle({ config, getRoot, setRoot, getSelectedMember, setS
 
     function toggle(memberNumber = null) {
         const root = getRoot();
-        if (root?.isConnected && root.style.display !== 'none') minimize();
+        if (!memberNumber && root?.isConnected && root.style.display !== 'none') minimize();
         else {
-            if (memberNumber) setActiveView('chat');
+            if (memberNumber) setActiveView('notifications');
             else {
                 setActiveView('notifications');
                 setStackedDetail(false);

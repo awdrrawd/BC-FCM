@@ -1,3 +1,4 @@
+import { roomHeaderText } from '../services/chat-room-header.js';
 import { contactCardHtml, conversationHtml } from './chat-conversation-view.js';
 import { conversationMessagesHtml } from './chat-message-view.js';
 
@@ -17,10 +18,7 @@ function createChatConversationPresenter({ getMemberNumber, getConfig, getRoom, 
         const available = capability(memberNumber);
         const { roomInfo, roomText: baseRoomText, canOpenRoom, unavailable } = roomState.get(memberNumber);
         const cachedRoom = roomInfo?.name ? getCachedRoomInfo(roomInfo.name) : null;
-        const memberCount = roomInfo?.isCurrent ? (getRoomCharacters()?.length ?? null) : (roomInfo?.memberCount ?? cachedRoom?.MemberCount ?? null);
-        const memberLimit = roomInfo?.isCurrent ? (getRoom()?.MemberLimit ?? null) : (roomInfo?.memberLimit ?? cachedRoom?.MemberLimit ?? null);
-        const roomCount = memberCount !== null && memberCount !== undefined ? ` ＜${memberCount}${memberLimit !== null && memberLimit !== undefined ? `/${memberLimit}` : ''}＞` : '';
-        const roomText = canOpenRoom ? `${roomInfo.name}${roomCount}` : baseRoomText;
+        const roomText = roomHeaderText({ roomInfo, baseRoomText, room: getRoom(), characters: getRoomCharacters(), cachedRoom });
         const online = available !== 'none';
         const inputPlaceholder = unavailable ? text('noBeepNotFriend') : !online ? text('chatOfflineQueuePlaceholder') : available === 'whisper' ? text('chatWhisperInputPlaceholder') : text('chatPrivateInputPlaceholder');
         return conversationHtml({
@@ -30,7 +28,7 @@ function createChatConversationPresenter({ getMemberNumber, getConfig, getRoom, 
             roomText, roomName: roomInfo?.name || '', canOpenRoom,
             canSummon: !!getRoom() && online && !inRoom(memberNumber), groups: Object.entries(config.chatGroups || {}),
             contactCardHtml: isContactCardOpen() ? renderContactCard() : '', messagesHtml: conversationMessagesHtml(getMessages()),
-            unread: getUnread(), multiSelect: isMultiSelect(), available, online,
+            canWhisper: inRoom(memberNumber), unread: getUnread(), multiSelect: isMultiSelect(), available, online,
             canInvite: available !== 'none' && !inRoom(memberNumber), inputPlaceholder, unavailable,
             replyTarget: getReplyTarget(), selectedCount: getSelectedCount(), canForwardToRoom: !!getRoom(),
         });
