@@ -1,4 +1,6 @@
-function createChatConversationPresence({ getRoot, getMemberNumber, getRoom, getOnlineFriends, roomState, capability, inRoom, sharedProfile, text, queryRoomInfo }) {
+import { roomHeaderText } from '../services/chat-room-header.js';
+
+function createChatConversationPresence({ getRoot, getMemberNumber, getRoom, getRoomCharacters = () => [], getCachedRoomInfo = () => null, getOnlineFriends, roomState, capability, inRoom, sharedProfile, text, queryRoomInfo }) {
     function refreshRoomMeta() {
         const memberNumber = Number(getMemberNumber());
         if (!memberNumber) return;
@@ -8,9 +10,9 @@ function createChatConversationPresence({ getRoot, getMemberNumber, getRoom, get
         queryRoomInfo(roomInfo.name, friend?.ChatRoomSpace, data => {
             const meta = getRoot()?.querySelector(`[data-room-meta="${memberNumber}"]`);
             if (!meta || Number(getMemberNumber()) !== memberNumber || memberNumber !== Number(meta.dataset.roomMeta)) return;
-            const count = data?.MemberCount;
-            const limit = data?.MemberLimit;
-            const roomText = `${roomInfo.name}${count !== null && count !== undefined ? ` ＜${count}${limit !== null && limit !== undefined ? `/${limit}` : ''}＞` : ''}`;
+            const current = roomState.get(memberNumber);
+            if (current.roomInfo?.name !== roomInfo.name || !current.canOpenRoom || current.roomInfo?.isPrivate || current.roomInfo?.isCurrent) return;
+            const roomText = roomHeaderText({ roomInfo: current.roomInfo, baseRoomText: current.roomText, cachedRoom: data });
             meta.textContent = roomText;
             meta.title = roomText;
         });
@@ -21,7 +23,8 @@ function createChatConversationPresence({ getRoot, getMemberNumber, getRoom, get
         if (!memberNumber) return;
         const root = getRoot();
         const available = capability(memberNumber);
-        const { roomInfo, roomText, canOpenRoom, unavailable } = roomState.get(memberNumber);
+        const { roomInfo, roomText: baseRoomText, canOpenRoom, unavailable } = roomState.get(memberNumber);
+        const roomText = roomHeaderText({ roomInfo, baseRoomText, room: getRoom(), characters: getRoomCharacters(), cachedRoom: getCachedRoomInfo(roomInfo?.name) });
         const meta = root?.querySelector(`[data-room-meta="${memberNumber}"]`);
         if (meta) {
             meta.textContent = roomText;
@@ -44,8 +47,8 @@ function createChatConversationPresence({ getRoot, getMemberNumber, getRoom, get
         if (summon) summon.disabled = !getRoom() || !online || inRoom(memberNumber);
         const whisper = root?.querySelector('[data-channel="whisper"]');
         const beep = root?.querySelector('[data-channel="beep"]');
-        if (whisper) { whisper.disabled = available !== 'whisper'; whisper.classList.toggle('active', available === 'whisper'); }
-        if (beep) { beep.disabled = available !== 'beep'; beep.classList.toggle('active', available === 'beep'); }
+        if (whisper) { whisper.disabled = !inRoom(memberNumber); whisper.classList.toggle('active', available === 'whisper'); }
+        if (beep) { beep.disabled = !online; beep.classList.toggle('active', available === 'beep'); }
         const input = root?.querySelector('[data-input]');
         if (input) input.placeholder = unavailable ? text('noBeepNotFriend') : !online ? text('chatOfflineQueuePlaceholder') : available === 'whisper' && inRoom(memberNumber) ? text('chatWhisperInputPlaceholder') : text('chatPrivateInputPlaceholder');
         const send = root?.querySelector('[data-send]');

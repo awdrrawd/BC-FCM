@@ -24,6 +24,12 @@ function createChatConversationEvents({ getRoot, getMemberNumber, config, saveCo
         if (!main) return;
         main.querySelector('[data-back]')?.addEventListener('click', closeStackedDetail);
         main.querySelector('[data-send]')?.addEventListener('click', composer.send);
+        main.querySelectorAll('[data-channel]').forEach(button => button.addEventListener('click', () => {
+            composer.selectChannel(button.dataset.channel);
+            main.querySelectorAll('[data-channel]').forEach(item => item.classList.toggle('active', item.dataset.channel === composer.getChannel()));
+            const input = main.querySelector('[data-input]');
+            if (input) input.placeholder = button.dataset.placeholder;
+        }));
         historyViewport.bind(main.querySelector('.fcm-chat-messages'), main.querySelector('[data-new-messages]'));
         main.querySelector('[data-multi-forward-contact]')?.addEventListener('click', forwardTargets.show);
         main.querySelector('[data-multi-forward-room]')?.addEventListener('click', selectedActions.forwardToRoom);

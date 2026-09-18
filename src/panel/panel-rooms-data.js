@@ -51,7 +51,7 @@ async function queryRoomInfo(roomName, space, onUpdate) {
         const zones = space !== undefined ? [space, 'X', '', 'M'] : ['X', '', 'M'];
         for (const z of [...new Set(zones)]) {
             try {
-                const res = await ServerRoomSearch(roomName, { Language: '', Space: z, Game: '', FullRooms: false });
+                const res = await ServerRoomSearch(roomName, { Language: '', Space: z, Game: '', FullRooms: true });
                 if (!res || res.err || !res.value) continue;
                 const found = res.value.find(r => r.Name === roomName);
                 if (found) { _cacheRooms([found]); if (onUpdate) onUpdate(_roomCache.get(roomName)); break; }
