@@ -473,5 +473,8 @@
   "chatSending": "发送中…",
   "chatSendFailed": "发送失败，文字已保留。离线时无法分享 Profiles；请确认人物资料、消息长度及发送权限。",
   "chatOfflineQueuePlaceholder": "离线文字将在上线后补发；Profiles 请上线后重新分享…",
-  "chatQueueSend": "离线发送"
+  "chatQueueSend": "离线发送",
+  "chatTranslate": "翻译",
+  "chatTranslationLoading": "翻译中…",
+  "chatTranslationFailed": "翻译失败，请点击“翻译”重试。"
 }

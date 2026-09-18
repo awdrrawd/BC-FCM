@@ -1,3 +1,5 @@
+import { hasMAT } from '../services/chat-translation.js';
+
 function selectMessageText(messageElement) {
     const content = messageElement?.querySelector('.fcm-chat-content');
     if (!content) return;
@@ -10,14 +12,20 @@ function selectMessageText(messageElement) {
     selection.addRange(range);
 }
 
-function installMessageActions({ root, log, menu, isMultiSelectActive, selectedIds, updateMultiSelectUi, openProfile, replyToMessage, enterMultiSelect, isMobile }) {
+function installMessageActions({ root, log, menu, isMultiSelectActive, selectedIds, updateMultiSelectUi, openProfile, replyToMessage, translateMessage = () => {}, enterMultiSelect, isMobile }) {
     if (!root || !log || !menu) return () => {};
+    const listeners = new AbortController();
+    const listen = (element, type, handler, options = {}) => element.addEventListener(type, handler, { ...options, signal: listeners.signal });
+    const syncTranslation = () => root.querySelectorAll('[data-message-translate],[data-context-translate]').forEach(button => { button.hidden = !hasMAT(); });
+    syncTranslation();
+    listen(window, 'liko:mat-ready', syncTranslation);
     let target = null;
     let suppressClickUntil = 0;
     let holdTimer = 0;
 
     const hide = () => { menu.hidden = true; target = null; };
     const show = (message, clientX, clientY) => {
+        syncTranslation();
         target = message;
         menu.hidden = false;
         const panelRect = root.querySelector('#fcm-chat-panel').getBoundingClientRect();
@@ -25,9 +33,9 @@ function installMessageActions({ root, log, menu, isMultiSelectActive, selectedI
         menu.style.top = `${Math.max(8, Math.min(clientY - panelRect.top, panelRect.height - menu.offsetHeight - 8))}px`;
     };
     const closeFromOutside = event => { if (!event.target.closest('.fcm-chat-context-menu')) hide(); };
-    document.addEventListener('pointerdown', closeFromOutside, true);
+    listen(document, 'pointerdown', closeFromOutside, { capture: true });
 
-    log.addEventListener('click', event => {
+    listen(log, 'click', event => {
         if (Date.now() < suppressClickUntil) { event.preventDefault(); return; }
         const message = event.target.closest('.fcm-chat-message');
         if (isMultiSelectActive() && message) {
@@ -48,6 +56,8 @@ function installMessageActions({ root, log, menu, isMultiSelectActive, selectedI
             }
             return;
         }
+        const translation = event.target.closest('[data-message-translate]');
+        if (translation) { event.stopPropagation(); void translateMessage(message); return; }
         const reply = event.target.closest('[data-message-reply]');
         if (reply) { event.stopPropagation(); replyToMessage(reply.closest('.fcm-chat-message')); return; }
         if (message) {
@@ -56,7 +66,7 @@ function installMessageActions({ root, log, menu, isMultiSelectActive, selectedI
             message.classList.toggle('selected', !selected);
         }
     });
-    log.addEventListener('contextmenu', event => {
+    listen(log, 'contextmenu', event => {
         const message = event.target.closest('.fcm-chat-message');
         if (!message) return;
         event.preventDefault();
@@ -67,7 +77,7 @@ function installMessageActions({ root, log, menu, isMultiSelectActive, selectedI
         let startX = 0;
         let startY = 0;
         const cancelHold = () => { clearTimeout(holdTimer); holdTimer = 0; };
-        log.addEventListener('pointerdown', event => {
+        listen(log, 'pointerdown', event => {
             const message = event.target.closest('.fcm-chat-message');
             if (!message || event.button !== 0) return;
             startX = event.clientX;
@@ -78,12 +88,14 @@ function installMessageActions({ root, log, menu, isMultiSelectActive, selectedI
                 show(message, startX, startY);
             }, 550);
         });
-        log.addEventListener('pointerup', cancelHold);
-        log.addEventListener('pointercancel', cancelHold);
-        log.addEventListener('pointermove', event => { if (Math.hypot(event.clientX - startX, event.clientY - startY) > 10) cancelHold(); });
+        listen(log, 'pointerup', cancelHold);
+        listen(log, 'pointercancel', cancelHold);
+        listen(log, 'pointermove', event => { if (Math.hypot(event.clientX - startX, event.clientY - startY) > 10) cancelHold(); });
     }
 
     menu.querySelector('[data-context-reply]').onclick = () => { const message = target; hide(); replyToMessage(message); };
+    const translation = menu.querySelector('[data-context-translate]');
+    if (translation) translation.onclick = () => { const message = target; hide(); void translateMessage(message); };
     menu.querySelector('[data-context-select]').onclick = () => { const message = target; hide(); selectMessageText(message); };
     menu.querySelector('[data-context-copy]').onclick = async () => {
         const parts = target ? [...target.querySelectorAll('.fcm-chat-content,.fcm-chat-message-original')].map(element => element.textContent) : [];
@@ -95,16 +107,19 @@ function installMessageActions({ root, log, menu, isMultiSelectActive, selectedI
 
     return () => {
         clearTimeout(holdTimer);
-        document.removeEventListener('pointerdown', closeFromOutside, true);
+        listeners.abort();
+        menu.querySelectorAll('button').forEach(button => { button.onclick = null; });
+        hide();
     };
 }
 
-function createChatMessageActionsController({ getRoot, messageSelection, openProfile, replyToMessage, isMobile }) {
+function createChatMessageActionsController({ getRoot, messageSelection, openProfile, replyToMessage, translateMessage, closeTranslation = () => {}, isMobile }) {
     let cleanup = null;
 
     function bind() {
         const root = getRoot();
         cleanup?.();
+        closeTranslation();
         cleanup = installMessageActions({
             root,
             log: root?.querySelector('.fcm-chat-messages'),
@@ -114,12 +129,14 @@ function createChatMessageActionsController({ getRoot, messageSelection, openPro
             updateMultiSelectUi: messageSelection.updateUi,
             openProfile,
             replyToMessage,
+            translateMessage,
             enterMultiSelect: messageSelection.enter,
             isMobile,
         });
     }
 
     function destroy() {
+        closeTranslation();
         cleanup?.();
         cleanup = null;
     }

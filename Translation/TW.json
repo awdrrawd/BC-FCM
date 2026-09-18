@@ -473,5 +473,8 @@
   "chatProvDeepl": "DeepL",
   "chatProvGoogle": "Google 翻譯",
   "chatOfflineQueuePlaceholder": "離線文字將於上線後補送；Profiles 請上線後重分享…",
-  "chatQueueSend": "離線傳送"
+  "chatQueueSend": "離線傳送",
+  "chatTranslate": "翻譯",
+  "chatTranslationLoading": "翻譯中…",
+  "chatTranslationFailed": "翻譯失敗，請點「翻譯」重試。"
 }

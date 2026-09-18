@@ -47,11 +47,8 @@ function createChatLifecycle({ config, getRoot, setRoot, getSelectedMember, setS
         const root = getRoot();
         if (!memberNumber && root?.isConnected && root.style.display !== 'none') minimize();
         else {
-            if (memberNumber) setActiveView('notifications');
-            else {
-                setActiveView('notifications');
-                setStackedDetail(false);
-            }
+            setActiveView('notifications');
+            if (!memberNumber) setStackedDetail(false);
             open(memberNumber);
         }
     }

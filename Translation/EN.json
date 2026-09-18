@@ -473,5 +473,8 @@
   "chatProvDeepl": "DeepL",
   "chatProvGoogle": "Google Translate",
   "chatOfflineQueuePlaceholder": "Offline text will be sent when they return; share Profiles again when online…",
-  "chatQueueSend": "Queue send"
+  "chatQueueSend": "Queue send",
+  "chatTranslate": "Translate",
+  "chatTranslationLoading": "Translating…",
+  "chatTranslationFailed": "Translation failed. Click Translate to try again."
 }

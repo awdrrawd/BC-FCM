@@ -473,5 +473,8 @@
   "chatSending": "Enviando…",
   "chatSendFailed": "No se pudo enviar. El texto se ha conservado. No se pueden compartir Profiles sin conexión; revisa los datos del perfil, la longitud y los permisos de envío.",
   "chatOfflineQueuePlaceholder": "El texto se enviará cuando vuelva a conectarse; comparte los Profiles de nuevo entonces…",
-  "chatQueueSend": "Enviar al conectarse"
+  "chatQueueSend": "Enviar al conectarse",
+  "chatTranslate": "Traducir",
+  "chatTranslationLoading": "Traduciendo…",
+  "chatTranslationFailed": "Error de traducción. Haz clic en Traducir para reintentar."
 }
