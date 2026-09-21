@@ -41,9 +41,11 @@ const OfflineQueue = {
 
 const ChatStore = {
     db: null,
+    opening: null,
     async init() {
         if (this.db) return true;
-        return new Promise(resolve => {
+        if (this.opening) return this.opening;
+        this.opening = new Promise(resolve => {
             try {
                 const req = indexedDB.open(DB_NAME);
                 req.onupgradeneeded = e => {
@@ -55,13 +57,17 @@ const ChatStore = {
                     }
                 };
                 req.onsuccess = () => {
-                    this.db = req.result;
-                    this.db.onversionchange = () => { this.db.close(); this.db = null; };
+                    const db = req.result;
+                    this.db = db;
+                    const release = () => { if (this.db === db) this.db = null; };
+                    db.onversionchange = () => { db.close(); release(); };
+                    db.onclose = release;
                     resolve(true);
                 };
                 req.onerror = () => { warnLimited('chat database open failed', req.error); resolve(false); };
             } catch (error) { warnLimited('chat database open failed', error); resolve(false); }
         });
+        try { return await this.opening; } finally { this.opening = null; }
     },
     async put(message) {
         const ownerMemberNumber = accountNumber();
@@ -89,15 +95,20 @@ const ChatStore = {
         });
     },
     // Returns a lightweight recent-message index for the UI. This never deletes
-    // history; deletion remains an explicit user action.
-    async recentIndex({ maxCount = 100 } = {}) {
+    // history; deletion remains an explicit user action. Null means the read
+    // failed: callers must preserve their existing index rather than clear it.
+    async recentIndex({ maxCount = 100, retry = true } = {}) {
         const ownerMemberNumber = accountNumber();
         if (!ownerMemberNumber || !this.db) await this.init();
-        if (!ownerMemberNumber || !this.db || maxCount <= 0) return [];
+        if (!ownerMemberNumber || !this.db) return null;
+        if (maxCount <= 0) return [];
         const rows = [];
-        return new Promise(resolve => {
+        const db = this.db;
+        const result = await new Promise(resolve => {
             try {
-                const index = this.db.transaction('messages', 'readonly').objectStore('messages').index('timestamp');
+                const tx = db.transaction('messages', 'readonly');
+                tx.onabort = () => { warnLimited('recent chat history transaction aborted', tx.error); resolve(null); };
+                const index = tx.objectStore('messages').index('timestamp');
                 const req = index.openCursor(null, 'prev');
                 req.onsuccess = () => {
                     const cursor = req.result;
@@ -105,9 +116,14 @@ const ChatStore = {
                     if (Number(cursor.value.ownerMemberNumber) === ownerMemberNumber) rows.push(cursor.value);
                     cursor.continue();
                 };
-                req.onerror = () => { warnLimited('recent chat history read failed', req.error); resolve([]); };
-            } catch (error) { warnLimited('recent chat history read failed', error); resolve([]); }
+                req.onerror = () => { warnLimited('recent chat history read failed', req.error); resolve(null); };
+            } catch (error) { warnLimited('recent chat history read failed', error); resolve(null); }
         });
+        if (accountNumber() !== ownerMemberNumber) return null;
+        if (result !== null || !retry) return result;
+        if (this.db === db) { db.close(); this.db = null; }
+        if (!await this.init()) return null;
+        return this.recentIndex({ maxCount, retry: false });
     },
     async page(memberNumber, { before = Infinity, limit = 50 } = {}) {
         const ownerMemberNumber = accountNumber();

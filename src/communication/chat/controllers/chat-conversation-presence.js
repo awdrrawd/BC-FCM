@@ -52,7 +52,7 @@ function createChatConversationPresence({ getRoot, getMemberNumber, getRoom, get
         const input = root?.querySelector('[data-input]');
         if (input) input.placeholder = unavailable ? text('noBeepNotFriend') : !online ? text('chatOfflineQueuePlaceholder') : available === 'whisper' && inRoom(memberNumber) ? text('chatWhisperInputPlaceholder') : text('chatPrivateInputPlaceholder');
         const send = root?.querySelector('[data-send]');
-        if (send) {
+        if (send && !send.dataset?.sending) {
             send.textContent = online ? text('chatSend') : text('chatQueueSend');
             send.disabled = unavailable;
         }

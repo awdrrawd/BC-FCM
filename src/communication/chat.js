@@ -42,6 +42,9 @@ import { createChatTranslationController } from './chat/controllers/chat-transla
 let root = null;
 let selectedMember = null;
 let messages = [];
+function setMessageIndex(value) {
+    if (Array.isArray(value)) messages = value;
+}
 const conversation = new ChatConversationController(50, 40);
 let activeView = 'chat';
 let maximized = false;
@@ -73,7 +76,7 @@ const messageRecorder = createChatMessageRecorder({
     conversation,
     isPanelVisible: () => !!root?.isConnected && root.style.display !== 'none',
     isSelectedMember: memberNumber => Number(memberNumber) === Number(selectedMember),
-    setMessageIndex: value => { messages = value; },
+    setMessageIndex,
     appendMessage: message => messageAppender.append(message),
     refreshList: () => chatList.refreshVisible(),
     notifyIncoming: message => {
@@ -89,7 +92,7 @@ const autoReply = createChatAutoReplyService({
 const offlineDelivery = createOfflineDeliveryService({
     offlineQueue: OfflineQueue, chatStore: ChatStore, isFriend: isFriendOf, sendBeep: sendBcxAwareBeep, runWithoutOutgoingCapture,
     onDelivered: async stored => {
-        messages = await ChatStore.recentIndex();
+        setMessageIndex(await ChatStore.recentIndex());
         if (root?.isConnected && root.style.display !== 'none') {
             const element = root.querySelector(`[data-msg-id="${CSS.escape(String(stored?.id || ''))}"]`);
             element?.classList.remove('queued');
@@ -234,7 +237,7 @@ const memberSelection = createChatMemberSelection({
     getRoot: () => root, getMemberNumber: () => selectedMember, setMemberNumber: value => { selectedMember = value; },
     resetSelection: resetMessageSelectionState, clearReply: replyController.clear, closeContactCard: contactCard.close,
     setStackedDetail: value => { stackedDetail = value; }, chatStore: ChatStore,
-    setMessageIndex: value => { messages = value; }, loadConversation,
+    setMessageIndex, loadConversation,
     refreshList: () => chatList.refreshVisible(),
     refreshBadges: () => chatBalloons.refreshBadges(), getLayout: () => cfg.chatLayout,
     refreshConversation: refreshConversationMain,
@@ -323,13 +326,13 @@ const chatLifecycle = createChatLifecycle({
     setStackedDetail: value => { stackedDetail = value; }, resetSelection: resetMessageSelectionState,
     clearReply: replyController.clear, closeContactCard: contactCard.close,
     cleanupMessageActions: messageActions.destroy,
-    requestOnlineFriends, chatStore: ChatStore, setMessageIndex: value => { messages = value; }, loadConversation,
+    requestOnlineFriends, chatStore: ChatStore, setMessageIndex, loadConversation,
     refreshBadges: chatBalloons.refreshBadges, render: chatRenderer.render,
     syncBalloonVisibility: chatBalloons.syncVisibility, ensureBalloons: chatBalloons.ensure,
     resetBalloonInteraction, paintBalloon: chatBalloons.paint,
 });
 const chatRuntime = createChatRuntime({
-    config: cfg, chatStore: ChatStore, setMessageIndex: value => { messages = value; }, getMessageIndex: () => messages,
+    config: cfg, chatStore: ChatStore, setMessageIndex, getMessageIndex: () => messages,
     cleanMessage, profileDb: PDB, initAudio: initChatAudio, injectStyles: injectChatStyles,
     balloons: chatBalloons, getRoot: () => root, render: chatRenderer.render,
     refreshSettings: () => refreshChatSettings(), text: T, contactCard, presence,

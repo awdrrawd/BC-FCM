@@ -1,4 +1,5 @@
 function createChatLifecycle({ config, getRoot, setRoot, getSelectedMember, setSelectedMember, getPlayerMemberNumber, setActiveView, setStackedDetail, resetSelection, clearReply, closeContactCard, cleanupMessageActions, requestOnlineFriends, chatStore, setMessageIndex, loadConversation, refreshBadges, render, syncBalloonVisibility, ensureBalloons, resetBalloonInteraction, paintBalloon }) {
+    let generation = 0;
     function ensureRoot() {
         let root = getRoot();
         if (!root?.isConnected) {
@@ -12,6 +13,8 @@ function createChatLifecycle({ config, getRoot, setRoot, getSelectedMember, setS
 
     async function open(memberNumber = null) {
         if (!config.communicationEnabled) return false;
+        const request = ++generation;
+        const owner = getPlayerMemberNumber();
         if (Number(memberNumber) === Number(getPlayerMemberNumber())) memberNumber = null;
         if (memberNumber) {
             setSelectedMember(Number(memberNumber));
@@ -23,19 +26,21 @@ function createChatLifecycle({ config, getRoot, setRoot, getSelectedMember, setS
         ensureRoot().style.display = 'block';
         requestOnlineFriends();
         const selectedMember = getSelectedMember();
+        const isCurrent = () => request === generation && owner === getPlayerMemberNumber() && getSelectedMember() === selectedMember;
         if (selectedMember) await chatStore.markRead(selectedMember);
-        if (selectedMember && Number(getSelectedMember()) !== Number(selectedMember)) return false;
+        if (!isCurrent()) return false;
         const messageIndex = await chatStore.recentIndex();
-        if (selectedMember && Number(getSelectedMember()) !== Number(selectedMember)) return false;
-        setMessageIndex(messageIndex);
+        if (!isCurrent()) return false;
+        if (Array.isArray(messageIndex)) setMessageIndex(messageIndex);
         if (selectedMember) await loadConversation(selectedMember);
-        if (selectedMember && Number(getSelectedMember()) !== Number(selectedMember)) return false;
+        if (!isCurrent()) return false;
         refreshBadges();
         render();
         return true;
     }
 
     function minimize() {
+        generation++;
         cleanupMessageActions();
         const root = getRoot();
         if (root) root.style.display = 'none';
@@ -54,6 +59,7 @@ function createChatLifecycle({ config, getRoot, setRoot, getSelectedMember, setS
     }
 
     function close() {
+        generation++;
         const memberToClose = getSelectedMember();
         setSelectedMember(null);
         resetSelection();
