@@ -1,4 +1,4 @@
-function createChatComposer({ getRoot, getMemberNumber, displayName, capability, isFriend, sender, getReplyTarget, clearReplyTarget, text = key => key }) {
+function createChatComposer({ getRoot, getMemberNumber, displayName, capability, isFriend, sender, getReplyTarget, clearReplyTarget, text = key => key, sendingDelay = 600 }) {
     let sending = false;
     const channels = new Map();
     function getChannel(memberNumber = getMemberNumber()) {
@@ -29,7 +29,15 @@ function createChatComposer({ getRoot, getMemberNumber, displayName, capability,
         const label = button?.textContent;
         const notice = getRoot()?.querySelector('[data-bcx-compose-notice]');
         if (notice) notice.hidden = true;
-        if (button) { button.disabled = true; button.textContent = text('chatSending'); }
+        const width = button?.style?.width;
+        if (button) {
+            if (button.style && button.getBoundingClientRect) button.style.width = button.getBoundingClientRect().width + 'px';
+            button.disabled = true;
+            if (button.dataset) button.dataset.sending = 'true';
+        }
+        const timer = setTimeout(() => {
+            if (button?.isConnected && Number(getMemberNumber()) === memberNumber) button.textContent = text('chatSending');
+        }, sendingDelay);
         sending = true;
         try {
             const sent = await sender.send({ memberNumber, content, channel: available, replyTarget: reply });
@@ -41,8 +49,14 @@ function createChatComposer({ getRoot, getMemberNumber, displayName, capability,
             if (getReplyTarget() === reply) clearReplyTarget({ focus: false });
             if (input.value === original) input.value = '';
         } finally {
+            clearTimeout(timer);
             sending = false;
-            if (button) { button.disabled = false; button.textContent = label; }
+            if (button) {
+                button.disabled = capability(memberNumber) === 'none' && !isFriend(memberNumber);
+                button.textContent = label;
+                if (button.style) button.style.width = width;
+                if (button.dataset) delete button.dataset.sending;
+            }
         }
     }
 
