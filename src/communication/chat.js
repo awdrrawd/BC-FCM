@@ -39,6 +39,8 @@ import { createNativeChatTags } from './chat/controllers/chat-native-tags.js';
 import { createChatTranslationService } from './chat/services/chat-translation.js';
 import { createChatTranslationController } from './chat/controllers/chat-translation.js';
 
+import { createChatIndexRefresh } from './chat/controllers/chat-index-refresh.js';
+
 let root = null;
 let selectedMember = null;
 let messages = [];
@@ -243,6 +245,7 @@ const memberSelection = createChatMemberSelection({
     refreshConversation: refreshConversationMain,
 });
 const listNavigation = createChatListNavigation({
+    refreshMessageIndex: () => indexRefresh.refresh(),
     getActiveView: () => activeView,
     config: cfg, saveConfig: saveCfg, promptGroupName: chatDialogs.promptGroupName,
     refreshList: options => chatList.refresh(options), refreshVisible: () => chatList.refreshVisible(),
@@ -303,6 +306,7 @@ const conversationEvents = createChatConversationEvents({
     promptGroupName: chatDialogs.promptGroupName, createGroup: listNavigation.createGroup, rerender: renderChat,
 });
 const shellEvents = createChatShellEvents({
+    refreshMessageIndex: () => indexRefresh.refresh(),
     getRoot: () => root, panelControls, setActiveView: value => { activeView = value; },
     resetSelection: resetMessageSelectionState, setStackedDetail: value => { stackedDetail = value; }, rerender: renderChat,
     bindListNavigation: listNavigation.bind, bindConversation: conversationEvents.bind, bindForwardTargets: forwardTargets.bind,
@@ -331,7 +335,13 @@ const chatLifecycle = createChatLifecycle({
     syncBalloonVisibility: chatBalloons.syncVisibility, ensureBalloons: chatBalloons.ensure,
     resetBalloonInteraction, paintBalloon: chatBalloons.paint,
 });
+const indexRefresh = createChatIndexRefresh({
+    store: ChatStore, getOwner: () => globalThis.Player?.MemberNumber, setIndex: setMessageIndex,
+    refreshList: () => { if (root?.isConnected && root.style.display !== 'none') chatList.refreshVisible(); },
+    refreshBadges: chatBalloons.refreshBadges,
+});
 const chatRuntime = createChatRuntime({
+    refreshMessageIndex: indexRefresh.refresh,
     config: cfg, chatStore: ChatStore, setMessageIndex, getMessageIndex: () => messages,
     cleanMessage, profileDb: PDB, initAudio: initChatAudio, injectStyles: injectChatStyles,
     balloons: chatBalloons, getRoot: () => root, render: chatRenderer.render,

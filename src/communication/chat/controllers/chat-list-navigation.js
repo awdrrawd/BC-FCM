@@ -1,6 +1,6 @@
 import { bindSearch } from '../views/chat-search-view.js';
 
-function createChatListNavigation({ config, saveConfig, promptGroupName, refreshList, refreshVisible, bindMemberRows, getActiveView }) {
+function createChatListNavigation({ config, saveConfig, promptGroupName, refreshList, refreshVisible, bindMemberRows, getActiveView, refreshMessageIndex = () => {} }) {
     const state = {
         search: '', presenceFilter: 'online', relationFilter: '', notificationTab: 'recent',
         notificationSearch: '', selectedGroup: 'room', groupMode: 'room', groupSearch: '',
@@ -24,6 +24,7 @@ function createChatListNavigation({ config, saveConfig, promptGroupName, refresh
     function bind(scope) {
         scope?.querySelectorAll('[data-notification-tab]').forEach(button => button.addEventListener('click', () => {
             state.notificationTab = button.dataset.notificationTab;
+            void refreshMessageIndex();
             refreshList();
         }));
         scope?.querySelectorAll('[data-group]').forEach(button => button.addEventListener('click', () => {

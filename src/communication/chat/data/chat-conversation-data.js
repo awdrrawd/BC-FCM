@@ -1,3 +1,4 @@
+import { CHAT_RECENT_CONTACTS, CHAT_HISTORY_MESSAGES, CHAT_HISTORY_AGE } from './chat-retention.js';
 import { cleanMessage } from '../services/chat-content.js';
 
 function conversationRows(messages, friendRows, selfMemberNumber) {
@@ -23,13 +24,13 @@ function unreadMessageCount(messages, memberNumber = null) {
     return messages.filter(message => message.direction === 'in' && !message.read && (target === null || Number(message.memberNumber) === target)).length;
 }
 
-function recentConversationRows(rows, limit = 30) {
-    return rows.filter(row => row.timestamp).slice(0, limit);
+function recentConversationRows(rows, limit = CHAT_RECENT_CONTACTS, now = Date.now()) {
+    return rows.filter(row => row.timestamp && Number(row.timestamp) >= now - CHAT_HISTORY_AGE).sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
 }
 
-function historyMessageRows(messages, selfMemberNumber, limit = 100) {
+function historyMessageRows(messages, selfMemberNumber, limit = CHAT_HISTORY_MESSAGES, now = Date.now()) {
     const self = Number(selfMemberNumber);
-    return messages.filter(message => Number(message.memberNumber) !== self).sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
+    return messages.filter(message => Number(message.memberNumber) !== self && Number(message.timestamp) >= now - CHAT_HISTORY_AGE).sort((a, b) => b.timestamp - a.timestamp).slice(0, limit);
 }
 
 function normalizeConversationPage(messages) {

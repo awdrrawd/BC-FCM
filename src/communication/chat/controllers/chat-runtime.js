@@ -1,4 +1,4 @@
-function createChatRuntime({ config, chatStore, setMessageIndex, getMessageIndex, cleanMessage, profileDb, initAudio, injectStyles, balloons, getRoot, render, refreshSettings, text, contactCard, presence, refreshList, refreshConversationPresence, offlineDelivery, closeChat }) {
+function createChatRuntime({ config, chatStore, setMessageIndex, getMessageIndex, cleanMessage, profileDb, initAudio, injectStyles, balloons, getRoot, render, refreshSettings, text, contactCard, presence, refreshList, refreshConversationPresence, offlineDelivery, closeChat, refreshMessageIndex = async () => {} }) {
     let initPromise = null;
     let blockedNoticeTimer = 0;
 
@@ -49,6 +49,7 @@ function createChatRuntime({ config, chatStore, setMessageIndex, getMessageIndex
             refreshConversationPresence();
         }
         offlineDelivery.dispatch(result);
+        await refreshMessageIndex();
     }
 
     function setStatus(status, rerender = true) {

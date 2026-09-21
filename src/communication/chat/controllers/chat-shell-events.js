@@ -1,4 +1,4 @@
-function createChatShellEvents({ getRoot, panelControls, setActiveView, resetSelection, setStackedDetail, rerender, bindListNavigation, bindConversation, bindForwardTargets, setStatus, bindSettings, bindProfile }) {
+function createChatShellEvents({ getRoot, panelControls, setActiveView, resetSelection, setStackedDetail, rerender, bindListNavigation, bindConversation, bindForwardTargets, setStatus, bindSettings, bindProfile, refreshMessageIndex = () => {} }) {
     function bind() {
         const root = getRoot();
         const panel = root?.querySelector('#fcm-chat-panel');
@@ -9,6 +9,7 @@ function createChatShellEvents({ getRoot, panelControls, setActiveView, resetSel
             resetSelection();
             setStackedDetail(false);
             rerender();
+            if (button.dataset.view === 'notifications') void refreshMessageIndex();
         }));
         bindListNavigation(root);
         bindConversation();
