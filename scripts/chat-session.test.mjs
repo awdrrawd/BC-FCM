@@ -89,3 +89,35 @@ test('sending feedback is delayed and preserves the button width', async () => {
     assert.equal(button.style.width, '');
     assert.equal(button.disabled, false);
 });
+
+
+test('notification index retains 15 contacts independently of the last 100 messages and expires at seven days', async () => {
+    const previous = globalThis.Player;
+    globalThis.Player = { MemberNumber: 1 };
+    const now = Date.now();
+    const week = 7 * 24 * 60 * 60 * 1000;
+    const records = [
+        ...Array.from({ length: 110 }, (_, i) => ({ id: 'busy-' + i, memberNumber: 2, timestamp: now - i, ownerMemberNumber: 1 })),
+        ...Array.from({ length: 20 }, (_, i) => ({ id: 'contact-' + i, memberNumber: i + 3, timestamp: now - 200 - i, ownerMemberNumber: 1 })),
+        { id: 'expired', memberNumber: 99, timestamp: now - week - 1, ownerMemberNumber: 1 },
+    ];
+    ChatStore.db = { transaction: () => ({ objectStore: () => ({ index: () => ({ openCursor: () => {
+        const request = {};
+        let position = 0;
+        const advance = () => queueMicrotask(() => {
+            request.result = position < records.length ? { value: records[position++], continue: advance } : null;
+            request.onsuccess();
+        });
+        advance();
+        return request;
+    } }) }) }) };
+    try {
+        const result = await ChatStore.recentIndex({ now });
+        assert.equal(new Set(result.map(row => row.memberNumber)).size, 15);
+        assert.equal(result.filter(row => row.memberNumber === 2).length, 100);
+        assert.equal(result.some(row => row.id === 'expired'), false);
+        records.splice(0, records.length, { id: 'boundary', memberNumber: 2, timestamp: now - week, ownerMemberNumber: 1 },
+            { id: 'expired', memberNumber: 3, timestamp: now - week - 1, ownerMemberNumber: 1 });
+        assert.deepEqual((await ChatStore.recentIndex({ now })).map(row => row.id), ['boundary']);
+    } finally { ChatStore.db = null; globalThis.Player = previous; }
+});

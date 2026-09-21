@@ -1,3 +1,4 @@
+import { CHAT_RECENT_CONTACTS, CHAT_HISTORY_MESSAGES, CHAT_HISTORY_AGE } from './chat-retention.js';
 import { warnLimited } from '../../../core/logger.js';
 
 const DB_NAME = 'fcm-chat';
@@ -97,12 +98,15 @@ const ChatStore = {
     // Returns a lightweight recent-message index for the UI. This never deletes
     // history; deletion remains an explicit user action. Null means the read
     // failed: callers must preserve their existing index rather than clear it.
-    async recentIndex({ maxCount = 100, retry = true } = {}) {
+    async recentIndex({ maxCount = CHAT_HISTORY_MESSAGES, retry = true, now = Date.now() } = {}) {
         const ownerMemberNumber = accountNumber();
         if (!ownerMemberNumber || !this.db) await this.init();
         if (!ownerMemberNumber || !this.db) return null;
         if (maxCount <= 0) return [];
         const rows = [];
+        const contacts = new Set();
+        let historyCount = 0;
+        const cutoff = now - CHAT_HISTORY_AGE;
         const db = this.db;
         const result = await new Promise(resolve => {
             try {
@@ -112,8 +116,16 @@ const ChatStore = {
                 const req = index.openCursor(null, 'prev');
                 req.onsuccess = () => {
                     const cursor = req.result;
-                    if (!cursor || rows.length >= maxCount) { resolve(rows.reverse()); return; }
-                    if (Number(cursor.value.ownerMemberNumber) === ownerMemberNumber) rows.push(cursor.value);
+                    if (!cursor || Number(cursor.value.timestamp) < cutoff || (historyCount >= maxCount && contacts.size >= CHAT_RECENT_CONTACTS)) { resolve(rows.reverse()); return; }
+                    const message = cursor.value;
+                    const member = Number(message.memberNumber);
+                    if (Number(message.ownerMemberNumber) === ownerMemberNumber && member && member !== ownerMemberNumber) {
+                        // A busy conversation must not crowd other recent contacts out.
+                        const newContact = !contacts.has(member) && contacts.size < CHAT_RECENT_CONTACTS;
+                        if (newContact) contacts.add(member);
+                        if (historyCount < maxCount || newContact) rows.push(message);
+                        historyCount++;
+                    }
                     cursor.continue();
                 };
                 req.onerror = () => { warnLimited('recent chat history read failed', req.error); resolve(null); };
@@ -123,7 +135,7 @@ const ChatStore = {
         if (result !== null || !retry) return result;
         if (this.db === db) { db.close(); this.db = null; }
         if (!await this.init()) return null;
-        return this.recentIndex({ maxCount, retry: false });
+        return this.recentIndex({ maxCount, retry: false, now });
     },
     async page(memberNumber, { before = Infinity, limit = 50 } = {}) {
         const ownerMemberNumber = accountNumber();
