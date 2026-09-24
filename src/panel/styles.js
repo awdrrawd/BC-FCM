@@ -218,6 +218,11 @@ import { chatFontFamily } from '../communication/chat-font.js';
 .fcm-graph-stage .selected circle,.fcm-graph-stage [data-node]:focus circle{fill:var(--ac,#a078e8);stroke:var(--tx,#fff);}
 .fcm-graph-stage text{fill:var(--tx,#eee);font-size:19px;paint-order:stroke;stroke:var(--surface-alt,#161020);stroke-width:4px;stroke-linejoin:round;}
 .fcm-graph-stage [data-node] text{display:block;}
+.fcm-graph-stage:not(.fcm-fitting) [data-node].fcm-graph-no-label text{display:none;}
+.fcm-graph-stepper{display:inline-flex;align-items:center;gap:4px;}
+.fcm-graph-stepper input{appearance:textfield;-moz-appearance:textfield;text-align:center;}
+.fcm-graph-stepper input::-webkit-inner-spin-button{appearance:none;}
+.fcm-page-loading{display:flex;align-items:center;justify-content:center;gap:12px;min-height:100px;flex:1;}
 .fcm-graph-stage .fcm-raster-labels:not(.fcm-fitting) [data-node] text{display:none;}
 .fcm-graph-stage [data-node].fcm-graph-muted text{display:none;}
 .fcm-graph-sidebar{width:240px;max-width:35%;overflow:auto;padding:16px;border-left:1px solid color-mix(in srgb,var(--ac,#a078e8) 30%,transparent);}

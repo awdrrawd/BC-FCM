@@ -54,6 +54,7 @@ test('card buttons keep whole labels on a narrow screen', async ({page}) => {
 test('pending people visits ignore out-of-order results and leaving', async ({page}) => {
     await page.evaluate(()=>fixture.people());await page.waitForFunction(()=>loads.length===1);
     await expect(page.locator('.fcm-search')).toHaveCount(0);
+    await expect(page.locator('.fcm-page-loading')).toBeVisible();
     await page.evaluate(()=>fixture.people());await page.waitForFunction(()=>loads.length===2);
     await page.evaluate(()=>loads[1]([]));await expect(page.locator('.fcm-toolbar')).toHaveCount(1);
     await page.evaluate(()=>loads[0]([]));await expect(page.locator('.fcm-toolbar')).toHaveCount(1);

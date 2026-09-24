@@ -1,3 +1,4 @@
+import { withPanelLoading } from './panel-loading.js';
 import { CAMERA_ICON } from '../ui/icons.js';
 import { cfg } from '../core/config.js';
 import { T } from '../i18n/i18n.js';
@@ -96,7 +97,7 @@ async function renderFriends(container, _myToken) {
     const page = paginate(friends, friendsPage, FRIENDS_PAGE_SIZE);
     friendsPage = page.page;
     friends = page.items;
-    await PDB.batchGet(friends.map(f => f.mn));
+    await withPanelLoading(container, () => PDB.batchGet(friends.map(f => f.mn)));
     if (_myToken !== getRenderToken()) return;
     friends.forEach(f => { f.name = getDisplayName(f.mn); });
 

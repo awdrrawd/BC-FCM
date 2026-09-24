@@ -99,7 +99,7 @@
   "graphDepth": "关系层数",
   "graphMaster": "主人",
   "graphSub": "奴隶",
-  "graphDepthHint": "預設 2 層，可輸入任意正整數；不限制人物數量，高層數可能造成卡頓。超過 1000 人才會提醒。",
+  "graphDepthHint": "默认 2 层，范围 1–10；不限制人数，超过 1000 人才会提醒。",
   "graphHops": "{0} 层关系",
   "graphLovership": "恋人",
   "graphHint": "依儲存的 Profile 快照顯示，不代表即時關係。所有人物名稱預設顯示；點選後只保留高亮路徑的名稱，右鍵恢復全部。雙擊切換中心，拖曳平移、滾輪縮放。顏色與線型可在設定調整；大型圖可放大或選取人物以查看密集名稱。",
@@ -540,5 +540,7 @@
   "tabDisplaySettings": "分頁顯示與排序",
   "tabSettingsHint": "拖曳按鈕調整順序，點選切換顯示／隱藏；也可用 Alt＋左右鍵排序。右上角齒輪隨時可開啟設定。",
   "tabEdit": "編輯",
-  "graphBusy": "正在載入關係網…"
+  "graphBusy": "正在載入關係網…",
+  "graphNames": "显示名称",
+  "panelLoading": "正在读取数据…"
 }

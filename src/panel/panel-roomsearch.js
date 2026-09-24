@@ -1,3 +1,4 @@
+import { withPanelLoading } from './panel-loading.js';
 import { makeSearchWrap } from '../ui/search-clear.js';
 import { T } from '../i18n/i18n.js';
 import { onlineFriends } from '../data/data.js';
@@ -87,7 +88,8 @@ async function renderRoomSearch(container) {
         const revision = ++searchRevision;
         _roomSearchQ2 = inp.value;
         srchBtn.textContent = T('roomSearching'); srchBtn.disabled = true;
-        const results = await doRoomSearch(_roomSearchQ2, _roomZoneFilter);
+        scroll.replaceChildren();
+        const results = await withPanelLoading(scroll, () => doRoomSearch(_roomSearchQ2, _roomZoneFilter));
         if (revision !== searchRevision || token !== getRenderToken() || !wrap.isConnected) return;
         setRoomResults(results);
         srchBtn.textContent = T('btnSearch'); srchBtn.disabled = false;

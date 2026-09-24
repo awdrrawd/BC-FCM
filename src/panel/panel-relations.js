@@ -8,7 +8,7 @@ import { T } from '../i18n/i18n.js';
 import { createRelationWorker } from '../data/relation-worker.js';
 import { beginPanelView } from './panel-lifecycle.js';
 
-let focusId = null, query = '', sidebarVisible = true;
+let query = '', sidebarVisible = true;
 const CANVAS_LABEL_THRESHOLD = 200, LARGE_GRAPH_THRESHOLD = 1000;
 const svgNS = 'http://www.w3.org/2000/svg';
 const element = (tag, className, text) => {
@@ -23,7 +23,8 @@ const svgElement = (tag, attributes = {}) => {
     return node;
 };
 
-export async function renderRelations(container, { openPeopleSearch } = {}) {
+export async function renderRelations(container, { openPeopleSearch, initialFocus = null } = {}) {
+    let focusId = initialFocus;
     const options = relationOptions(cfg.relationGraph);
     let service, observer, cancelWarning, frame = 0, requestVersion = 0, searchVersion = 0;
     const active = beginPanelView(container, { dispose() { cancelWarning?.(); cancelAnimationFrame(frame); service?.dispose(); observer?.disconnect(); } });
@@ -43,15 +44,23 @@ export async function renderRelations(container, { openPeopleSearch } = {}) {
     button(T('btnSearch'), () => { void search(); });
     toolbar.append(element('span', 'fcm-spacer'));
     button(T('graphSelf'), () => { focusId = Number(globalThis.Player?.MemberNumber); void showGraph(); });
-    const refreshButton = button(T('graphRefresh'), () => { void renderRelations(container, { openPeopleSearch }); });
+    const refreshButton = button(T('graphRefresh'), () => { void renderRelations(container, { openPeopleSearch, initialFocus: focusId }); });
     const depth = element('input', 'fcm-search');
-    depth.type = 'number'; depth.min = '1'; depth.step = '1';
+    depth.type = 'number'; depth.min = '1'; depth.max = '10'; depth.step = '1';
     depth.setAttribute('aria-label', T('graphDepth'));
     depth.value = String(options.depth);
     const filters = element('div', 'fcm-graph-filters');
     const depthLabel = element('label', 'fcm-graph-depth', T('graphDepth'));
     depth.title = T('graphDepthHint');
-    depthLabel.append(depth); filters.append(depthLabel);
+    const stepper = element('span', 'fcm-graph-stepper');
+    for (const [text, delta] of [['−', -1], ['+', 1]]) {
+        const step = element('button', 'fcm-btn', text); step.type = 'button';
+        step.setAttribute('aria-label', `${T('graphDepth')} ${text} 1`);
+        step.onclick = () => { depth.value = String(Math.min(10, Math.max(1, Number(depth.value) + delta))); applyDepth(); };
+        controls.push(step); stepper.append(step);
+        if (delta === -1) stepper.append(depth);
+    }
+    depthLabel.append(stepper); filters.append(depthLabel);
     const isPressed = toggle => toggle.getAttribute('aria-pressed') === 'true';
     function saveOptions(patch) {
         Object.assign(options, relationOptions({ ...cfg.relationGraph, ...patch }));
@@ -78,6 +87,15 @@ export async function renderRelations(container, { openPeopleSearch } = {}) {
         saveOptions({ warnLarge: !disabled });
         if (disabled) cancelWarning?.(true);
     });
+    let namePath = new Set();
+    filter('graphNames', 'fcm-graph-names', options.showNames, value => { saveOptions({ showNames: value }); updateNames(); });
+    function updateNames() {
+        for (const node of visualNodes) {
+            node.hideLabel = !options.showNames || !(node.center || namePath.has(Number(node.group.dataset.node)));
+            node.group.classList.toggle('fcm-graph-no-label', node.hideLabel);
+        }
+        paintCanvas();
+    }
     const stop = button(T('graphStop'), () => {
         ++requestVersion; ++searchVersion; cancelWarning?.(); service?.dispose(); service = null;
         clearGraph(); setBusy(false); setControlsDisabled(false);
@@ -89,7 +107,7 @@ export async function renderRelations(container, { openPeopleSearch } = {}) {
     }
     function applyDepth() {
         const value = Number(depth.value);
-        if (!Number.isSafeInteger(value) || value < 1) { depth.value = String(options.depth); return; }
+        if (!Number.isSafeInteger(value) || value < 1 || value > 10) { depth.value = String(options.depth); return; }
         if (options.depth === value) return;
         saveOptions({ depth: value }); void showGraph();
     }
@@ -212,6 +230,7 @@ export async function renderRelations(container, { openPeopleSearch } = {}) {
             pathEdges.add(edge.id); neighbors.add(other);
             if (!visited.has(other)) { visited.add(other); queue.push(other); }
         }
+        namePath = highlight ? visited : new Set();
         for (const edge of visualEdges) {
             const { from, to } = edge;
             const connected = from === node.id || to === node.id || pathEdges.has(edge.id);
@@ -222,7 +241,7 @@ export async function renderRelations(container, { openPeopleSearch } = {}) {
             item.classList.toggle('selected', Number(item.dataset.node) === node.id);
             item.classList.toggle('fcm-graph-muted', highlight && !neighbors.has(Number(item.dataset.node)));
         }
-        paintCanvas();
+        updateNames();
         detail.replaceChildren(element('b', '', node.name), element('span', 'fcm-graph-member-id', `#${node.id}`),
             element('small', 'fcm-graph-distance', node.level === 0 ? T('graphCenter') : T('graphHops', node.level)),
             element('p', '', T('graphSeen', date(node.seen))));
@@ -390,7 +409,6 @@ export async function renderRelations(container, { openPeopleSearch } = {}) {
         if (!active()) return;
         setBusy(false);
         setControlsDisabled(false);
-        focusId ??= Number(globalThis.Player?.MemberNumber) || null;
-        if (query) await search(); else if (focusId) await showGraph();
+        if (focusId) await showGraph();
     } catch (error) { showError(error); if (active()) { setBusy(false); refreshButton.disabled = false; } }
 }

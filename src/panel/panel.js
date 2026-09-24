@@ -26,7 +26,7 @@ import { requestOnlineFriends, onlineFriends, buildFriendList, inRoomFn } from '
     let _renderToken = 0;
     // 供已拆出的分頁模組（如 panel-people.js）判斷自己的 render 是否已過期。
     function getRenderToken() { return _renderToken; }
-    let panelEl = null, miniEl = null, panelOpen = false, panelMini = false;
+    let panelEl = null, miniEl = null, panelOpen = false, panelMini = false, preservedGraph = false;
     let uiTab = 'friends';
     // 手動刷新的 5 秒冷卻計時。線上資料平時由 AccountQueryResult 事件推進，
     // 面板開啟／還原時只主動查詢一次，不另設短週期輪詢。
@@ -154,7 +154,8 @@ import { requestOnlineFriends, onlineFriends, buildFriendList, inRoomFn } from '
         panelOpen = true; panelMini = false;
         // 開啟即查一次；不動 _lastRefresh，手動 ↻ 的冷卻與「開啟」脫鉤（開啟後仍可立即手動再查一次）
         requestOnlineFriends();
-        renderCurrent();
+        if (preservedGraph && uiTab === 'relations') { preservedGraph = false; refresh.capture(); }
+        else { preservedGraph = false; renderCurrent(); }
     }
 
     // 語言切換：就地刷新標題／頁籤／當前分頁文字，不整個銷毀重建面板（CHAT 端亦以同一套
@@ -183,16 +184,19 @@ import { requestOnlineFriends, onlineFriends, buildFriendList, inRoomFn } from '
     // CHAT 端切換語言時會廣播同一事件；FCM 面板若已開啟，就地刷新即可，不需重建。
     window.addEventListener('fcm-language-change', refreshChrome);
 
-    function minimizePanel({ showMini = true } = {}) { if (!panelEl) return; refresh.dispose(); ++_renderToken; disposePanelView(panelEl.querySelector('#fcm-content')); panelEl.classList.add('hidden'); if (miniEl) miniEl.classList.toggle('visible', showMini); panelMini = showMini; if (!showMini) panelOpen = false; _removeWhisperAvatar(); }
+    function minimizePanel({ showMini = true } = {}) { if (!panelEl) return; refresh.dispose(); preservedGraph = uiTab === 'relations'; if (!preservedGraph) { ++_renderToken; disposePanelView(panelEl.querySelector('#fcm-content')); } panelEl.classList.add('hidden'); if (miniEl) miniEl.classList.toggle('visible', showMini); panelMini = showMini; if (!showMini) panelOpen = false; _removeWhisperAvatar(); }
     function restorePanel() {
+        if (!panelMini) return;
         if (!panelEl) buildPanel();
         panelEl.classList.remove('hidden');
         if (miniEl) miniEl.classList.remove('visible');
         panelMini = false;
         requestOnlineFriends();
-        renderCurrent();
+        if (preservedGraph && uiTab === 'relations') { preservedGraph = false; refresh.capture(); }
+        else { preservedGraph = false; renderCurrent(); }
     }
     function closePanel() {
+        preservedGraph = false;
         disposePanelView(panelEl?.querySelector('#fcm-content'));
         refresh.dispose(); ++_renderToken;
         if (panelEl) panelEl.classList.add('hidden');

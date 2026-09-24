@@ -91,7 +91,7 @@ export function createRelationCanvas(canvas) {
             context.restore();
         }
         for (const node of labels) {
-            if (node.group.classList.contains('fcm-graph-muted') || node.group.style.display === 'none') continue;
+            if (node.hideLabel || node.group.classList.contains('fcm-graph-muted') || node.group.style.display === 'none') continue;
             const x = node.pos.x * scale + ox, y = node.pos.y * scale + oy;
             const sprite = textSprite(node.label.textContent, ratio, colors);
             context.save(); context.translate(x,y);
