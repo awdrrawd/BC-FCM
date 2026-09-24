@@ -44,11 +44,37 @@ async function setup(page, count = 8, fullPanel = false) {
         header.append(createPanelMaximizeButton(panel)); panel.prepend(header); syncPanelMaximize(panel);
         globalThis.Player.MemberNumber = 1;
         globalThis.graphTest = {
-            render: () => renderRelations(document.querySelector('#fcm-content'), { openPeopleSearch: id => { globalThis.graphTest.searched = id; } }),
+            render: () => renderRelations(document.querySelector('#fcm-content'), { initialFocus: 1, openPeopleSearch: id => { globalThis.graphTest.searched = id; } }),
             dispose: () => disposePanelView(document.querySelector('#fcm-content')),
         };
     }, count);
 }
+
+test('opening the graph stays idle until an explicit request, including revisits', async ({ page }) => {
+    await setup(page);
+    await page.evaluate(async () => {
+        globalThis.graphWorkerStarts = 0;
+        const NativeWorker = globalThis.Worker;
+        globalThis.Worker = class extends NativeWorker {
+            constructor(...args) { super(...args); globalThis.graphWorkerStarts++; }
+        };
+        globalThis.openIdleGraph = async () => {
+            const { renderRelations } = await import('/src/panel/panel-relations.js');
+            await renderRelations(document.querySelector('#fcm-content'));
+        };
+        await globalThis.openIdleGraph();
+    });
+    await expect(page.locator('[data-node]')).toHaveCount(0);
+    expect(await page.evaluate(() => globalThis.graphWorkerStarts)).toBe(0);
+    await page.getByRole('button', {name:'以我為中心',exact:true}).click();
+    await expect(page.locator('[data-node]')).toHaveCount(8);
+    await page.evaluate(() => globalThis.openIdleGraph());
+    await expect(page.locator('[data-node]')).toHaveCount(0);
+    expect(await page.evaluate(() => globalThis.graphWorkerStarts)).toBe(1);
+    await page.locator('.fcm-toolbar input').fill('Member 2');
+    await page.locator('.fcm-toolbar input').press('Enter');
+    await expect(page.locator('[data-node]')).toHaveCount(8);
+});
 
 // Click the painted circle: an SVG group bounding box also includes its label
 // and can have its center in empty space depending on the platform font metrics.
@@ -171,6 +197,8 @@ test('real FCM shell places Relations after People and releases workers on tab s
     expect(await page.locator('#fcm-tabs .fcm-tab').evaluateAll(tabs => tabs.map(tab => tab.dataset.tab)))
         .toEqual(['friends', 'room', 'roomSearch', 'people', 'relations', 'settings', 'help']);
     await page.locator('[data-tab="relations"]').click();
+    await expect(page.locator('[data-node]')).toHaveCount(0);
+    await page.getByRole('button', { name: '以我為中心', exact: true }).click();
     await expect(page.locator('.fcm-graph-stage [data-node]')).toHaveCount(8);
     expect(await page.evaluate(() => globalThis.activeGraphWorkers)).toBe(1);
     await page.locator('[data-panel-max]').click();
@@ -178,6 +206,8 @@ test('real FCM shell places Relations after People and releases workers on tab s
     await page.locator('[data-tab="settings"]').click();
     expect(await page.evaluate(() => globalThis.activeGraphWorkers)).toBe(0);
     await page.locator('[data-tab="relations"]').click();
+    await expect(page.locator('[data-node]')).toHaveCount(0);
+    await page.getByRole('button', { name: '以我為中心', exact: true }).click();
     await expect(page.locator('.fcm-graph-stage [data-node]')).toHaveCount(8);
     await page.screenshot({ path: 'test-results/relations-fullscreen.png' });
     await page.locator('[data-panel-close]').click();
@@ -293,6 +323,8 @@ test('opening Profile hides FCM and its minimized pill and allows reopening', as
         globalThis.realGraphPanel = panel; panel.openPanel();
     });
     await page.locator('[data-tab="relations"]').click();
+    await expect(page.locator('[data-node]')).toHaveCount(0);
+    await page.getByRole('button', { name: '以我為中心', exact: true }).click();
     await expect(page.locator('[data-node]')).toHaveCount(8);
     await page.getByRole('button', {name:'開啟 Profile'}).click();
     await expect(page.locator('#fcm-panel')).toBeHidden();
@@ -388,7 +420,7 @@ test('1000-person interaction benchmark', { tag: '@performance' }, async ({ page
     await expect(page.locator('[data-node]')).toHaveCount(1000);
 });
 
-test('canvas chain links keep ten-pixel spacing across zoom and none hides edges', async ({ page }) => {
+test('canvas chain links keep twenty-pixel spacing across zoom and none hides edges', async ({ page }) => {
     await setup(page);
     const result = await page.evaluate(async () => {
         const { createRelationCanvas } = await import('/src/panel/relation-canvas.js');
@@ -401,7 +433,7 @@ test('canvas chain links keep ten-pixel spacing across zoom and none hides edges
         const after=Array.from(ctx.getImageData(40,40,100,20).data);
         const row=ctx.getImageData(40,50,100,1).data;
         const holes=Array.from({length:100},(_,i)=>row[i*4+3]).filter(alpha=>alpha<50).length;
-        const repeats=Array.from({length:90},(_,i)=>row[i*4+3]===row[(i+10)*4+3]).every(Boolean);
+        const repeats=Array.from({length:80},(_,i)=>row[i*4+3]===row[(i+20)*4+3]).every(Boolean);
         painter.paint([{...edge,style:'none'}],{x:0,y:0,w:400,h:100},400,100,2);
         const empty=ctx.getImageData(0,0,400,100).data.every(value=>value===0);
         return {same:JSON.stringify(before)===JSON.stringify(after),holes,repeats,empty};
