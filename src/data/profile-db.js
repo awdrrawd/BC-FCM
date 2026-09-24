@@ -3,6 +3,33 @@ import { T } from '../i18n/i18n.js';
 import { inRoomFn } from './data.js';
 import { profileCache as _pc } from './profile-cache.js';
 import { warnLimited } from '../core/logger.js';
+
+function normalizeProfile(profile, allowNameOnly) {
+    const memberNumber = Number(profile?.memberNumber);
+    if (!Number.isSafeInteger(memberNumber) || memberNumber <= 0 || !Number.isFinite(profile?.seen) || profile.seen <= 0) return null;
+    try {
+        const bundle = typeof profile.characterBundle === 'string' ? JSON.parse(profile.characterBundle) : null;
+        if (typeof profile.characterBundle === 'string' && (!bundle || typeof bundle !== 'object')) return null;
+        if ([profile.name, bundle?.Name].some(value => value !== undefined && typeof value !== 'string')) return null;
+        // BC/WCE serialize an unset nickname as either null or an absent property.
+        if ([profile.lastNick, bundle?.Nickname].some(value => value != null && typeof value !== 'string')) return null;
+        if (bundle ? Number(bundle.MemberNumber) !== memberNumber || !Array.isArray(bundle.Appearance)
+            : !allowNameOnly || typeof profile.name !== 'string') return null;
+        return {
+            memberNumber, name: bundle?.Name || profile.name || '',
+            lastNick: bundle?.Nickname || profile.lastNick || bundle?.Name || profile.name || '',
+            seen: profile.seen, ...(bundle ? { characterBundle: profile.characterBundle } : {}),
+        };
+    } catch { return null; }
+}
+
+function mergeProfile(existing, incoming) {
+    if (existing && Number(existing.seen ?? existing.savedAt) >= incoming.seen) return existing;
+    const saved = { ...existing, ...incoming };
+    // Keep the full bundle's observation date when only a newer name is available.
+    if (!incoming.characterBundle && existing?.characterBundle) saved.seen = existing.seen ?? existing.savedAt;
+    return saved;
+}
 // ════════════════════════════════════════
 //  FCM module: profile-db.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -121,14 +148,10 @@ import { warnLimited } from '../core/logger.js';
             } catch (error) { warnLimited('profile cache write failed', error); }
         },
         async receiveShared(profile, { allowNameOnly = false } = {}) {
-            const memberNumber = Number(profile?.memberNumber);
-            if (!Number.isSafeInteger(memberNumber) || memberNumber <= 0 || !Number.isFinite(profile?.seen) || profile.seen <= 0) return false;
+            const incoming = normalizeProfile(profile, allowNameOnly);
+            if (!incoming) return false;
+            const { memberNumber } = incoming;
             try {
-                const bundle = typeof profile.characterBundle === 'string' ? JSON.parse(profile.characterBundle) : null;
-                if (typeof profile.characterBundle === 'string' && (!bundle || typeof bundle !== 'object')) return false;
-                if ([profile.name, profile.lastNick, bundle?.Name, bundle?.Nickname].some(value => value !== undefined && typeof value !== 'string')) return false;
-                if (bundle ? Number(bundle.MemberNumber) !== memberNumber || !Array.isArray(bundle.Appearance)
-                    : !allowNameOnly || typeof profile.name !== 'string') return false;
                 if (!this.db) await this.init();
                 if (!this.db?.objectStoreNames.contains('profiles')) return false;
                 return await new Promise(resolve => {
@@ -139,11 +162,7 @@ import { warnLimited } from '../core/logger.js';
                     req.onsuccess = () => {
                         const existing = req.result;
                         // Compare observation times, never the time the share arrived.
-                        saved = existing && Number(existing.seen) >= profile.seen ? existing : {
-                            ...existing, memberNumber, name: bundle?.Name || profile.name || '', lastNick: bundle?.Nickname || profile.lastNick || bundle?.Name || profile.name || '',
-                            seen: !bundle && existing?.characterBundle ? existing.seen : profile.seen,
-                            ...(bundle ? { characterBundle: profile.characterBundle } : {}),
-                        };
+                        saved = mergeProfile(existing, incoming);
                         if (saved !== existing) { store.put(saved); changed = true; }
                     };
                     tx.oncomplete = () => { _pc[memberNumber] = saved; resolve(changed); };
@@ -180,24 +199,54 @@ import { warnLimited } from '../core/logger.js';
             return { exportedAt: new Date().toISOString(), dbVersion: this.db.version, profiles, notes };
         },
         async importBackup(data) {
-            if (!data || typeof data !== 'object' || !await this.init()) throw new Error('Invalid profile backup or unavailable database');
-            let pc = 0, nc = 0;
+            if (!data || !Array.isArray(data.profiles) || (data.notes !== undefined && !Array.isArray(data.notes))) throw new Error('Invalid profile backup');
+            if (!await this.init()) throw new Error('Profile database unavailable');
+            const result = { pc: 0, nc: 0, kept: 0, invalid: 0, unavailableNotes: 0 };
             // Backup dbVersion is informational only. Never upgrade or create stores for an import.
-            for (const profile of Array.isArray(data.profiles) ? data.profiles : []) {
-                if (await this.receiveShared({ ...profile, seen: profile?.seen || profile?.savedAt }, { allowNameOnly: true })) pc++;
+            for (const [storeName, rows] of [['profiles', data.profiles], ['notes', data.notes || []]]) {
+                if (!this.db.objectStoreNames.contains(storeName)) { result.unavailableNotes += rows.length; continue; }
+                // Bound transaction size and yield between batches for large backups.
+                for (let offset = 0; offset < rows.length; offset += 100) {
+                    const batch = rows.slice(offset, offset + 100).map(row => {
+                        if (storeName === 'profiles') return normalizeProfile({ ...row, seen: row?.seen || row?.savedAt }, true);
+                        if (!Number.isSafeInteger(row?.memberNumber) || row.memberNumber <= 0 || typeof row.note !== 'string'
+                            || !Number.isFinite(row.updatedAt) || row.updatedAt < 0) return null;
+                        return { memberNumber: row.memberNumber, note: row.note, updatedAt: row.updatedAt };
+                    });
+                    await new Promise((resolve, reject) => {
+                        const tx = this.db.transaction(storeName, 'readwrite');
+                        const store = tx.objectStore(storeName);
+                        const committed = new Map();
+                        let changed = 0, kept = 0, invalid = 0;
+                        let index = 0;
+                        // Queue the next read after the preceding write, including duplicate IDs.
+                        const next = () => {
+                            while (index < batch.length && !batch[index]) { invalid++; index++; }
+                            if (index === batch.length) return;
+                            const incoming = batch[index++];
+                            const req = store.get(incoming.memberNumber);
+                            req.onsuccess = () => {
+                                const existing = req.result;
+                                const saved = storeName === 'profiles' ? mergeProfile(existing, incoming)
+                                    : existing && Number(existing.updatedAt) >= incoming.updatedAt ? existing : incoming;
+                                if (saved !== existing) { store.put(saved); changed++; }
+                                else kept++;
+                                committed.set(incoming.memberNumber, saved);
+                                next();
+                            };
+                        };
+                        tx.oncomplete = () => {
+                            if (storeName === 'profiles') for (const [id, row] of committed) _pc[id] = row;
+                            result[storeName === 'profiles' ? 'pc' : 'nc'] += changed;
+                            result.kept += kept; result.invalid += invalid;
+                            resolve();
+                        };
+                        tx.onerror = tx.onabort = () => reject(tx.error || new Error('Profile import transaction failed'));
+                        next();
+                    });
+                }
             }
-            if (Array.isArray(data.notes) && this.db.objectStoreNames.contains('notes')) {
-                const notes = data.notes.filter(note => Number.isSafeInteger(note?.memberNumber) && note.memberNumber > 0
-                    && typeof note.note === 'string' && Number.isFinite(note.updatedAt));
-                await new Promise((resolve, reject) => {
-                    const tx = this.db.transaction('notes', 'readwrite');
-                    const store = tx.objectStore('notes');
-                    for (const note of notes) store.put({ memberNumber: note.memberNumber, note: note.note, updatedAt: note.updatedAt });
-                    tx.oncomplete = () => { nc = notes.length; resolve(); };
-                    tx.onerror = tx.onabort = () => reject(tx.error);
-                });
-            }
-            return { pc, nc };
+            return result;
         },
     };
     const Snapshot = {
