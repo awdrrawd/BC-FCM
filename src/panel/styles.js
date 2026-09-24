@@ -57,7 +57,9 @@ import { chatFontFamily } from '../communication/chat-font.js';
 #fcm-panel .fcm-lang-flag-select,#fcm-panel .fcm-lang-flag-select option{font-family:"Twemoji Country Flags",-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans TC",sans-serif!important;}
 .fcm-name,.fcm-room-name,.fcm-tbl{font-size:${baseFontSize}px!important;}
 .fcm-set-label{font-size:${Math.round(baseFontSize * 1.15)}px!important;}
+#fcm-panel .fcm-settings-wrap button:not(.fcm-tog):not(.fcm-icon-btn):not(.fcm-color-button){font-size:calc(${Math.max(10, baseFontSize - 1)}px + 1pt)!important;}
 .fcm-set-note,.fcm-id,.fcm-search,.fcm-sel{font-size:${Math.max(10, baseFontSize - 1)}px!important;}
+#fcm-panel .fcm-graph-filters,#fcm-panel .fcm-graph-filters *{font-size:${Math.max(10, baseFontSize - 1)}px!important;}
 #fcm-mini{background:${p}!important;border-color:${border}!important;color:${textDim}!important;}
 #fcm-mini:hover{background:${rowHover}!important;border-color:${a}!important;box-shadow:${glow(9,20)}!important;}
 .fcm-mini-pill{background:${border}!important;}
@@ -171,6 +173,64 @@ import { chatFontFamily } from '../communication/chat-font.js';
 #fcm-panel{position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);width:min(1050px,96vw);height:min(650px,92vh);
   background:#1a1821;border:2px solid #7648fe;border-radius:14px;box-shadow:0 12px 60px rgba(0,0,0,.75);z-index:99990;display:flex;flex-direction:column;overflow:hidden;}
 #fcm-panel.hidden{display:none!important;}
+#fcm-panel.maximized{left:0!important;top:0!important;width:100vw!important;height:100vh!important;max-width:none!important;max-height:none!important;transform:none!important;resize:none;border-radius:0;}
+#fcm-panel.maximized #fcm-hdr{cursor:default;}
+#fcm-panel [data-panel-max]{display:flex;align-items:center;justify-content:center;width:30px;padding:0;}
+#fcm-panel [data-panel-max] svg{width:16px;height:16px;fill:currentColor;}
+.fcm-relations{flex:1;display:flex;flex-direction:column;min-height:0;color:var(--tx,#eee);}
+.fcm-relations .fcm-toolbar{flex-wrap:wrap;}
+
+.fcm-relations select{width:auto;}
+.fcm-relations .fcm-btn{padding:5px 9px;}
+.fcm-graph-filters{display:flex;gap:16px;align-items:center;flex-wrap:wrap;padding:8px 14px;border-top:1px solid color-mix(in srgb,var(--ac,#a078e8) 18%,transparent);}
+.fcm-graph-filters label{display:flex;align-items:center;gap:4px;}
+.fcm-graph-filters .fcm-graph-depth{gap:10px;margin-right:auto;}
+.fcm-graph-depth input{width:90px;min-width:0;padding:6px 6px 6px 10px;box-sizing:border-box;}
+.fcm-graph-filter{display:inline-flex;align-items:center;padding:5px 9px;border-radius:6px;background:transparent;border:1px solid #514b5d;color:var(--tx,#eee);cursor:pointer;opacity:.48;transition:opacity .15s,border-color .15s,box-shadow .15s;}
+.fcm-graph-filter.active{opacity:1;border-color:var(--ac,#a078e8);box-shadow:0 0 5px color-mix(in srgb,var(--ac,#a078e8) 35%,transparent);}
+.fcm-graph-filter:disabled{cursor:wait;}
+.fcm-graph-loading{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:color-mix(in srgb,var(--surface-alt,#161020) 85%,transparent);z-index:3;pointer-events:auto;}
+.fcm-graph-loading[hidden]{display:none;}
+.fcm-graph-spinner{width:36px;height:36px;border:3px solid color-mix(in srgb,var(--ac,#a078e8) 20%,transparent);border-top-color:var(--ac,#a078e8);border-radius:50%;animation:fcm-graph-spin .8s linear infinite;}
+@keyframes fcm-graph-spin{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.fcm-graph-spinner{animation:none;}}
+.fcm-graph-owner{color:var(--tx,#eee);}.fcm-graph-master{color:#ffb347;}.fcm-graph-sub{color:#6ac9ff;}.fcm-graph-lover{color:#ff69b4;}
+.fcm-graph-footer{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 14px;border-top:1px solid color-mix(in srgb,var(--ac,#a078e8) 25%,transparent);}
+.fcm-graph-status{flex:1;min-width:180px;font-size:12px;color:var(--dim,#aaa);}
+.fcm-graph-help{font-size:12px;}.fcm-graph-help summary{cursor:pointer;color:var(--ac,#a078e8);}
+.fcm-graph-help[open]{flex-basis:100%;}.fcm-graph-hint{color:var(--dim,#aaa);padding-top:8px;line-height:1.6;}
+.fcm-graph-body{display:flex;flex:1;min-height:0;border-top:1px solid var(--ac,#a078e8);}
+.fcm-graph-warning { position:absolute; z-index:5; top:50%; left:50%; transform:translate(-50%,-50%); width:min(380px,85%); background:var(--bg,#181621); border:1px solid var(--ac); border-radius:10px; padding:16px; box-shadow:0 4px 24px #0008; }
+        .fcm-graph-warning .fcm-btn { margin:4px; }
+        .fcm-graph-social { color:#62cf85; }
+        .fcm-graph-stage{position:relative;flex:1;min-width:0;min-height:180px;background:radial-gradient(circle at center,color-mix(in srgb,var(--ac,#a078e8) 7%,transparent),transparent 70%),var(--surface-alt,#161020);}
+.fcm-graph-center{position:absolute;top:12px;left:14px;max-width:calc(100% - 28px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;pointer-events:none;font-size:12px;color:var(--dim,#aaa);background:var(--surface-alt,#161020);padding:5px 8px;border-radius:6px;}
+.fcm-graph-viewport-controls{position:absolute;bottom:12px;left:14px;display:flex;gap:5px;padding:5px;border:1px solid color-mix(in srgb,var(--ac,#a078e8) 30%,transparent);border-radius:9px;background:var(--surface-alt,#161020);}
+.fcm-graph-viewport-controls .fcm-btn{min-width:30px;}
+.fcm-graph-edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;}
+.fcm-graph-stage>svg{display:block;width:100%;height:100%;position:absolute;inset:0;touch-action:none;cursor:grab;}
+.fcm-graph-stage>svg:active{cursor:grabbing;}
+.fcm-graph-stage [data-node]{cursor:pointer;outline:none;}
+.fcm-graph-stage [data-node] circle{fill:var(--surface-alt,#251d35);stroke:var(--node-color,var(--ac,#a078e8));stroke-width:2;vector-effect:non-scaling-stroke;}
+.fcm-graph-stage .fcm-graph-ring{fill:none;stroke:var(--ac,#a078e8);stroke-opacity:.13;stroke-width:1;stroke-dasharray:3 7;vector-effect:non-scaling-stroke;pointer-events:none;}
+.fcm-graph-stage .fcm-graph-muted{opacity:.25;}.fcm-graph-stage [data-node]:hover{opacity:1;}
+.fcm-graph-stage .missing circle{stroke-dasharray:4 3;}
+.fcm-graph-stage .selected circle,.fcm-graph-stage [data-node]:focus circle{fill:var(--ac,#a078e8);stroke:var(--tx,#fff);}
+.fcm-graph-stage text{fill:var(--tx,#eee);font-size:19px;paint-order:stroke;stroke:var(--surface-alt,#161020);stroke-width:4px;stroke-linejoin:round;}
+.fcm-graph-stage [data-node] text{display:block;}
+.fcm-graph-stage .fcm-raster-labels:not(.fcm-fitting) [data-node] text{display:none;}
+.fcm-graph-stage [data-node].fcm-graph-muted text{display:none;}
+.fcm-graph-sidebar{width:240px;max-width:35%;overflow:auto;padding:16px;border-left:1px solid color-mix(in srgb,var(--ac,#a078e8) 30%,transparent);}
+.fcm-graph-sidebar[hidden]{display:none;}
+.fcm-graph-sidebar .fcm-btn{display:block;max-width:100%;white-space:normal;overflow-wrap:anywhere;margin:7px 0;}
+.fcm-graph-section-title{font-size:11px;letter-spacing:.08em;color:var(--dim,#aaa);margin-bottom:10px;}
+.fcm-graph-detail{overflow-wrap:anywhere;margin-bottom:20px;padding-bottom:16px;border-bottom:1px solid color-mix(in srgb,var(--ac,#a078e8) 20%,transparent);}
+.fcm-graph-detail>b{display:block;font-size:16px;}.fcm-graph-member-id{display:inline-block;color:var(--ac,#a078e8);margin:6px 10px 0 0;}
+.fcm-graph-distance{display:inline-block;color:var(--dim,#aaa);}.fcm-graph-detail p{font-size:12px;line-height:1.6;color:var(--dim,#aaa);}
+.fcm-graph-results small{color:var(--dim,#aaa);}
+.fcm-graph-empty{position:absolute;inset:0;display:grid;place-content:center;padding:20px;text-align:center;pointer-events:none;}
+.fcm-graph-empty[hidden]{display:none;}
+@media(max-width:650px){.fcm-graph-body{flex-direction:column;}.fcm-graph-sidebar{width:100%;max-width:none;max-height:140px;border-left:0;border-top:1px solid var(--ac,#a078e8);}.fcm-graph-hint{font-size:11px;}}
 #fcm-mini{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);width:220px;height:40px;background:#1e1635;border:2px solid #5a48a8;border-radius:20px;display:none;align-items:center;justify-content:center;gap:10px;cursor:pointer;z-index:99990;color:#c4a0e0;font-size:12px;transition:all .15s;}
 #fcm-mini.visible{display:flex;} #fcm-mini:hover{border-color:#b090f0;background:#261a48;}
 .fcm-mini-pill{width:32px;height:4px;background:#5a48a8;border-radius:2px;}
@@ -179,12 +239,13 @@ import { chatFontFamily } from '../communication/chat-font.js';
 #fcm-title{color:#e8c8ff;font-size:13px;letter-spacing:2px;font-weight:700;flex:1;}
 .fcm-hbtn{width:30px;height:30px;padding:0;border-radius:6px;background:transparent;border:1px solid #5a48a8;color:#c4a0e0;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:16px;line-height:1;transition:all .15s;flex-shrink:0;}
 .fcm-hbtn:hover{background:#3a2860;color:#f0d8ff;border-color:#9070d8;}
-#fcm-tabs{display:flex;background:#1a1230;border-bottom:1px solid #4a3890;flex-shrink:0;}
+#fcm-tabs{display:flex;background:#1a1230;border-bottom:1px solid #4a3890;flex-shrink:0;overflow-x:auto;}
+#fcm-tabs .fcm-tab{flex-shrink:0;white-space:nowrap;}
 .fcm-tab{padding:10px 22px;color:#7060a0;cursor:pointer;font-size:11px;letter-spacing:1.2px;font-weight:700;border-bottom:2px solid transparent;transition:all .15s;}
 .fcm-tab:hover{color:#c4a0e0;background:#211540;} .fcm-tab.active{color:#e0b8ff;border-bottom-color:#a078e8;background:#1e1438;}
 #fcm-content{flex:1;overflow:hidden;display:flex;flex-direction:column;min-height:0;}
 .fcm-toolbar{padding:8px 14px;display:flex;align-items:center;gap:6px;flex-wrap:nowrap;border-bottom:1px solid #362858;flex-shrink:0;background:#211540;overflow-x:auto;}
-.fcm-search-wrap{position:relative;display:inline-flex;align-items:center;width:min(200px,35vw);flex-shrink:0;}
+.fcm-search-wrap{position:relative;display:inline-flex;align-items:center;width:min(168px,33vw);max-width:100%;flex:0 0 auto;}
 .fcm-search{background:#1a1030;border:1px solid #5048a0;border-radius:8px;padding:6px 26px 6px 10px;color:#f0e4ff;font-size:12px;width:100%;outline:none;transition:border-color .15s;}
 .fcm-search:focus{border-color:#9078d0;} .fcm-search::placeholder{color:#5a4878;}
 .fcm-clear-btn{position:absolute;right:6px;background:none;border:none;color:#6050a0;cursor:pointer;font-size:15px;padding:0 2px;line-height:1;transition:color .15s;}
@@ -265,11 +326,20 @@ import { chatFontFamily } from '../communication/chat-font.js';
 .fcm-settings-nav{position:sticky;top:-16px;z-index:5;display:flex;gap:8px;padding:10px 24px;background:#1a1821;border-bottom:1px solid #332b50;margin:-16px -24px 4px;width:calc(100% + 48px);}
 .fcm-settings-nav button{flex:1;padding:8px 12px;border-radius:8px;border:1px solid #40366c;background:transparent;color:#aaa1c4;font-weight:700;cursor:pointer;}
 .fcm-settings-section{scroll-margin-top:58px;}
+.fcm-tab-editor[hidden]{display:none;}
+.fcm-tab-chips{display:flex;flex-wrap:wrap;gap:8px;}
+.fcm-tab-chip{border:1px solid #514b5d;border-radius:7px;padding:7px 12px;background:transparent;color:#807889;cursor:grab;touch-action:none;user-select:none;}
+.fcm-tab-chip.active{border-color:var(--ac,#a078e8);color:var(--tx,#eee);box-shadow:0 0 5px color-mix(in srgb,var(--ac,#a078e8) 35%,transparent);}
+.fcm-tab-chip.dragging{opacity:.4;}.fcm-tab-chip.drop-target{outline:2px dashed var(--ac,#a078e8);outline-offset:3px;}
 .fcm-theme-presets{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.fcm-theme-presets .fcm-btn{font-size:12px;padding:6px 10px}
 .fcm-theme-manage{padding:6px 11px;flex-shrink:0}.fcm-theme-options{margin:0 0 5px;padding:10px 12px;border:1px solid #40366c;border-radius:8px;background:#1a1030}.fcm-theme-options .fcm-theme-presets{margin-top:0}
+.fcm-setting-actions{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex:0 0 auto;margin-left:auto;}
+.fcm-setting-actions input[type=color]{width:32px;height:28px;padding:1px;flex:none;}
+.fcm-setting-actions input[type=number]{padding:6px;box-sizing:border-box;}
+.fcm-setting-actions .fcm-btn{width:auto;min-width:28px;}
 .fcm-set-row{display:flex;align-items:flex-start;gap:14px;padding:3px 0;}
 .fcm-set-row{border-radius:8px;transition:background-color .16s ease,box-shadow .16s ease}.fcm-set-row:hover{background:color-mix(in srgb,#7648fe 9%,transparent);box-shadow:0 0 0 1px color-mix(in srgb,#7648fe 20%,transparent) inset}
-.fcm-tog{width:42px;height:22px;border-radius:11px;border:1px solid #4838a0;background:#1a1030;cursor:pointer;position:relative;transition:all .2s;flex-shrink:0;margin-top:2px;margin-right:4px;}
+.fcm-tog{box-sizing:content-box;padding:0;display:inline-block;min-width:42px;max-width:42px;width:42px;height:22px;border-radius:11px;border:1px solid #4838a0;background:#1a1030;cursor:pointer;position:relative;transition:all .2s;flex-shrink:0;margin-top:2px;margin-right:4px;}
 .fcm-tog.on{background:#3a1858;border-color:#b080e8;}
 .fcm-tog-dot{position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#4838a8;transition:all .2s;}
 .fcm-tog.on .fcm-tog-dot{left:23px;background:#d090f8;}

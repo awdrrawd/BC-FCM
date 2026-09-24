@@ -19,7 +19,8 @@ function installDragScroll(scope, selector, { enabled = () => true } = {}) {
         const target = event.target instanceof Element ? event.target : null;
         const area = target && findArea(target);
         if (!area || (area.scrollHeight <= area.clientHeight + 1 && area.scrollWidth <= area.clientWidth + 1)) return;
-        if (target.closest('input[type="range"],textarea,select,[contenteditable="true"]')) return;
+        // A nested drag control owns pointer capture; scrolling must not steal it.
+        if (target.closest('[data-fcm-drag-owner],input[type="range"],textarea,select,[contenteditable="true"]')) return;
         state.drag = {
             area, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY,
             startScrollLeft: area.scrollLeft, startScrollTop: area.scrollTop, dragging: false,

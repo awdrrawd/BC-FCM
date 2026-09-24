@@ -1,4 +1,4 @@
-import { attachSearchClear } from '../ui/search-clear.js';
+import { makeSearchWrap } from '../ui/search-clear.js';
 import { T } from '../i18n/i18n.js';
 import { PDB, _pc, Snapshot } from '../data/profile-db.js';
 import { importProfileFile } from '../data/profile-import.js';
@@ -40,11 +40,9 @@ async function renderPeople(container, _myToken) {
     if (!isCurrent()) return;
     allProfiles.sort((a, b) => (b.seen || b.savedAt || 0) - (a.seen || a.savedAt || 0));
     const toolbar = document.createElement('div'); toolbar.className = 'fcm-toolbar';
-    const sw = document.createElement('div'); sw.style.cssText = 'position:relative;display:inline-flex;align-items:center;flex:1;min-width:180px;max-width:320px;';
-    const inp = document.createElement('input'); inp.className = 'fcm-search'; inp.style.width = '100%';
-    inp.placeholder = T('peopleSearchPlaceholder'); inp.value = _peopleQ;
-    sw.appendChild(inp); toolbar.appendChild(sw);
-    attachSearchClear(inp, { onClear: () => { _peopleQ = ''; _peoplePage = 0; runSearch(''); } });
+    const { wrap: sw, inp } = makeSearchWrap(_peopleQ, T('peopleSearchPlaceholder'), undefined, undefined,
+        () => { _peopleQ = ''; _peoplePage = 0; runSearch(''); });
+    toolbar.appendChild(sw);
 
     const srchBtn = mkBtn(T('btnSearch'), 'fcm-btn', () => { _peoplePage = 0; runSearch(inp.value); });
     srchBtn.style.cssText = 'padding:5px 12px;font-size:12px;flex-shrink:0;';

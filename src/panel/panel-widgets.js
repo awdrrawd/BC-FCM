@@ -1,4 +1,5 @@
-import { attachSearchClear } from '../ui/search-clear.js';
+import { mkToggle } from '../ui/toggle.js';
+import { makeSearchWrap } from '../ui/search-clear.js';
 import { cfg } from '../core/config.js';
 import { T } from '../i18n/i18n.js';
 import { PDB, _pc, Snapshot, _avQueue, _avBusy, _processAvQueue, loadAvatarFromBundle, _captureSnapshotDelayed, syncRoomAvatar } from '../data/profile-db.js';
@@ -132,17 +133,6 @@ function makeRelEl(rel) {
 }
 function makePermEl(perm) { const el = document.createElement('span'); el.className = `fcm-perm fcm-perm-${perm}`; el.textContent = { admin: T('permAdmin'), pass: T('permPass'), ban: T('permBan'), visit: T('permVisit') }[perm] || perm; return el; }
 function mkBtn(label, cls, cb, title) { const b = document.createElement('button'); b.className = 'fcm-btn' + (cls ? ' ' + cls : ''); b.textContent = label; if (title) b.title = title; b.addEventListener('click', e => { e.stopPropagation(); cb(e); }); return b; }
-function mkToggle(on, onChange) { const w = document.createElement('div'); w.className = 'fcm-tog' + (on ? ' on' : ''); const d = document.createElement('div'); d.className = 'fcm-tog-dot'; w.appendChild(d); w.addEventListener('click', () => { const v = !w.classList.contains('on'); w.classList.toggle('on', v); onChange(v); }); return w; }
-
-// ── Bug fix: all search inputs stop keydown propagation to prevent
-// BC's global Enter handler from triggering room joins / profile opens.
-function makeSearchWrap(initialValue, placeholder, onInput, extraClass, onClear) {
-    const wrap = document.createElement('div'); wrap.className = 'fcm-search-wrap';
-    const inp = document.createElement('input'); inp.className = 'fcm-search' + (extraClass ? ' ' + extraClass : ''); inp.placeholder = placeholder; inp.value = initialValue;
-    wrap.appendChild(inp);
-    attachSearchClear(inp, { onInput, onClear });
-    return { wrap, inp };
-}
 
 function buildMgmtBtns(mn, context) {
     if (!ChatRoomData) return null;

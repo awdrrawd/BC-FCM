@@ -1,3 +1,5 @@
+import { renderTabSettings } from './panel-tab-settings.js';
+import { renderRelationSettings } from './panel-relation-settings.js';
 import { CAMERA_ICON } from '../ui/icons.js';
 import { cfg, saveCfg, THEME_DEFAULTS } from '../core/config.js';
 import { T, FCM_LANGS, FCM_LANG_NAMES, FCM_LANG_FLAGS, ensureI18n } from '../i18n/i18n.js';
@@ -28,6 +30,7 @@ function renderSettings(container) {
         const lbl = document.createElement('div'); lbl.className = 'fcm-set-label'; lbl.textContent = label;
         const nt = document.createElement('div'); nt.className = 'fcm-set-note'; nt.textContent = note;
         info.style.flex = '1';
+        tog.setAttribute('aria-label', label);
         info.appendChild(lbl); info.appendChild(nt); row.appendChild(info); row.appendChild(tog);
         return row;
     }
@@ -45,7 +48,7 @@ function renderSettings(container) {
         return row;
     }
     const nav = document.createElement('div'); nav.className = 'fcm-settings-nav';
-    const navItems = [['main', T('settingsTabMain')], ['communication', T('settingsTabCommunication')], ['chat', T('settingsTabChat')]];
+    const navItems = [['main', T('settingsTabMain')], ['communication', T('settingsTabCommunication')], ['relations', T('graphSettings')], ['chat', T('settingsTabChat')]];
     navItems.forEach(([id, label], index) => {
         const b = document.createElement('button'); b.textContent = label; b.classList.toggle('active', index === 0);
         b.addEventListener('click', () => {
@@ -92,6 +95,8 @@ function renderSettings(container) {
     });
     langRow.appendChild(langInfo); langRow.appendChild(langSel);
     wrap.appendChild(langRow);
+    divider();
+    wrap.append(renderTabSettings());
     divider();
 
     // ── Theme Colors (面板底色 / 字體顏色 / 強調色) ──
@@ -257,35 +262,32 @@ function renderSettings(container) {
     wrap.appendChild(avPanel);
     divider();
 
-    // ── Button Visibility — three checkboxes inline ───────────────
+    // ── Button Visibility — three switches inline ───────────────
     const btnVisRow = document.createElement('div'); btnVisRow.className = 'fcm-set-row'; btnVisRow.style.alignItems = 'center';
     const btnVisInfo = document.createElement('div'); btnVisInfo.style.flex = '1';
     const btnVisLbl = document.createElement('div'); btnVisLbl.className = 'fcm-set-label'; btnVisLbl.textContent = T('btnVisibilityLabel');
     const btnVisNote = document.createElement('div'); btnVisNote.className = 'fcm-set-note'; btnVisNote.textContent = T('btnVisibilityNote');
     btnVisInfo.appendChild(btnVisLbl); btnVisInfo.appendChild(btnVisNote);
     btnVisRow.appendChild(btnVisInfo);
-    // Three checkboxes side by side
-    const chkWrap = document.createElement('div'); chkWrap.style.cssText = 'display:flex;flex-direction:row;gap:12px;flex-shrink:0;align-items:center;';
-    function makeBtnVisChk(cfgKey, labelText) {
-        const cell = document.createElement('label'); cell.style.cssText = 'display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;';
-        const chk = document.createElement('input'); chk.type = 'checkbox'; chk.checked = cfg[cfgKey]; chk.style.cssText = 'width:14px;height:14px;accent-color:#a078e8;cursor:pointer;';
-        const lbl = document.createElement('span'); lbl.style.cssText = 'color:#c4a0e0;font-size:12px;';  lbl.textContent = labelText;
-        chk.addEventListener('change', () => {
+    // Three switches side by side
+    const visibilityControls = document.createElement('div'); visibilityControls.style.cssText = 'display:flex;flex-direction:row;gap:12px;flex-shrink:0;align-items:center;flex-wrap:wrap;';
+    function makeVisibilityToggle(cfgKey, labelText) {
+        const cell = document.createElement('div'); cell.style.cssText = 'display:flex;align-items:center;gap:4px;cursor:pointer;white-space:nowrap;';
+        const lbl = document.createElement('span'); lbl.className = 'fcm-set-label'; lbl.textContent = labelText;
+        const toggle = mkToggle(cfg[cfgKey], value => {
             const keys = ['btnShowChatRoom', 'btnShowMainHall', 'btnShowProfile'];
-            if (!chk.checked && !keys.filter(k => k !== cfgKey).some(k => cfg[k])) {
-                chk.checked = true;
-                lbl.style.color = '#ff8080'; setTimeout(() => { lbl.style.color = '#c4a0e0'; }, 1200);
-                return;
+            if (!value && !keys.filter(k => k !== cfgKey).some(k => cfg[k])) {
+                toggle.classList.add('on'); toggle.setAttribute('aria-checked', 'true'); return;
             }
-            cfg[cfgKey] = chk.checked; saveCfg();
+            cfg[cfgKey] = value; saveCfg();
         });
-        cell.appendChild(chk); cell.appendChild(lbl);
+        toggle.setAttribute('aria-label', labelText); cell.append(lbl, toggle);
         return cell;
     }
-    chkWrap.appendChild(makeBtnVisChk('btnShowChatRoom', T('btnShowChatRoom')));
-    chkWrap.appendChild(makeBtnVisChk('btnShowMainHall', T('btnShowMainHall')));
-    chkWrap.appendChild(makeBtnVisChk('btnShowProfile',  T('btnShowProfile')));
-    btnVisRow.appendChild(chkWrap);
+    visibilityControls.appendChild(makeVisibilityToggle('btnShowChatRoom', T('btnShowChatRoom')));
+    visibilityControls.appendChild(makeVisibilityToggle('btnShowMainHall', T('btnShowMainHall')));
+    visibilityControls.appendChild(makeVisibilityToggle('btnShowProfile',  T('btnShowProfile')));
+    btnVisRow.appendChild(visibilityControls);
     wrap.appendChild(btnVisRow);
     divider();
 
@@ -389,6 +391,8 @@ function renderSettings(container) {
     // ══════════════════════════════════════════
     //  GROUP B: 聊天室管理
     // ══════════════════════════════════════════
+    sectionHeader(T('graphSettings'), 'relations');
+    wrap.append(renderRelationSettings());
     sectionHeader(T('setSecChat'), 'chat');
 
     // ── Profile 關係人快速搜尋（置於聊天室管理最上方）──

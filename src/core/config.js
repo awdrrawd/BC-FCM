@@ -25,6 +25,8 @@ function isMobile() { return globalThis.CommonIsMobile === true; }
     // 主題顏色預設值（＝原本精心調校的深紫配色）；三者皆為預設時不套用覆蓋、保留原生外觀
     const THEME_DEFAULTS = { panelColor: '#1a1821', fontColor: '#f1ecff', accentColor: '#7648fe' };
     let cfg = {
+        relationGraph: {},
+        panelTabs: {},
         avatars: false, lang: 'auto', saveMode: 'off',
         favorites: [],                // 關注的成員編號（個人關係頁星號）
         favoriteRooms: [],

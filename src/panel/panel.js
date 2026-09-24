@@ -1,8 +1,12 @@
+import { cfg } from '../core/config.js';
+import { panelTabs, tabPreferences } from '../data/panel-tabs.js';
 import { T, TH } from '../i18n/i18n.js';
 import { injectStyles } from './styles.js';
 import { _removeWhisperAvatar } from '../chat/chat-fx.js';
 import { renderHelp } from './panel-help.js';
 import { renderPeople, resetPeopleSearch, setPeopleQuery } from './panel-people.js';
+import { renderRelations } from './panel-relations.js';
+import { createPanelMaximizeButton, syncPanelMaximize } from './panel-maximize.js';
 import { renderSettings } from './panel-settings.js';
 import { renderFriends, resetFriendsSearch } from './panel-friends.js';
 import { renderRoom, resetRoomAdminSearch } from './panel-room.js';
@@ -40,6 +44,20 @@ import { requestOnlineFriends, onlineFriends, buildFriendList, inRoomFn } from '
     // ═══════════════════════════════════════════════════════════
     //  PANEL BUILD
     // ═══════════════════════════════════════════════════════════
+    function buildTabs(tabBar) {
+        tabBar.replaceChildren();
+        const prefs = tabPreferences(cfg.panelTabs), names = new Map(panelTabs);
+        prefs.order.filter(key => !prefs.hidden.includes(key)).forEach(key => {
+            const t = document.createElement('div'); t.className = 'fcm-tab' + (key === uiTab ? ' active' : ''); t.dataset.tab = key; t.textContent = T(names.get(key));
+            t.addEventListener('click', () => { uiTab = key; if (key !== 'people') resetPeopleSearch(); renderCurrent(); });
+            tabBar.append(t);
+        });
+    }
+    window.addEventListener('fcm-tabs-change', () => {
+        const bar = panelEl?.querySelector('#fcm-tabs'); if (bar) buildTabs(bar);
+        const prefs = tabPreferences(cfg.panelTabs);
+        if (uiTab !== 'settings' && prefs.hidden.includes(uiTab)) { uiTab = prefs.order.find(key => !prefs.hidden.includes(key)) || 'settings'; renderCurrent(); }
+    });
     function buildPanel() {
         if (document.getElementById('fcm-panel')) { panelEl = document.getElementById('fcm-panel'); return; }
         injectStyles();
@@ -48,22 +66,18 @@ import { requestOnlineFriends, onlineFriends, buildFriendList, inRoomFn } from '
         const title = document.createElement('div'); title.id = 'fcm-title'; title.textContent = T('panelTitle');
         const minBtn = document.createElement('button'); minBtn.type = 'button'; minBtn.className = 'fcm-hbtn fcm-chat-icon-action'; minBtn.title = T('minimize'); minBtn.textContent = T('minimize'); minBtn.addEventListener('click', minimizePanel);
         const closeBtn = document.createElement('button'); closeBtn.type = 'button'; closeBtn.className = 'fcm-hbtn fcm-chat-icon-action'; closeBtn.title = T('close'); closeBtn.textContent = T('close'); closeBtn.addEventListener('click', closePanel);
-        hdr.appendChild(title); hdr.appendChild(minBtn); hdr.appendChild(closeBtn);
+        minBtn.dataset.panelMin = ''; closeBtn.dataset.panelClose = '';
+        const settingsButton = document.createElement('button'); settingsButton.type = 'button'; settingsButton.className = 'fcm-hbtn fcm-chat-icon-action'; settingsButton.textContent = '⚙'; settingsButton.title = T('tabSettings'); settingsButton.setAttribute('aria-label', T('tabSettings')); settingsButton.dataset.panelSettings = '';
+        settingsButton.onclick = () => { uiTab = 'settings'; renderCurrent(); };
+        hdr.append(title, settingsButton); hdr.appendChild(createPanelMaximizeButton(panel)); hdr.appendChild(minBtn); hdr.appendChild(closeBtn);
         const tabBar = document.createElement('div'); tabBar.id = 'fcm-tabs';
-        [['friends', T('tabFriends')], ['room', T('tabRoom')], ['roomSearch', T('tabRoomSearch')], ['people', T('tabPeople')], ['settings', T('tabSettings')], ['help', T('tabHelp')]].forEach(([key, label]) => {
-            const t = document.createElement('div'); t.className = 'fcm-tab' + (key === uiTab ? ' active' : ''); t.dataset.tab = key; t.textContent = label;
-            t.addEventListener('click', () => {
-                uiTab = key;
-                if (key !== 'people') resetPeopleSearch();
-                tabBar.querySelectorAll('.fcm-tab').forEach(x => x.classList.toggle('active', x.dataset.tab === key));
-                renderCurrent();
-            }); tabBar.appendChild(t);
-        });
+        buildTabs(tabBar);
         const content = document.createElement('div'); content.id = 'fcm-content';
         panel.appendChild(hdr); panel.appendChild(tabBar); panel.appendChild(content);
         document.body.appendChild(panel); panelEl = panel;
+        syncPanelMaximize(panel);
         let drag = { on: false, ox: 0, oy: 0 };
-        hdr.addEventListener('mousedown', e => { if (e.target === minBtn || e.target === closeBtn) return; drag.on = true; const r = panel.getBoundingClientRect(); drag.ox = e.clientX - r.left; drag.oy = e.clientY - r.top; panel.style.transform = 'none'; e.preventDefault(); });
+        hdr.addEventListener('mousedown', e => { if (e.target.closest('button') || panel.classList.contains('maximized')) return; drag.on = true; const r = panel.getBoundingClientRect(); drag.ox = e.clientX - r.left; drag.oy = e.clientY - r.top; panel.style.transform = 'none'; e.preventDefault(); });
         document.addEventListener('mousemove', e => {
             if (!drag.on) return;
             // 夾住位置：讓標題列（fcm-hdr）永遠留在畫面內，避免拖出視窗後找不到
@@ -107,6 +121,7 @@ import { requestOnlineFriends, onlineFriends, buildFriendList, inRoomFn } from '
         let p;
         if (uiTab === 'friends') p = renderFriends(content, _myToken);
         else if (uiTab === 'people') p = renderPeople(content, _myToken);
+        else if (uiTab === 'relations') p = renderRelations(content, { openPeopleSearch });
         else if (uiTab === 'room') p = renderRoom(content);
         else if (uiTab === 'roomSearch') p = Promise.resolve(renderRoomSearch(content));
         else if (uiTab === 'help') p = Promise.resolve(renderHelp(content));
@@ -147,11 +162,13 @@ import { requestOnlineFriends, onlineFriends, buildFriendList, inRoomFn } from '
     function refreshChrome() {
         if (!panelEl) return;
         const title = panelEl.querySelector('#fcm-title'); if (title) title.textContent = T('panelTitle');
-        const hdrBtns = panelEl.querySelectorAll('#fcm-hdr .fcm-hbtn');
-        if (hdrBtns[0]) hdrBtns[0].textContent = T('minimize');
-        if (hdrBtns[1]) hdrBtns[1].textContent = T('close');
-        const tabDefs = [['friends', T('tabFriends')], ['room', T('tabRoom')], ['roomSearch', T('tabRoomSearch')], ['people', T('tabPeople')], ['settings', T('tabSettings')], ['help', T('tabHelp')]];
-        panelEl.querySelectorAll('#fcm-tabs .fcm-tab').forEach((el, index) => { if (tabDefs[index]) el.textContent = tabDefs[index][1]; });
+        const minBtn = panelEl.querySelector('[data-panel-min]'), closeBtn = panelEl.querySelector('[data-panel-close]');
+        if (minBtn) minBtn.textContent = minBtn.title = T('minimize');
+        if (closeBtn) closeBtn.textContent = closeBtn.title = T('close');
+        syncPanelMaximize(panelEl);
+        buildTabs(panelEl.querySelector('#fcm-tabs'));
+        const settingsButton = panelEl.querySelector('[data-panel-settings]');
+        if (settingsButton) { settingsButton.title = T('tabSettings'); settingsButton.setAttribute('aria-label', T('tabSettings')); }
         if (miniEl) { const lbl = miniEl.querySelector('.fcm-mini-lbl'); if (lbl) lbl.textContent = T('miniLabel'); }
         renderCurrent();
     }
@@ -166,7 +183,7 @@ import { requestOnlineFriends, onlineFriends, buildFriendList, inRoomFn } from '
     // CHAT 端切換語言時會廣播同一事件；FCM 面板若已開啟，就地刷新即可，不需重建。
     window.addEventListener('fcm-language-change', refreshChrome);
 
-    function minimizePanel() { if (!panelEl) return; refresh.dispose(); ++_renderToken; disposePanelView(panelEl.querySelector('#fcm-content')); panelEl.classList.add('hidden'); if (miniEl) miniEl.classList.add('visible'); panelMini = true; _removeWhisperAvatar(); }
+    function minimizePanel({ showMini = true } = {}) { if (!panelEl) return; refresh.dispose(); ++_renderToken; disposePanelView(panelEl.querySelector('#fcm-content')); panelEl.classList.add('hidden'); if (miniEl) miniEl.classList.toggle('visible', showMini); panelMini = showMini; if (!showMini) panelOpen = false; _removeWhisperAvatar(); }
     function restorePanel() {
         if (!panelEl) buildPanel();
         panelEl.classList.remove('hidden');
