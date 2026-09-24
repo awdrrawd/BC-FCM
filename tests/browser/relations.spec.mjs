@@ -366,7 +366,7 @@ test('graph search clears and fixed screen-space rope pitch survives zoom', asyn
     expect((await page.locator('.fcm-search-wrap').boundingBox()).width).toBe(168);
 });
 
-test('1000-person interaction benchmark', async ({ page }) => {
+test('1000-person interaction benchmark', { tag: '@performance' }, async ({ page }) => {
     test.setTimeout(60000);
     await setup(page, 1000);
     const metrics = await page.evaluate(async () => {
@@ -409,7 +409,7 @@ test('canvas chain links keep ten-pixel spacing across zoom and none hides edges
     expect(result.same).toBe(true); expect(result.holes).toBeGreaterThan(10); expect(result.repeats).toBe(true); expect(result.empty).toBe(true);
 });
 
-test('1000 people with 3999 relationships remain interactive and render cached names', async ({ page }) => {
+test('1000 people with 3999 relationships remain interactive and render cached names', { tag: '@performance' }, async ({ page }) => {
     test.setTimeout(60000); await setup(page, 1000);
     const metrics = await page.evaluate(async () => {
         await new Promise((resolve,reject)=>{
