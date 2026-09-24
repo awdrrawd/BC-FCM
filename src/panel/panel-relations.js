@@ -8,7 +8,7 @@ import { T } from '../i18n/i18n.js';
 import { createRelationWorker } from '../data/relation-worker.js';
 import { beginPanelView } from './panel-lifecycle.js';
 
-let focusId = null, query = '', sidebarVisible = true;
+let query = '', sidebarVisible = true;
 const CANVAS_LABEL_THRESHOLD = 200, LARGE_GRAPH_THRESHOLD = 1000;
 const svgNS = 'http://www.w3.org/2000/svg';
 const element = (tag, className, text) => {
@@ -23,7 +23,8 @@ const svgElement = (tag, attributes = {}) => {
     return node;
 };
 
-export async function renderRelations(container, { openPeopleSearch } = {}) {
+export async function renderRelations(container, { openPeopleSearch, initialFocus = null } = {}) {
+    let focusId = initialFocus;
     const options = relationOptions(cfg.relationGraph);
     let service, observer, cancelWarning, frame = 0, requestVersion = 0, searchVersion = 0;
     const active = beginPanelView(container, { dispose() { cancelWarning?.(); cancelAnimationFrame(frame); service?.dispose(); observer?.disconnect(); } });
@@ -43,7 +44,7 @@ export async function renderRelations(container, { openPeopleSearch } = {}) {
     button(T('btnSearch'), () => { void search(); });
     toolbar.append(element('span', 'fcm-spacer'));
     button(T('graphSelf'), () => { focusId = Number(globalThis.Player?.MemberNumber); void showGraph(); });
-    const refreshButton = button(T('graphRefresh'), () => { void renderRelations(container, { openPeopleSearch }); });
+    button(T('graphRefresh'), () => { void renderRelations(container, { openPeopleSearch, initialFocus: focusId }); });
     const depth = element('input', 'fcm-search');
     depth.type = 'number'; depth.min = '1'; depth.step = '1';
     depth.setAttribute('aria-label', T('graphDepth'));
@@ -381,16 +382,7 @@ export async function renderRelations(container, { openPeopleSearch } = {}) {
         } catch (error) { if (version === searchVersion) showError(error); }
     }
     input.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); if (!input.disabled) void search(); } });
-    setControlsDisabled(true);
-    // Refresh remains available after a read error; leaving the tab also cancels the worker.
-    try {
-        service = ensureService();
-        setBusy(true);
-        await service.ready;
-        if (!active()) return;
-        setBusy(false);
-        setControlsDisabled(false);
-        focusId ??= Number(globalThis.Player?.MemberNumber) || null;
-        if (query) await search(); else if (focusId) await showGraph();
-    } catch (error) { showError(error); if (active()) { setBusy(false); refreshButton.disabled = false; } }
+    // Opening the tab must not scan profiles or rebuild a previously large graph.
+    // Only an explicit refresh carries a focus into the newly rendered view.
+    if (focusId) await showGraph();
 }

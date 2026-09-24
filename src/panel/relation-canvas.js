@@ -8,28 +8,24 @@ export function createRelationCanvas(canvas) {
         if (patterns.has(key)) return patterns.get(key);
         const tile = document.createElement('canvas'); tile.width = Math.ceil(segmentWidth * ratio); tile.height = Math.ceil(segmentHeight * ratio);
         const ctx = tile.getContext('2d'); ctx.scale(tile.width / segmentWidth, tile.height / segmentHeight); ctx.strokeStyle = color;
-        // Compact silhouettes inspired by chain.svg / rope.svg. The tile is
-        // measured in screen pixels and cached, so zoom never stretches a link.
+        // Fixed screen-space silhouettes, tinted with the relationship color.
         if (style === 'chain') {
-            ctx.lineWidth = Math.min(3, Math.max(1.4, width * .9));
+            const linkHeight = Math.max(3, width * 2);
+            ctx.lineWidth = Math.min(1.5, Math.max(.8, width * .55));
             ctx.lineJoin = ctx.lineCap = 'round';
-            ctx.beginPath(); ctx.roundRect(2, 5, 16, 10, 5); ctx.stroke();
-            // The narrow, edge-on link bridges the open face of adjacent links.
+            ctx.beginPath(); ctx.roundRect(2, 10 - linkHeight / 2, 16, linkHeight, linkHeight / 2); ctx.stroke();
             ctx.beginPath(); ctx.moveTo(-4, 10); ctx.lineTo(4, 10);
             ctx.moveTo(16, 10); ctx.lineTo(24, 10); ctx.stroke();
         } else {
-            const radius = Math.min(5, Math.max(3, width * 2));
+            const radius = Math.max(1.2, width * .7);
             ctx.fillStyle = color; ctx.fillRect(0, 10 - radius, segmentWidth, radius * 2);
             ctx.save(); ctx.beginPath(); ctx.rect(0, 10 - radius, segmentWidth, radius * 2); ctx.clip();
-            // Closely packed diagonal strands, with a seam and a small highlight.
-            // No separated sine waves: the rope remains one continuous body.
-            ctx.lineWidth = Math.max(1, width * .65);
+            const seamWidth = Math.max(.6, width * .4);
             for (let x = -10; x <= segmentWidth; x += 10) {
-                ctx.strokeStyle = '#00000080';
-                ctx.beginPath(); ctx.moveTo(x, 10 - radius); ctx.lineTo(x + 7, 10 + radius); ctx.stroke();
-                ctx.strokeStyle = '#ffffff40'; ctx.lineWidth *= .6;
-                ctx.beginPath(); ctx.moveTo(x + 2, 10 - radius); ctx.lineTo(x + 9, 10 + radius); ctx.stroke();
-                ctx.lineWidth /= .6;
+                ctx.strokeStyle = '#00000080'; ctx.lineWidth = seamWidth;
+                ctx.beginPath(); ctx.moveTo(x, 10 - radius); ctx.lineTo(x + 4, 10 + radius); ctx.stroke();
+                ctx.strokeStyle = '#ffffff40'; ctx.lineWidth = seamWidth * .6;
+                ctx.beginPath(); ctx.moveTo(x + 1, 10 - radius); ctx.lineTo(x + 5, 10 + radius); ctx.stroke();
             }
             ctx.restore();
         }
