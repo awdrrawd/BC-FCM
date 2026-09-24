@@ -1,3 +1,4 @@
+import { withPanelLoading } from './panel-loading.js';
 import { CAMERA_ICON } from '../ui/icons.js';
 import { cfg } from '../core/config.js';
 import { T } from '../i18n/i18n.js';
@@ -128,7 +129,7 @@ async function renderRoom(container) {
 
     if (!mns.length) { const em = document.createElement('div'); em.className = 'fcm-empty'; em.textContent = T('noData'); scroll.appendChild(em); wrapper.appendChild(scroll); wrapper.appendChild(makeCountBar(0)); container.appendChild(wrapper); return; }
 
-    await PDB.batchGet(mns);
+    await withPanelLoading(container, () => PDB.batchGet(mns));
     if (token !== getRenderToken() || roomRenders.get(container) !== revision || !container.isConnected) return;
 
     const tbl = document.createElement('table'); tbl.className = 'fcm-tbl';

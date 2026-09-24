@@ -50,7 +50,7 @@ async function setup(page, count = 8, fullPanel = false) {
     }, count);
 }
 
-test('opening the graph stays idle until an explicit request, including revisits', async ({ page }) => {
+test('opening and revisiting preload profiles without drawing until requested', async ({ page }) => {
     await setup(page);
     await page.evaluate(async () => {
         globalThis.graphWorkerStarts = 0;
@@ -65,12 +65,12 @@ test('opening the graph stays idle until an explicit request, including revisits
         await globalThis.openIdleGraph();
     });
     await expect(page.locator('[data-node]')).toHaveCount(0);
-    expect(await page.evaluate(() => globalThis.graphWorkerStarts)).toBe(0);
+    expect(await page.evaluate(() => globalThis.graphWorkerStarts)).toBe(1);
     await page.getByRole('button', {name:'以我為中心',exact:true}).click();
     await expect(page.locator('[data-node]')).toHaveCount(8);
     await page.evaluate(() => globalThis.openIdleGraph());
     await expect(page.locator('[data-node]')).toHaveCount(0);
-    expect(await page.evaluate(() => globalThis.graphWorkerStarts)).toBe(1);
+    expect(await page.evaluate(() => globalThis.graphWorkerStarts)).toBe(2);
     await page.locator('.fcm-toolbar input').fill('Member 2');
     await page.locator('.fcm-toolbar input').press('Enter');
     await expect(page.locator('[data-node]')).toHaveCount(8);
@@ -143,7 +143,7 @@ test('five-hop graph renders every level, remembers depth, and allows more room 
     expect(await page.locator('[data-node="6"]').getAttribute('transform')).not.toMatch(/undefined|NaN/);
     await page.locator('[data-node="3"] circle').click();
     await expect(page.locator('.fcm-graph-stage [data-node].fcm-graph-muted')).toHaveCount(2);
-    await expect(page.locator('[data-node="4"] text')).toBeVisible();
+    await expect(page.locator('[data-node="4"] text')).toBeHidden();
     await expect(page.locator('[data-node="5"] text')).toBeHidden();
     await expect(page.locator('[data-node="1"]')).not.toHaveClass(/fcm-graph-muted/);
     await page.locator('.fcm-graph-stage svg').click({button:'right',position:{x:10,y:10}});
@@ -232,7 +232,7 @@ test('bundled minified relation worker remains self-contained and keeps the shar
     expect(graph).toEqual({ count: 8, version: 31 });
 });
 
-test('dense first-hop labels stay visible, SVG fills its stage and relationship colors match direction', async ({ page }) => {
+test('first-hop labels stay hidden until selected, SVG fills its stage and colors match direction', async ({ page }) => {
     await setup(page, 80);
     await page.evaluate(async () => {
         await new Promise((resolve, reject) => {
@@ -248,7 +248,7 @@ test('dense first-hop labels stay visible, SVG fills its stage and relationship 
     });
     const labels = page.locator('.fcm-graph-stage [data-level="1"] text');
     await expect(labels).toHaveCount(80);
-    expect(await labels.evaluateAll(nodes => nodes.every(node => getComputedStyle(node).display !== 'none'))).toBe(true);
+    expect(await labels.evaluateAll(nodes => nodes.every(node => getComputedStyle(node).display === 'none'))).toBe(true);
     await expect(page.locator('.fcm-graph-edges')).toBeVisible();
     await expect(page.locator('[data-node="81"] circle')).toHaveCSS('stroke', 'rgb(255, 179, 71)');
     const stage = await page.locator('.fcm-graph-stage').boundingBox();
@@ -256,7 +256,7 @@ test('dense first-hop labels stay visible, SVG fills its stage and relationship 
     expect(svg.y).toBeCloseTo(stage.y, 0); expect(svg.height).toBeCloseTo(stage.height, 0);
     expect(await labels.evaluateAll(nodes => {
         const bounds = nodes[0].closest('svg').getBoundingClientRect();
-        return nodes.every(node => { const r = node.getBoundingClientRect();
+        return nodes.filter(node => getComputedStyle(node).display !== 'none').every(node => { const r = node.getBoundingClientRect();
             return r.top >= bounds.top && r.bottom <= bounds.bottom && r.left >= bounds.left && r.right <= bounds.right;
         });
     })).toBe(true);
@@ -264,7 +264,7 @@ test('dense first-hop labels stay visible, SVG fills its stage and relationship 
     await expect(page.locator('[data-node="81"] text')).toBeHidden();
     await page.locator('.fcm-graph-depth input').fill('12');
     await page.locator('.fcm-graph-depth input').press('Enter');
-    await expect(page.locator('.fcm-graph-depth input')).toHaveValue('12');
+    await expect(page.locator('.fcm-graph-depth input')).toHaveValue('2');
     await page.screenshot({ path: 'test-results/relations-dense-labels.png' });
 });
 
@@ -326,11 +326,18 @@ test('opening Profile hides FCM and its minimized pill and allows reopening', as
     await expect(page.locator('[data-node]')).toHaveCount(0);
     await page.getByRole('button', { name: '以我為中心', exact: true }).click();
     await expect(page.locator('[data-node]')).toHaveCount(8);
+    await page.evaluate(() => { globalThis.retainedNode = document.querySelector('[data-node]'); });
     await page.getByRole('button', {name:'開啟 Profile'}).click();
     await expect(page.locator('#fcm-panel')).toBeHidden();
     await expect(page.locator('#fcm-mini')).not.toHaveClass(/visible/);
     await page.evaluate(() => globalThis.realGraphPanel.togglePanel());
     await expect(page.locator('#fcm-panel')).toBeVisible();
+    expect(await page.evaluate(() => document.querySelector('[data-node]') === globalThis.retainedNode)).toBe(true);
+    await page.evaluate(() => globalThis.realGraphPanel.minimizePanel());
+    await expect(page.locator('#fcm-panel')).toBeHidden();
+    await page.locator('#fcm-mini').click();
+    await expect(page.locator('#fcm-panel')).toBeVisible();
+    expect(await page.evaluate(() => document.querySelector('[data-node]') === globalThis.retainedNode)).toBe(true);
 });
 
 test('relation settings use compact right-aligned switches and themed labels', async ({ page }) => {
@@ -467,3 +474,38 @@ test('1000 people with 3999 relationships remain interactive and render cached n
     await expect(page.locator('.fcm-graph-stage svg')).toHaveClass(/fcm-raster-labels/);
     await page.screenshot({path:'test-results/relations-dense-1000.png'});
 });
+
+ test('graph preloads without drawing, limits depth and toggles path names', async ({ page }) => {
+    await setup(page);
+    await page.evaluate(async () => {
+        const NativeWorker = globalThis.Worker;
+        globalThis.preloadWorkers = 0;
+        globalThis.Worker = class extends NativeWorker { constructor(...args) { super(...args); globalThis.preloadWorkers++; } };
+        const { renderRelations } = await import('/src/panel/panel-relations.js');
+        await renderRelations(document.querySelector('#fcm-content'));
+    });
+    await expect(page.locator('[data-node]')).toHaveCount(0);
+    expect(await page.evaluate(() => globalThis.preloadWorkers)).toBe(1);
+    await expect(page.locator('.fcm-graph-loading')).toBeHidden();
+    await page.getByRole('button',{name:'以我為中心',exact:true}).click();
+    await expect(page.locator('[data-node]')).toHaveCount(8);
+    expect(await page.evaluate(() => globalThis.preloadWorkers)).toBe(1);
+    await expect(page.locator('[data-node="1"] text')).toBeVisible();
+    await expect(page.locator('[data-node="2"] text')).toBeHidden();
+    await page.locator('[data-node="2"] circle').click();
+    await expect(page.locator('[data-node="2"] text')).toBeVisible();
+    await page.getByRole('button',{name:'顯示名稱',exact:true}).click();
+    await expect(page.locator('[data-node="1"] text')).toBeHidden();
+    await expect(page.locator('[data-node="2"] text')).toBeHidden();
+    await page.getByRole('button',{name:'關係層數 + 1',exact:true}).click();
+    await expect(page.getByLabel('關係層數',{exact:true})).toHaveValue('3');
+    await page.getByRole('button',{name:'關係層數 − 1',exact:true}).click();
+    await expect(page.getByLabel('關係層數',{exact:true})).toHaveValue('2');
+    const depth = page.getByLabel('關係層數',{exact:true});
+    await depth.fill('10'); await depth.press('Enter');
+    await page.getByRole('button',{name:'關係層數 + 1',exact:true}).click();
+    await expect(depth).toHaveValue('10');
+    await depth.fill('1'); await depth.press('Enter');
+    await page.getByRole('button',{name:'關係層數 − 1',exact:true}).click();
+    await expect(depth).toHaveValue('1');
+ });

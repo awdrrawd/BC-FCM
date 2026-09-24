@@ -99,7 +99,7 @@
   "graphDepth": "Relationship depth",
   "graphMaster": "Owner",
   "graphSub": "Submissive",
-  "graphDepthHint": "Default: 2 hops, with no people cap. High depths may cause lag. Warns only above 1000 people.",
+  "graphDepthHint": "1~10단계(기본값: 2). 인원 제한 없음. 1000명을 초과하면 경고합니다.",
   "graphHops": "{0} hop(s)",
   "graphLovership": "Lovership",
   "graphHint": "Uses saved Profile snapshots, not live relationships. All names are shown; selection keeps highlighted-path names, and right-click restores all names. Double-click to recenter, drag to pan and scroll to zoom. Customize colors and lines in Settings. Zoom or select a person to inspect crowded names.",
@@ -540,5 +540,7 @@
   "tabDisplaySettings": "Tab visibility and order",
   "tabSettingsHint": "Drag buttons to reorder; click to show or hide. Alt + arrow keys also reorder. The header gear always opens Settings.",
   "tabEdit": "Edit",
-  "graphBusy": "Loading relationship graph…"
+  "graphBusy": "Loading relationship graph…",
+  "graphNames": "이름 표시",
+  "panelLoading": "데이터 불러오는 중…"
 }

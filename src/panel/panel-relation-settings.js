@@ -24,7 +24,7 @@ export function renderRelationSettings() {
         select.onchange = () => { options[role].style = select.value; save(); };
         host.append(color, select);
     }
-    for (const [key, label, max] of [['depth', 'graphDefaultDepth', null], ['width', 'graphLineWidth', 6]]) {
+    for (const [key, label, max] of [['depth', 'graphDefaultDepth', 10], ['width', 'graphLineWidth', 6]]) {
         const input = document.createElement('input'); input.type = 'number'; input.className = 'fcm-search';
         input.min = '1'; input.step = '1'; if (max) input.max = String(max);
         input.style.width = '76px'; input.value = options[key]; input.setAttribute('aria-label', T(label));

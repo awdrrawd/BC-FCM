@@ -1,3 +1,4 @@
+import { withPanelLoading } from './panel-loading.js';
 import { makeSearchWrap } from '../ui/search-clear.js';
 import { T } from '../i18n/i18n.js';
 import { PDB, _pc, Snapshot } from '../data/profile-db.js';
@@ -27,7 +28,7 @@ async function renderPeople(container, _myToken) {
     const active = beginPanelView(container);
     const isCurrent = () => active() && _myToken === getRenderToken();
     container.innerHTML = '';
-    const ready = await PDB.init();
+    const ready = await withPanelLoading(container, () => PDB.init());
     if (!isCurrent()) return;
     if (!ready) {
         const em = document.createElement('div'); em.className = 'fcm-empty';
@@ -36,7 +37,7 @@ async function renderPeople(container, _myToken) {
     }
 
     // Finish loading before exposing search/refresh callbacks; a new visit invalidates this scope.
-    const allProfiles = await PDB.getAll().catch(error => { warnLimited('profile list read failed', error); return []; });
+    const allProfiles = await withPanelLoading(container, () => PDB.getAll().catch(error => { warnLimited('profile list read failed', error); return []; }));
     if (!isCurrent()) return;
     allProfiles.sort((a, b) => (b.seen || b.savedAt || 0) - (a.seen || a.savedAt || 0));
     const toolbar = document.createElement('div'); toolbar.className = 'fcm-toolbar';
@@ -134,7 +135,7 @@ async function renderPeople(container, _myToken) {
             }
             return;
         }
-        await PDB.batchGet(show.map(p => p.memberNumber));
+        await withPanelLoading(scroll, () => PDB.batchGet(show.map(p => p.memberNumber)));
         if (revision !== searchRevision || !isCurrent() || !scroll.isConnected) return;
         const tbl = document.createElement('table'); tbl.className = 'fcm-tbl';
         const thead = document.createElement('thead');

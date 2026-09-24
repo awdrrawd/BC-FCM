@@ -8,7 +8,8 @@ const defaults = {
 export function relationOptions(value = {}) {
     value ??= {};
     const result = {
-        depth: Number.isSafeInteger(value.depth) && value.depth > 0 ? value.depth : 2,
+        depth: Number.isSafeInteger(value.depth) && value.depth > 0 ? Math.min(10, value.depth) : 2,
+        showNames: value.showNames !== false,
         width: Number.isFinite(value.width) && value.width >= 1 && value.width <= 6 ? value.width : 2,
         warnLarge: value.warnLarge !== false,
     };
