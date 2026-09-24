@@ -1,4 +1,4 @@
-function createChatRuntime({ config, chatStore, setMessageIndex, getMessageIndex, cleanMessage, profileDb, initAudio, injectStyles, balloons, getRoot, render, refreshSettings, text, contactCard, presence, refreshList, refreshConversationPresence, offlineDelivery, closeChat, refreshMessageIndex = async () => {} }) {
+function createChatRuntime({ config, chatStore, setMessageIndex, getMessageIndex, cleanMessage, profileDb, initAudio, injectStyles, balloons, getRoot, render, refreshSettings, text, contactCard, presence, refreshList, refreshConversationPresence, offlineDelivery, closeChat, refreshMedia = () => {}, refreshMessageIndex = async () => {} }) {
     let initPromise = null;
     let blockedNoticeTimer = 0;
 
@@ -18,6 +18,7 @@ function createChatRuntime({ config, chatStore, setMessageIndex, getMessageIndex
         await initAudio();
         injectStyles();
         balloons.ensure();
+        window.addEventListener('liko:media-api-ready', refreshMedia);
         window.addEventListener('fcm-theme-change', refreshSettings);
         window.addEventListener('fcm-language-change', () => {
             if (isVisible()) render();

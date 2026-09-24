@@ -476,5 +476,7 @@
   "chatQueueSend": "Gửi khi trực tuyến",
   "chatTranslate": "Dịch",
   "chatTranslationLoading": "Đang dịch…",
-  "chatTranslationFailed": "Dịch thất bại. Nhấp vào Dịch để thử lại."
+  "chatTranslationFailed": "Dịch thất bại. Nhấp vào Dịch để thử lại.",
+  "chatUploadImage": "Upload image",
+  "chatUploadRecover": "Image uploaded, but the conversation changed. Copy the link:"
 }

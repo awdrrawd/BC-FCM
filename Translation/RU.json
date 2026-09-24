@@ -476,5 +476,7 @@
   "chatQueueSend": "Отправить при подключении",
   "chatTranslate": "Перевести",
   "chatTranslationLoading": "Перевод…",
-  "chatTranslationFailed": "Не удалось перевести. Нажмите «Перевести», чтобы повторить."
+  "chatTranslationFailed": "Не удалось перевести. Нажмите «Перевести», чтобы повторить.",
+  "chatUploadImage": "Upload image",
+  "chatUploadRecover": "Image uploaded, but the conversation changed. Copy the link:"
 }

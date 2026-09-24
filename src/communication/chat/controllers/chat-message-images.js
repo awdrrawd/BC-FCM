@@ -1,7 +1,9 @@
+import { processChatMedia } from './chat-media.js';
 import { normalizedImageOrigin, trustImageOrigin } from '../../image-trust.js';
 
 function createChatMessageImagesController({ getViewport, confirm, text, rerender }) {
     function bind(scope, log) {
+        processChatMedia(scope);
         scope?.querySelectorAll?.('.fcm-chat-image').forEach(image => {
             image.addEventListener('load', () => {
                 const viewport = getViewport();

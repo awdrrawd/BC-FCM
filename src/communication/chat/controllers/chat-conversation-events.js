@@ -1,3 +1,6 @@
+import { bindMediaComposer } from './chat-media.js';
+import { T } from '../../../i18n/i18n.js';
+
 function createChatConversationEvents({ getRoot, getMemberNumber, config, saveConfig, closeStackedDetail, composer, historyViewport, forwardTargets, selectedActions, messageSelection, bindMessageActions, replyController, profileSuggestion, conversationActions, roomActions, showRoomJoin, getCachedRoomInfo, contactCard, promptGroupName, createGroup, rerender }) {
     function openHeaderRoom(element) {
         if (!element?.dataset.roomName) return;
@@ -18,10 +21,12 @@ function createChatConversationEvents({ getRoot, getMemberNumber, config, saveCo
         main.querySelector('[data-assign-menu]')?.classList.remove('open');
     }
 
+    function bindMedia() { bindMediaComposer(getRoot()?.querySelector('.fcm-chat-main'), { getMemberNumber, text: T }); }
     function bind() {
         const root = getRoot();
         const main = root?.querySelector('.fcm-chat-main');
         if (!main) return;
+        bindMedia();
         main.querySelector('[data-back]')?.addEventListener('click', closeStackedDetail);
         main.querySelector('[data-send]')?.addEventListener('click', composer.send);
         main.querySelectorAll('[data-channel]').forEach(button => button.addEventListener('click', () => {
@@ -76,7 +81,7 @@ function createChatConversationEvents({ getRoot, getMemberNumber, config, saveCo
         });
     }
 
-    return { bind };
+    return { bind, bindMedia };
 }
 
 export { createChatConversationEvents };

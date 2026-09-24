@@ -476,5 +476,7 @@
   "chatQueueSend": "送信予約",
   "chatTranslate": "翻訳",
   "chatTranslationLoading": "翻訳中…",
-  "chatTranslationFailed": "翻訳に失敗しました。「翻訳」をクリックして再試行してください。"
+  "chatTranslationFailed": "翻訳に失敗しました。「翻訳」をクリックして再試行してください。",
+  "chatUploadImage": "Upload image",
+  "chatUploadRecover": "Image uploaded, but the conversation changed. Copy the link:"
 }

@@ -476,5 +476,7 @@
   "chatQueueSend": "Zum Senden vormerken",
   "chatTranslate": "Übersetzen",
   "chatTranslationLoading": "Wird übersetzt…",
-  "chatTranslationFailed": "Übersetzung fehlgeschlagen. Zum Wiederholen auf Übersetzen klicken."
+  "chatTranslationFailed": "Übersetzung fehlgeschlagen. Zum Wiederholen auf Übersetzen klicken.",
+  "chatUploadImage": "Upload image",
+  "chatUploadRecover": "Image uploaded, but the conversation changed. Copy the link:"
 }
