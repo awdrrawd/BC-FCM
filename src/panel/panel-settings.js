@@ -6,6 +6,7 @@ import { PDB, _pc, Snapshot, detectWCESave, setAvStatusEl, ensureOwnAvatarSnapsh
 import { buildFriendList } from '../data/data.js';
 import { mkBtn, mkToggle, refreshSnapshotsForList } from './panel-widgets.js';
 import { exportProfiles, importProfiles } from './panel-people.js';
+import { showProfileImportProgress } from './panel-profile-import.js';
 import { _applyWhisperStyle, _removeWhisperAvatar, _installOocProtect, _uninstallOocProtect } from '../chat/chat-fx.js';
 import { renderCurrent, reopenForLang } from './panel-controller.js';
 import { refreshChatSettings } from '../communication/chat.js';
@@ -321,8 +322,27 @@ function renderSettings(container) {
         if (n > 0 && typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('exportDone', n), 5000);
     }));
     exportRow.appendChild(mkActionBtn(T('importProfiles'), T('importNote'), 'fcm-btn-green', () => {
+        if (document.querySelector('#fcm-profile-import-progress[aria-busy="true"]')) return;
         const inp = document.createElement('input'); inp.type = 'file'; inp.accept = '.json';
-        inp.onchange = async () => { const f = inp.files[0]; if (!f) return; const r = await importProfiles(f); if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(T('importDone', r.pc, r.nc), 5000); renderCurrent(); };
+        inp.onchange = async () => {
+            const f = inp.files[0]; if (!f) return;
+            if (document.querySelector('#fcm-profile-import-progress[aria-busy="true"]')) return;
+            const status = showProfileImportProgress();
+            for (const button of exportRow.querySelectorAll('button')) button.disabled = true;
+            const notify = message => {
+                if (typeof ChatRoomSendLocal === 'function') ChatRoomSendLocal(message, 10000);
+                else globalThis.alert(message);
+            };
+            try {
+                const r = await importProfiles(f, { onProgress: state => status.update(state) });
+                const message = T('importSummary', r.pc, r.nc, r.kept, r.invalid, r.unavailableNotes);
+                status.finish(message); notify(message);
+            } catch (error) {
+                const message = T(error?.name === 'QuotaExceededError' ? 'importStorageFull' : 'importFailed');
+                status.finish(message); notify(message);
+            } finally { for (const button of exportRow.querySelectorAll('button')) button.disabled = false; }
+            renderCurrent();
+        };
         inp.click();
     }));
     wrap.appendChild(exportRow);

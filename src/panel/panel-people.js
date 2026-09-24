@@ -1,6 +1,7 @@
 import { attachSearchClear } from '../ui/search-clear.js';
 import { T } from '../i18n/i18n.js';
 import { PDB, _pc, Snapshot } from '../data/profile-db.js';
+import { importProfileFile } from '../data/profile-import.js';
 import { inRoomFn, amAdmin, getAllRels, onlineFriends, matchesSearchFields, searchScoreFields } from '../data/data.js';
 import { makeAvEl, makeRelEl, mkBtn, paginate, makePageBar, buildMgmtBtns, buildPersonOps } from './panel-widgets.js';
 import { makeIdCell } from '../chat/actions.js';
@@ -232,11 +233,10 @@ async function exportProfiles() {
     } catch(e) { console.error('🐈‍⬛ [FCM] export error:', e); return 0; }
 }
 
-async function importProfiles(file) {
+async function importProfiles(file, options) {
     try {
-        const data = JSON.parse(await file.text());
-        return await PDB.importBackup(data);
-    } catch(e) { console.error('🐈‍⬛ [FCM] import error:', e); return { pc:0, nc:0 }; }
+        return await importProfileFile(file, options);
+    } catch(e) { console.error('🐈‍⬛ [FCM] import error:', e); throw e; }
 }
 
 export { renderPeople, exportProfiles, importProfiles, resetPeopleSearch, setPeopleQuery };
