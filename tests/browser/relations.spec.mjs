@@ -50,6 +50,8 @@ async function setup(page, count = 8, fullPanel = false) {
     }, count);
 }
 
+// Click the painted circle: an SVG group bounding box also includes its label
+// and can have its center in empty space depending on the platform font metrics.
 test('relationship tab reads native IndexedDB, filters, focuses and links to people search', async ({ page }) => {
     await setup(page);
     await page.evaluate(() => globalThis.graphTest.render());
@@ -59,7 +61,7 @@ test('relationship tab reads native IndexedDB, filters, focuses and links to peo
     await page.locator('.fcm-graph-owner').click();
     await expect(page.locator('.fcm-graph-stage [data-node]')).toHaveCount(2);
     await expect(page.locator('.fcm-graph-status')).toContainText('1 條關係');
-    await page.locator('.fcm-graph-stage [data-node="2"]').click();
+    await page.locator('.fcm-graph-stage [data-node="2"] circle').click();
     await expect(page.locator('.fcm-graph-detail')).toContainText('Member 2');
     await page.locator('.fcm-graph-detail button').last().click();
     expect(await page.evaluate(() => globalThis.graphTest.searched)).toBe('2');
@@ -113,7 +115,7 @@ test('five-hop graph renders every level, remembers depth, and allows more room 
     await expect(page.locator('.fcm-graph-stage [data-node]')).toHaveCount(6);
     await expect(page.locator('.fcm-graph-ring')).toHaveCount(5);
     expect(await page.locator('[data-node="6"]').getAttribute('transform')).not.toMatch(/undefined|NaN/);
-    await page.locator('[data-node="3"]').click();
+    await page.locator('[data-node="3"] circle').click();
     await expect(page.locator('.fcm-graph-stage [data-node].fcm-graph-muted')).toHaveCount(2);
     await expect(page.locator('[data-node="4"] text')).toBeVisible();
     await expect(page.locator('[data-node="5"] text')).toBeHidden();
@@ -228,7 +230,7 @@ test('dense first-hop labels stay visible, SVG fills its stage and relationship 
             return r.top >= bounds.top && r.bottom <= bounds.bottom && r.left >= bounds.left && r.right <= bounds.right;
         });
     })).toBe(true);
-    await page.locator('[data-node="2"]').click();
+    await page.locator('[data-node="2"] circle').click();
     await expect(page.locator('[data-node="81"] text')).toBeHidden();
     await page.locator('.fcm-graph-depth input').fill('12');
     await page.locator('.fcm-graph-depth input').press('Enter');
@@ -251,7 +253,7 @@ test('own social filters, configurable appearance and Profile action', async ({ 
     await expect(page.locator('[data-node="100"]')).toHaveCount(1);
     await expect(page.getByRole('button', {name:'朋友',exact:true})).toHaveAttribute('aria-pressed','true');
     await expect(page.locator('[data-node="2"] circle')).toHaveCSS('stroke','rgb(17, 34, 51)');
-    await page.locator('[data-node="2"]').click();
+    await page.locator('[data-node="2"] circle').click();
     await page.getByRole('button', { name: '開啟 Profile' }).click();
     expect(await page.evaluate(() => globalThis.openedGraphProfile)).toBe(2);
 });
