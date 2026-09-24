@@ -1,25 +1,37 @@
 // Draw the dense edge layer without creating/rebuilding SVG paths per strand.
 // Interactive nodes and accessible names remain in SVG above this canvas.
 export function createRelationCanvas(canvas) {
-    const segmentWidth = 10, segmentHeight = 20, stripWidth = 4090;
+    const segmentWidth = 20, segmentHeight = 20, stripWidth = 4080;
     const context = canvas.getContext('2d'), patterns = new Map(), texts = new Map();
     function pattern(style, color, width, ratio) {
         const key = `${style}:${color}:${width}:${ratio}`;
         if (patterns.has(key)) return patterns.get(key);
         const tile = document.createElement('canvas'); tile.width = Math.ceil(segmentWidth * ratio); tile.height = Math.ceil(segmentHeight * ratio);
         const ctx = tile.getContext('2d'); ctx.scale(tile.width / segmentWidth, tile.height / segmentHeight); ctx.strokeStyle = color;
+        // Compact silhouettes inspired by chain.svg / rope.svg. The tile is
+        // measured in screen pixels and cached, so zoom never stretches a link.
         if (style === 'chain') {
-            ctx.lineWidth = Math.min(1.4, width * .5); ctx.beginPath(); ctx.ellipse(segmentWidth / 2, segmentHeight / 2, (segmentWidth - ctx.lineWidth) / 2, (segmentHeight - ctx.lineWidth) / 2, 0, 0, Math.PI * 2); ctx.stroke();
+            ctx.lineWidth = Math.min(3, Math.max(1.4, width * .9));
+            ctx.lineJoin = ctx.lineCap = 'round';
+            ctx.beginPath(); ctx.roundRect(2, 5, 16, 10, 5); ctx.stroke();
+            // The narrow, edge-on link bridges the open face of adjacent links.
+            ctx.beginPath(); ctx.moveTo(-4, 10); ctx.lineTo(4, 10);
+            ctx.moveTo(16, 10); ctx.lineTo(24, 10); ctx.stroke();
         } else {
-            ctx.lineWidth = Math.max(.65, width * .4);
-            for (const phase of [0, Math.PI * 2 / 3, Math.PI * 4 / 3]) {
-                ctx.beginPath();
-                for (let i = 0; i <= 16; i++) {
-                    const x = i * segmentWidth / 16, y = segmentHeight / 2 + Math.sin(i / 16 * Math.PI * 2 + phase) * (segmentHeight - ctx.lineWidth) / 2;
-                    if (!i) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-                }
-                ctx.stroke();
+            const radius = Math.min(5, Math.max(3, width * 2));
+            ctx.fillStyle = color; ctx.fillRect(0, 10 - radius, segmentWidth, radius * 2);
+            ctx.save(); ctx.beginPath(); ctx.rect(0, 10 - radius, segmentWidth, radius * 2); ctx.clip();
+            // Closely packed diagonal strands, with a seam and a small highlight.
+            // No separated sine waves: the rope remains one continuous body.
+            ctx.lineWidth = Math.max(1, width * .65);
+            for (let x = -10; x <= segmentWidth; x += 10) {
+                ctx.strokeStyle = '#00000080';
+                ctx.beginPath(); ctx.moveTo(x, 10 - radius); ctx.lineTo(x + 7, 10 + radius); ctx.stroke();
+                ctx.strokeStyle = '#ffffff40'; ctx.lineWidth *= .6;
+                ctx.beginPath(); ctx.moveTo(x + 2, 10 - radius); ctx.lineTo(x + 9, 10 + radius); ctx.stroke();
+                ctx.lineWidth /= .6;
             }
+            ctx.restore();
         }
         const strip = document.createElement('canvas'); strip.width = Math.ceil(stripWidth * ratio); strip.height = tile.height;
         const brush = strip.getContext('2d'); brush.fillStyle = brush.createPattern(tile, 'repeat'); brush.fillRect(0, 0, strip.width, strip.height);
