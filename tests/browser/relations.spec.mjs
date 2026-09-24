@@ -388,7 +388,7 @@ test('1000-person interaction benchmark', { tag: '@performance' }, async ({ page
     await expect(page.locator('[data-node]')).toHaveCount(1000);
 });
 
-test('canvas chain links keep ten-pixel spacing across zoom and none hides edges', async ({ page }) => {
+test('canvas chain links keep twenty-pixel spacing across zoom and none hides edges', async ({ page }) => {
     await setup(page);
     const result = await page.evaluate(async () => {
         const { createRelationCanvas } = await import('/src/panel/relation-canvas.js');
@@ -401,7 +401,7 @@ test('canvas chain links keep ten-pixel spacing across zoom and none hides edges
         const after=Array.from(ctx.getImageData(40,40,100,20).data);
         const row=ctx.getImageData(40,50,100,1).data;
         const holes=Array.from({length:100},(_,i)=>row[i*4+3]).filter(alpha=>alpha<50).length;
-        const repeats=Array.from({length:90},(_,i)=>row[i*4+3]===row[(i+10)*4+3]).every(Boolean);
+        const repeats=Array.from({length:80},(_,i)=>row[i*4+3]===row[(i+20)*4+3]).every(Boolean);
         painter.paint([{...edge,style:'none'}],{x:0,y:0,w:400,h:100},400,100,2);
         const empty=ctx.getImageData(0,0,400,100).data.every(value=>value===0);
         return {same:JSON.stringify(before)===JSON.stringify(after),holes,repeats,empty};
