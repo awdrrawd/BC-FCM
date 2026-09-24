@@ -50,6 +50,32 @@ async function setup(page, count = 8, fullPanel = false) {
     }, count);
 }
 
+test('opening and revisiting preload profiles without drawing until requested', async ({ page }) => {
+    await setup(page);
+    await page.evaluate(async () => {
+        globalThis.graphWorkerStarts = 0;
+        const NativeWorker = globalThis.Worker;
+        globalThis.Worker = class extends NativeWorker {
+            constructor(...args) { super(...args); globalThis.graphWorkerStarts++; }
+        };
+        globalThis.openIdleGraph = async () => {
+            const { renderRelations } = await import('/src/panel/panel-relations.js');
+            await renderRelations(document.querySelector('#fcm-content'));
+        };
+        await globalThis.openIdleGraph();
+    });
+    await expect(page.locator('[data-node]')).toHaveCount(0);
+    expect(await page.evaluate(() => globalThis.graphWorkerStarts)).toBe(1);
+    await page.getByRole('button', {name:'以我為中心',exact:true}).click();
+    await expect(page.locator('[data-node]')).toHaveCount(8);
+    await page.evaluate(() => globalThis.openIdleGraph());
+    await expect(page.locator('[data-node]')).toHaveCount(0);
+    expect(await page.evaluate(() => globalThis.graphWorkerStarts)).toBe(2);
+    await page.locator('.fcm-toolbar input').fill('Member 2');
+    await page.locator('.fcm-toolbar input').press('Enter');
+    await expect(page.locator('[data-node]')).toHaveCount(8);
+});
+
 // Click the painted circle: an SVG group bounding box also includes its label
 // and can have its center in empty space depending on the platform font metrics.
 test('relationship tab reads native IndexedDB, filters, focuses and links to people search', async ({ page }) => {
@@ -171,7 +197,8 @@ test('real FCM shell places Relations after People and releases workers on tab s
     expect(await page.locator('#fcm-tabs .fcm-tab').evaluateAll(tabs => tabs.map(tab => tab.dataset.tab)))
         .toEqual(['friends', 'room', 'roomSearch', 'people', 'relations', 'settings', 'help']);
     await page.locator('[data-tab="relations"]').click();
-    await page.getByRole('button',{name:'以我為中心',exact:true}).click();
+    await expect(page.locator('[data-node]')).toHaveCount(0);
+    await page.getByRole('button', { name: '以我為中心', exact: true }).click();
     await expect(page.locator('.fcm-graph-stage [data-node]')).toHaveCount(8);
     expect(await page.evaluate(() => globalThis.activeGraphWorkers)).toBe(1);
     await page.locator('[data-panel-max]').click();
@@ -179,7 +206,8 @@ test('real FCM shell places Relations after People and releases workers on tab s
     await page.locator('[data-tab="settings"]').click();
     expect(await page.evaluate(() => globalThis.activeGraphWorkers)).toBe(0);
     await page.locator('[data-tab="relations"]').click();
-    await page.getByRole('button',{name:'以我為中心',exact:true}).click();
+    await expect(page.locator('[data-node]')).toHaveCount(0);
+    await page.getByRole('button', { name: '以我為中心', exact: true }).click();
     await expect(page.locator('.fcm-graph-stage [data-node]')).toHaveCount(8);
     await page.screenshot({ path: 'test-results/relations-fullscreen.png' });
     await page.locator('[data-panel-close]').click();
@@ -295,7 +323,8 @@ test('opening Profile hides FCM and its minimized pill and allows reopening', as
         globalThis.realGraphPanel = panel; panel.openPanel();
     });
     await page.locator('[data-tab="relations"]').click();
-    await page.getByRole('button',{name:'以我為中心',exact:true}).click();
+    await expect(page.locator('[data-node]')).toHaveCount(0);
+    await page.getByRole('button', { name: '以我為中心', exact: true }).click();
     await expect(page.locator('[data-node]')).toHaveCount(8);
     await page.evaluate(() => { globalThis.retainedNode = document.querySelector('[data-node]'); });
     await page.getByRole('button', {name:'開啟 Profile'}).click();
