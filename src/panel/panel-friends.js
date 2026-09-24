@@ -48,6 +48,7 @@ async function renderFriends(container, _myToken) {
         if (e.key === 'Enter') { friendsPage = 0; renderCurrent(); }
     });
     toolbar.appendChild(sw);
+    toolbar.appendChild(mkBtn(T('btnSearch'), '', () => { searchQ = searchInp.value; friendsPage = 0; renderCurrent(); }));
     const fl = document.createElement('span'); fl.className = 'fcm-lbl-sm'; fl.textContent = T('showOnly') + ':';
     toolbar.appendChild(fl);
     [['online', T('fOnline')], ['offline', T('fOffline')], ['owner', T('fOwner')], ['lover', T('fLover')], ['sub', T('fSub')], ['friend', T('fFriend')], ['whitelist', T('fWhitelist')], ['blacklist', T('fBlacklist')]].forEach(([key, label]) => {

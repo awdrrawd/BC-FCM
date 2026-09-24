@@ -1,4 +1,4 @@
-import { attachSearchClear } from '../ui/search-clear.js';
+import { makeSearchWrap } from '../ui/search-clear.js';
 import { T } from '../i18n/i18n.js';
 import { onlineFriends } from '../data/data.js';
 import { showRoomJoinConfirm, roomInfoFromResult, shareRoomToChat } from '../chat/actions.js';
@@ -29,12 +29,11 @@ async function renderRoomSearch(container) {
     const tb = document.createElement('div'); tb.className = 'fcm-toolbar';
     // (left refresh button removed in v1.3.5 — right side already has one)
 
-    const sw = document.createElement('div'); sw.style.cssText = 'position:relative;display:inline-flex;align-items:center;flex:1;min-width:120px;max-width:200px;';
-    const inp = document.createElement('input'); inp.className = 'fcm-search'; inp.placeholder = T('roomSearch2'); inp.value = _roomSearchQ2; inp.style.width = '100%';
-    sw.appendChild(inp); tb.appendChild(sw);
-    attachSearchClear(inp, { onClear: () => { _roomSearchQ2 = ''; } });
+    const { wrap: sw, inp } = makeSearchWrap(_roomSearchQ2, T('roomSearch2'), undefined, undefined,
+        () => { _roomSearchQ2 = ''; });
+    tb.appendChild(sw);
 
-    const srchBtn = mkBtn(T('roomSearchBtn'), 'fcm-btn', () => runSearch());
+    const srchBtn = mkBtn(T('btnSearch'), 'fcm-btn', () => runSearch());
     srchBtn.style.cssText = 'padding:5px 10px;border-radius:8px;border:1.5px solid #4038a0;background:#1e1635;color:#b098d0;font-size:12px;font-weight:600;cursor:pointer;flex-shrink:0;';
     tb.appendChild(srchBtn);
 
@@ -91,7 +90,7 @@ async function renderRoomSearch(container) {
         const results = await doRoomSearch(_roomSearchQ2, _roomZoneFilter);
         if (revision !== searchRevision || token !== getRenderToken() || !wrap.isConnected) return;
         setRoomResults(results);
-        srchBtn.textContent = T('roomSearchBtn'); srchBtn.disabled = false;
+        srchBtn.textContent = T('btnSearch'); srchBtn.disabled = false;
         renderResults();
     }
 

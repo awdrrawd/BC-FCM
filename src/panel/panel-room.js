@@ -67,6 +67,9 @@ async function renderRoom(container) {
         }, 400);
     }, 'fcm-room-search');
     toolbar.appendChild(sw);
+    const submitSearch = () => { clearTimeout(roomSearchDebounce); roomSearchQ = rsEl.value; if (roomSubTab !== 'members') roomPages[roomSubTab] = 0; void renderRoom(container); };
+    toolbar.appendChild(mkBtn(T('btnSearch'), '', submitSearch));
+    rsEl.addEventListener('keydown', event => { if (event.key === 'Enter') { event.preventDefault(); event.stopPropagation(); submitSearch(); } });
 
     if (canAddHere) {
         addBtn = mkBtn(T('btnAdd'), 'fcm-btn-green fcm-add-btn', () => {
@@ -78,11 +81,6 @@ async function renderRoom(container) {
         });
         addBtn.title = T('btnAddTitle');
         addBtn.disabled = !isNumericQ(roomSearchQ);
-        // Bug fix: stopPropagation on room admin search keydown
-        rsEl.addEventListener('keydown', e => {
-            e.stopPropagation();
-            if (e.key === 'Enter' && !addBtn.disabled) { e.preventDefault(); addBtn.click(); }
-        });
         toolbar.appendChild(addBtn);
     }
 
