@@ -476,5 +476,7 @@
   "chatQueueSend": "Mettre en attente",
   "chatTranslate": "Traduire",
   "chatTranslationLoading": "Traduction en cours…",
-  "chatTranslationFailed": "Échec de la traduction. Cliquez sur Traduire pour réessayer."
+  "chatTranslationFailed": "Échec de la traduction. Cliquez sur Traduire pour réessayer.",
+  "chatUploadImage": "Upload image",
+  "chatUploadRecover": "Image uploaded, but the conversation changed. Copy the link:"
 }

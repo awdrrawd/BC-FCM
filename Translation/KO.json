@@ -476,5 +476,7 @@
   "chatQueueSend": "전송 예약",
   "chatTranslate": "번역",
   "chatTranslationLoading": "번역 중…",
-  "chatTranslationFailed": "번역에 실패했습니다. 번역을 눌러 다시 시도하세요."
+  "chatTranslationFailed": "번역에 실패했습니다. 번역을 눌러 다시 시도하세요.",
+  "chatUploadImage": "Upload image",
+  "chatUploadRecover": "Image uploaded, but the conversation changed. Copy the link:"
 }

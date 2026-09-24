@@ -476,5 +476,7 @@
   "chatQueueSend": "离线发送",
   "chatTranslate": "翻译",
   "chatTranslationLoading": "翻译中…",
-  "chatTranslationFailed": "翻译失败，请点击“翻译”重试。"
+  "chatTranslationFailed": "翻译失败，请点击“翻译”重试。",
+  "chatUploadImage": "上传图片",
+  "chatUploadRecover": "图片已上传，但原对话已切换。请复制链接："
 }

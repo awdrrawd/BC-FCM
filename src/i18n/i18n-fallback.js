@@ -165,6 +165,8 @@ const FCM_FALLBACK = {
     "bypassBcxCommunicationNote": { TW: "預設關閉。開啟後，FCM 會繞過 BCX 對發送及接收 BEEP／悄悄話的限制。", EN: "Off by default. When enabled, FCM bypasses BCX restrictions on sending and receiving BEEPs and whispers." },
     "bcxWhisperBlocked": { TW: "你被 BCX 限制發送悄悄話", EN: "BCX prevents you from sending whispers" },
     "bcxBeepBlocked": { TW: "你被 BCX 限制發送私訊", EN: "BCX prevents you from sending private messages" },
+    "chatUploadImage": {"TW": "上傳圖片", "CN": "上传图片", "EN": "Upload image"},
+    "chatUploadRecover": {"TW": "圖片已上傳，但原對話已切換。請複製連結：", "CN": "图片已上传，但原对话已切换。请复制链接：", "EN": "Image uploaded, but the conversation changed. Copy the link:"},
     "chatTrustImageDomain": { TW: "信任圖片網域", EN: "Trust image domain" },
     "chatTrustImagePrompt": { TW: "要在本次遊戲中信任「{0}」並直接顯示其圖片嗎？重新整理頁面後會重置。", EN: "Trust \"{0}\" and display its images for this game session? Trust resets when the page is refreshed." },
     "chatTrustImage": { TW: "信任", EN: "Trust" },

@@ -1,3 +1,4 @@
+import { processChatMedia } from './chat/controllers/chat-media.js';
 import { cfg, saveCfg, isMobile } from '../core/config.js';
 import { getDisplayName as getSharedDisplayName, getRoomInfo, inRoomFn, onlineFriends, requestOnlineFriends, buildFriendList, getAllRels, isFav, isFriendOf } from '../data/data.js';
 import { getCachedRoomInfo, queryRoomInfo } from '../panel/panel-rooms-data.js';
@@ -341,6 +342,7 @@ const indexRefresh = createChatIndexRefresh({
     refreshBadges: chatBalloons.refreshBadges,
 });
 const chatRuntime = createChatRuntime({
+    refreshMedia: () => { conversationEvents.bindMedia(); processChatMedia(root); },
     refreshMessageIndex: indexRefresh.refresh,
     config: cfg, chatStore: ChatStore, setMessageIndex, getMessageIndex: () => messages,
     cleanMessage, profileDb: PDB, initAudio: initChatAudio, injectStyles: injectChatStyles,
