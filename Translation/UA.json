@@ -99,7 +99,7 @@
   "graphDepth": "Relationship depth",
   "graphMaster": "Owner",
   "graphSub": "Submissive",
-  "graphDepthHint": "Від 1 до 10 рівнів (типово 2). Кількість людей не обмежена; попередження понад 1000.",
+  "graphDepthHint": "Від 1 до 100 рівнів (типово 2). Кількість людей не обмежена; попередження понад 1000.",
   "graphHops": "{0} hop(s)",
   "graphLovership": "Lovership",
   "graphHint": "Uses saved Profile snapshots, not live relationships. All names are shown; selection keeps highlighted-path names, and right-click restores all names. Double-click to recenter, drag to pan and scroll to zoom. Customize colors and lines in Settings. Zoom or select a person to inspect crowded names.",

@@ -99,7 +99,7 @@
   "graphDepth": "Relationship depth",
   "graphMaster": "Owner",
   "graphSub": "Submissive",
-  "graphDepthHint": "1–10 (default: 2). No people cap; warns above 1000 people.",
+  "graphDepthHint": "1–100 (default: 2). No people cap; warns above 1000 people.",
   "graphHops": "{0} hop(s)",
   "graphLovership": "Lovership",
   "graphHint": "Uses saved Profile snapshots, not live relationships. All names are shown; selection keeps highlighted-path names, and right-click restores all names. Double-click to recenter, drag to pan and scroll to zoom. Customize colors and lines in Settings. Zoom or select a person to inspect crowded names.",

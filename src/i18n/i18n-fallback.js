@@ -41,7 +41,7 @@ const FCM_FALLBACK = {
     "graphNames": { TW: "顯示名稱", EN: "Show names" },
     "graphSelf": { TW: "以我為中心", EN: "Center on me" },
     "graphRefresh": { TW: "重新讀取", EN: "Reload data" },
-    "graphDepthHint": { TW: "預設 2 層，範圍 1–10；不限制人物數量，高層數可能造成卡頓。超過 1000 人才會提醒。", EN: "Default: 2 hops (1–10), with no people cap. High depths may cause lag. Warns only above 1000 people." },
+    "graphDepthHint": { TW: "預設 2 層，範圍 1–100；不限制人物數量，高層數可能造成卡頓。超過 1000 人才會提醒。", EN: "Default: 2 hops (1–100), with no people cap. High depths may cause lag. Warns only above 1000 people." },
     "graphSettings": { TW: "關係網設置", EN: "Relationship graph settings" },
     "graphSocial": { TW: "好友／白名單", EN: "Friends / whitelist" },
     "graphFriend": { TW: "朋友", EN: "Friends" },

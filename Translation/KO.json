@@ -99,7 +99,7 @@
   "graphDepth": "Relationship depth",
   "graphMaster": "Owner",
   "graphSub": "Submissive",
-  "graphDepthHint": "1~10단계(기본값: 2). 인원 제한 없음. 1000명을 초과하면 경고합니다.",
+  "graphDepthHint": "1~100단계(기본값: 2). 인원 제한 없음. 1000명을 초과하면 경고합니다.",
   "graphHops": "{0} hop(s)",
   "graphLovership": "Lovership",
   "graphHint": "Uses saved Profile snapshots, not live relationships. All names are shown; selection keeps highlighted-path names, and right-click restores all names. Double-click to recenter, drag to pan and scroll to zoom. Customize colors and lines in Settings. Zoom or select a person to inspect crowded names.",
