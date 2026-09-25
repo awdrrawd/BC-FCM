@@ -219,6 +219,7 @@ import { chatFontFamily } from '../communication/chat-font.js';
 .fcm-graph-stage text{fill:var(--tx,#eee);font-size:19px;paint-order:stroke;stroke:var(--surface-alt,#161020);stroke-width:4px;stroke-linejoin:round;}
 .fcm-graph-stage [data-node] text{display:block;}
 .fcm-graph-stage:not(.fcm-fitting) [data-node].fcm-graph-no-label text{display:none;}
+.fcm-graph-zoom-percent{min-width:4ch;text-align:center;font-variant-numeric:tabular-nums;user-select:none;}
 .fcm-graph-stepper{display:inline-flex;align-items:center;gap:4px;}
 .fcm-graph-stepper input{appearance:textfield;-moz-appearance:textfield;text-align:center;}
 .fcm-graph-stepper input::-webkit-inner-spin-button{appearance:none;}

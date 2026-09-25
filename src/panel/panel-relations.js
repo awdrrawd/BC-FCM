@@ -46,7 +46,7 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
     button(T('graphSelf'), () => { focusId = Number(globalThis.Player?.MemberNumber); void showGraph(); });
     const refreshButton = button(T('graphRefresh'), () => { void renderRelations(container, { openPeopleSearch, initialFocus: focusId }); });
     const depth = element('input', 'fcm-search');
-    depth.type = 'number'; depth.min = '1'; depth.max = '10'; depth.step = '1';
+    depth.type = 'number'; depth.min = '1'; depth.max = '100'; depth.step = '1';
     depth.setAttribute('aria-label', T('graphDepth'));
     depth.value = String(options.depth);
     const filters = element('div', 'fcm-graph-filters');
@@ -56,7 +56,7 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
     for (const [text, delta] of [['−', -1], ['+', 1]]) {
         const step = element('button', 'fcm-btn', text); step.type = 'button';
         step.setAttribute('aria-label', `${T('graphDepth')} ${text} 1`);
-        step.onclick = () => { depth.value = String(Math.min(10, Math.max(1, Number(depth.value) + delta))); applyDepth(); };
+        step.onclick = () => { depth.value = String(Math.min(100, Math.max(1, Number(depth.value) + delta))); applyDepth(); };
         controls.push(step); stepper.append(step);
         if (delta === -1) stepper.append(depth);
     }
@@ -89,7 +89,7 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
     filter('graphNames', 'fcm-graph-names', options.showNames, value => { saveOptions({ showNames: value }); updateNames(); });
     function updateNames() {
         for (const node of visualNodes) {
-            node.hideLabel = !options.showNames || (namePath !== null && !(node.center || namePath.has(Number(node.group.dataset.node))));
+            node.hideLabel = namePath !== null ? !(node.center || namePath.has(Number(node.group.dataset.node))) : !options.showNames;
             node.group.classList.toggle('fcm-graph-no-label', node.hideLabel);
         }
         paintCanvas();
@@ -105,7 +105,7 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
     }
     function applyDepth() {
         const value = Number(depth.value);
-        if (!Number.isSafeInteger(value) || value < 1 || value > 10) { depth.value = String(options.depth); return; }
+        if (!Number.isSafeInteger(value) || value < 1 || value > 100) { depth.value = String(options.depth); return; }
         if (options.depth === value) return;
         saveOptions({ depth: value }); void showGraph();
     }
@@ -126,6 +126,7 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
     const empty = element('div', 'fcm-graph-empty', T('graphStart'));
     const centerLabel = element('div', 'fcm-graph-center', T('graphStart'));
     const viewportControls = element('div', 'fcm-graph-viewport-controls');
+    const zoomPercent = element('output', 'fcm-graph-zoom-percent', '—');
     const loading = element('div', 'fcm-graph-loading'); loading.hidden = true; loading.setAttribute('role', 'status');
     loading.append(element('span', 'fcm-graph-spinner'), element('span', '', T('graphBusy')));
     function setBusy(busy) { loading.hidden = !busy; stage.setAttribute('aria-busy', String(busy)); }
@@ -149,6 +150,7 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
     let view = { x: -400, y: -300, w: 800, h: 600 }, fitted = { ...view }, drag, visualEdges = [];
     function clearGraph() {
         cancelAnimationFrame(frame); frame = 0;
+        zoomPercent.textContent = '—';
         svg.replaceChildren(); graphNodes = []; visualNodes = []; visualEdges = [];
         nodeLevels.clear(); adjacency.clear(); canvasRenderer.reset();
         detail.textContent = T('graphSelect');
@@ -170,7 +172,7 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
         if (!edges) return;
         paintCanvas();
     }
-    function applyView(edges = true) { svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${view.h}`); updateSizes(edges); }
+    function applyView(edges = true) { zoomPercent.textContent = `${Math.round(fitted.w / view.w * 100)}%`; svg.setAttribute('viewBox', `${view.x} ${view.y} ${view.w} ${view.h}`); updateSizes(edges); }
     function scheduleView() { if (!frame) frame = requestAnimationFrame(() => { frame = 0; if (active()) applyView(); }); }
     function fitGraph() {
         if (!svg.querySelector('[data-node]')) return;
@@ -197,11 +199,12 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
         else updateSizes();
     }); observer.observe(stage);
     function zoom(factor) {
-        const width = Math.max(fitted.w / 8, Math.min(fitted.w * 3, view.w * factor));
+        const width = Math.max(fitted.w / 8, Math.min(fitted.w * 10, view.w * factor));
         const ratio = width / view.w;
         view = { x: view.x + (view.w - width) / 2, y: view.y + view.h * (1 - ratio) / 2, w: width, h: view.h * ratio }; scheduleView();
     }
     button('+', () => zoom(0.8), viewportControls).setAttribute('aria-label', T('graphZoomIn'));
+    viewportControls.append(zoomPercent);
     button('−', () => zoom(1.25), viewportControls).setAttribute('aria-label', T('graphZoomOut'));
     button(T('graphFit'), fitGraph, viewportControls);
     svg.addEventListener('wheel', event => { event.preventDefault(); zoom(event.deltaY > 0 ? 1.15 : 0.87); }, { passive: false });
