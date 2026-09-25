@@ -84,7 +84,8 @@ test('relationship tab reads native IndexedDB, filters, focuses and links to peo
     await expect(page.locator('.fcm-graph-stage [data-node]')).toHaveCount(8);
     await expect(page.locator('.fcm-graph-edges')).toBeVisible();
     await expect(page.locator('.fcm-graph-status')).toContainText('8 條關係');
-    await page.locator('.fcm-graph-owner').click();
+    await page.locator('button.fcm-graph-sub').click();
+    await page.locator('button.fcm-graph-master').click();
     await expect(page.locator('.fcm-graph-stage [data-node]')).toHaveCount(2);
     await expect(page.locator('.fcm-graph-status')).toContainText('1 條關係');
     await page.locator('.fcm-graph-stage [data-node="2"] circle').click();
@@ -95,7 +96,8 @@ test('relationship tab reads native IndexedDB, filters, focuses and links to peo
     await page.locator('.fcm-relations .fcm-toolbar input').press('Enter');
     await expect(page.locator('.fcm-graph-stage [data-node]')).toHaveCount(1);
     await expect(page.locator('.fcm-graph-detail')).toContainText('Member 8');
-    await page.locator('.fcm-graph-owner').click();
+    await page.locator('button.fcm-graph-sub').click();
+    await page.locator('button.fcm-graph-master').click();
     await page.locator('.fcm-graph-depth input').fill('2');
     await page.locator('.fcm-graph-depth input').press('Enter');
     await expect(page.locator('.fcm-graph-stage [data-node]')).toHaveCount(8);
@@ -232,7 +234,7 @@ test('bundled minified relation worker remains self-contained and keeps the shar
     expect(graph).toEqual({ count: 8, version: 31 });
 });
 
-test('first-hop labels stay hidden until selected, SVG fills its stage and colors match direction', async ({ page }) => {
+test('first-hop labels are visible until a path is selected, SVG fills its stage and colors match direction', async ({ page }) => {
     await setup(page, 80);
     await page.evaluate(async () => {
         await new Promise((resolve, reject) => {
@@ -248,7 +250,7 @@ test('first-hop labels stay hidden until selected, SVG fills its stage and color
     });
     const labels = page.locator('.fcm-graph-stage [data-level="1"] text');
     await expect(labels).toHaveCount(80);
-    expect(await labels.evaluateAll(nodes => nodes.every(node => getComputedStyle(node).display === 'none'))).toBe(true);
+    expect(await labels.evaluateAll(nodes => nodes.every(node => getComputedStyle(node).display !== 'none'))).toBe(true);
     await expect(page.locator('.fcm-graph-edges')).toBeVisible();
     await expect(page.locator('[data-node="81"] circle')).toHaveCSS('stroke', 'rgb(255, 179, 71)');
     const stage = await page.locator('.fcm-graph-stage').boundingBox();
@@ -491,7 +493,7 @@ test('1000 people with 3999 relationships remain interactive and render cached n
     await expect(page.locator('[data-node]')).toHaveCount(8);
     expect(await page.evaluate(() => globalThis.preloadWorkers)).toBe(1);
     await expect(page.locator('[data-node="1"] text')).toBeVisible();
-    await expect(page.locator('[data-node="2"] text')).toBeHidden();
+    await expect(page.locator('[data-node="2"] text')).toBeVisible();
     await page.locator('[data-node="2"] circle').click();
     await expect(page.locator('[data-node="2"] text')).toBeVisible();
     await page.getByRole('button',{name:'顯示名稱',exact:true}).click();

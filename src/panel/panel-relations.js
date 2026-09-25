@@ -72,13 +72,11 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
         toggle.onclick = () => { pressed = !pressed; sync(); void onChange(pressed); };
         sync(); filters.append(toggle); return toggle;
     }
-    const owner = filter('', 'fcm-graph-owner'), lover = filter('graphLovership', 'fcm-graph-lover');
-    const legend = element('span', 'fcm-graph-ownership-legend');
-    legend.append(element('span', 'fcm-graph-master', T('graphMaster')), document.createTextNode(' / '),
-        element('span', 'fcm-graph-sub', T('graphSub')));
-    owner.append(legend);
-    legend.querySelector('.fcm-graph-master').style.color = options.master.color;
-    legend.querySelector('.fcm-graph-sub').style.color = options.sub.color;
+    const master = filter('graphMaster', 'fcm-graph-master');
+    const sub = filter('graphSub', 'fcm-graph-sub');
+    const lover = filter('graphLovership', 'fcm-graph-lover');
+    master.style.color = options.master.color;
+    sub.style.color = options.sub.color;
     lover.style.color = options.lover.color;
     const friend = filter('graphFriend', 'fcm-graph-social', false), whitelist = filter('graphWhitelist', 'fcm-graph-social', false);
     friend.title = whitelist.title = T('graphOwnSocial');
@@ -87,11 +85,11 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
         saveOptions({ warnLarge: !disabled });
         if (disabled) cancelWarning?.(true);
     });
-    let namePath = new Set();
+    let namePath = null;
     filter('graphNames', 'fcm-graph-names', options.showNames, value => { saveOptions({ showNames: value }); updateNames(); });
     function updateNames() {
         for (const node of visualNodes) {
-            node.hideLabel = !options.showNames || !(node.center || namePath.has(Number(node.group.dataset.node)));
+            node.hideLabel = !options.showNames || (namePath !== null && !(node.center || namePath.has(Number(node.group.dataset.node))));
             node.group.classList.toggle('fcm-graph-no-label', node.hideLabel);
         }
         paintCanvas();
@@ -102,7 +100,7 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
         status.textContent = centerLabel.textContent = T('graphStopped');
     }, filters);
     function setControlsDisabled(disabled) {
-        for (const control of [...controls, input, depth, owner, lover, friend, whitelist]) control.disabled = disabled;
+        for (const control of [...controls, input, depth, master, sub, lover, friend, whitelist]) control.disabled = disabled;
         stop.disabled = false;
     }
     function applyDepth() {
@@ -230,7 +228,7 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
             pathEdges.add(edge.id); neighbors.add(other);
             if (!visited.has(other)) { visited.add(other); queue.push(other); }
         }
-        namePath = highlight ? visited : new Set();
+        namePath = highlight ? visited : null;
         for (const edge of visualEdges) {
             const { from, to } = edge;
             const connected = from === node.id || to === node.id || pathEdges.has(edge.id);
@@ -369,7 +367,7 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
         const valid = () => active() && version === requestVersion;
         try {
             setBusy(true);
-            const count = await current.request('prepare', { options: { id: focusId, depth: depth.value, owner: isPressed(owner), lover: isPressed(lover), friend: isPressed(friend), whitelist: isPressed(whitelist) } });
+            const count = await current.request('prepare', { options: { id: focusId, depth: depth.value, master: isPressed(master), sub: isPressed(sub), lover: isPressed(lover), friend: isPressed(friend), whitelist: isPressed(whitelist) } });
             if (!valid()) return;
             if (options.warnLarge && count.nodes > LARGE_GRAPH_THRESHOLD) {
                 setBusy(false);

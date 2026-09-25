@@ -65,3 +65,17 @@ test('social edges use only the explicit own-player lists and default off', () =
     assert.deepEqual(index.graph({ id: 1, whitelist: true }).nodes.map(n => n.id), [1, 3]);
     assert.equal(index.graph({ id: 999, friend: true }).nodes.length, 0);
 });
+
+test('master and sub filters traverse ownership in separate directions at every hop', () => {
+    const index = createRelationIndex();
+    index.add(profile(1));
+    index.add(profile(2, { Ownership: { MemberNumber: 1 } }));
+    index.add(profile(3, { Ownership: { MemberNumber: 2 } }));
+    index.add(profile(4, { Ownership: { MemberNumber: 3 } }));
+    index.finish();
+    const ids = options => index.graph({ id: 3, depth: 3, lover: false, ...options }).nodes.map(node => node.id);
+    assert.deepEqual(ids({ master: true, sub: false }), [3, 2, 1]);
+    assert.deepEqual(ids({ master: false, sub: true }), [3, 4]);
+    assert.deepEqual(ids({ master: false, sub: false }), [3]);
+    assert.deepEqual(new Set(ids({ master: true, sub: true })), new Set([1, 2, 3, 4]));
+});
