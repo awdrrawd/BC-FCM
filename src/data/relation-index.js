@@ -55,18 +55,19 @@ export function createRelationIndex() {
         }
         return found;
     }
-    function graph({ id, depth = 2, owner = true, lover = true, friend = false, whitelist = false }) {
+    function graph({ id, depth = 2, owner = true, master = owner, sub = owner, lover = true, friend = false, whitelist = false }) {
         id = Number(id);
         if (!members.has(id) && !adjacency.has(id)) return { nodes: [], edges: [] };
         const levels = new Map([[id, 0]]), queue = [id];
         depth = Number.isSafeInteger(Number(depth)) && Number(depth) > 0 ? Number(depth) : 2;
         const enabled = { owner, lover, friend, whitelist };
-        const allowed = edge => enabled[edge.type];
+        const allowed = (edge, current) => edge.type === 'owner'
+            ? (edge.to === current ? master : sub) : enabled[edge.type];
         for (let i = 0; i < queue.length; i++) {
             const current = queue[i], level = levels.get(current);
             if (level >= depth) continue;
             for (const edge of adjacency.get(current) || []) {
-                if (!allowed(edge)) continue;
+                if (!allowed(edge, current)) continue;
                 const other = edge.from === current ? edge.to : edge.from;
                 if (levels.has(other)) continue;
                 levels.set(other, level + 1); queue.push(other);
@@ -74,7 +75,7 @@ export function createRelationIndex() {
         }
         const visibleEdges = new Map();
         for (const current of queue) for (const edge of adjacency.get(current) || []) {
-            if (!allowed(edge) || !levels.has(edge.from) || !levels.has(edge.to) || visibleEdges.has(edge.id)) continue;
+            if (!allowed(edge, current) || !levels.has(edge.from) || !levels.has(edge.to) || visibleEdges.has(edge.id)) continue;
             visibleEdges.set(edge.id, edge);
         }
         return { nodes: queue.map(id => ({ ...node(id), level: levels.get(id) })), edges: [...visibleEdges.values()] };
