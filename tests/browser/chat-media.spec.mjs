@@ -8,7 +8,7 @@ test('FCM owns optional media buttons, drafts and recipient isolation', async ({
         const root = document.createElement('div');
         document.getElementById('fcm-panel').style.display = 'none';
         root.id = 'fcm-chat-panel';
-        root.innerHTML = '<div class="fcm-chat-compose"><button data-upload-image hidden>Upload</button><textarea data-input>draft</textarea><button data-send>Send</button></div><div class="fcm-chat-content">video</div>';
+        root.innerHTML = '<div class="fcm-chat-actions"><button data-upload-image hidden>Upload</button></div><div class="fcm-chat-compose"><textarea data-input>draft</textarea><button data-send>Send</button></div><div class="fcm-chat-content">video</div>';
         document.body.append(root);
         globalThis.mediaFixture = { root, member: 2, choices: 0, processed: 0 };
         const state = globalThis.mediaFixture;
@@ -64,4 +64,43 @@ test('panel header and history drops use the current composer once after rebindi
         return { calls, first, second };
     });
     expect(result).toEqual({calls:2,first:'first https://example.test/image.png',second:'second https://example.test/image.png'});
+});
+
+
+test('clipboard images upload once, preserve drafts and recover after switching recipients', async ({ page }) => {
+    await page.goto('/tests/browser/fixture.html');
+    await page.waitForFunction(() => !!globalThis.fixture);
+    const result = await page.evaluate(async () => {
+        const { bindMediaComposer } = await import('/src/communication/chat/controllers/chat-media.js');
+        const root = document.createElement('div');
+        root.innerHTML = '<div class="fcm-chat-compose"><textarea data-input>draft</textarea></div>';
+        document.body.append(root);
+        const input = root.querySelector('textarea');
+        let member = 2, calls = 0, complete, recovered;
+        window.prompt = (_, url) => { recovered = url; };
+        const options = { getMemberNumber: () => member, text: key => key };
+        bindMediaComposer(root, options); bindMediaComposer(root, options);
+        function paste(image = true) {
+            const data = new DataTransfer();
+            if (image) data.items.add(new File(['x'], 'clip.png', {type:'image/png'}));
+            else data.setData('text/plain', 'plain text');
+            const event = new ClipboardEvent('paste', {bubbles:true, cancelable:true, clipboardData:data});
+            input.dispatchEvent(event);
+            return event.defaultPrevented;
+        }
+        globalThis.Liko = undefined;
+        const unavailable = paste();
+        globalThis.Liko = { ImageUploader: {uploadFile: () => { calls++; return new Promise(resolve => {complete=resolve;}); }} };
+        const plain = paste(false);
+        const image = paste();
+        complete('https://example.test/clip.png');
+        await new Promise(resolve => setTimeout(resolve, 0));
+        const draft = input.value;
+        paste(); member = 3;
+        complete('https://example.test/late.png');
+        await new Promise(resolve => setTimeout(resolve, 0));
+        return {unavailable, plain, image, calls, draft, final:input.value, recovered};
+    });
+    expect(result).toEqual({unavailable:false, plain:false, image:true, calls:2,
+        draft:'draft https://example.test/clip.png', final:'draft https://example.test/clip.png', recovered:'https://example.test/late.png'});
 });

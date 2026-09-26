@@ -34,8 +34,28 @@ function bindMediaComposer(main, { getMemberNumber, text }) {
     }
     const compose = main?.querySelector('.fcm-chat-compose');
     const input = compose?.querySelector('[data-input]');
-    const button = compose?.querySelector('[data-upload-image]');
-    if (!input || !button) return;
+    const button = main?.querySelector('[data-upload-image]');
+    if (!input) return;
+    if (!bound.has(input)) {
+        bound.add(input);
+        input.addEventListener('paste', async event => {
+            const api = uploader();
+            if (typeof api?.uploadFile !== 'function') return;
+            const files = Array.from(event.clipboardData?.items || [])
+                .filter(item => item.kind === 'file' && item.type.startsWith('image/'))
+                .map(item => item.getAsFile()).filter(Boolean);
+            if (!files.length) return;
+            event.preventDefault(); event.stopPropagation();
+            const deliver = captureDestination(input, { getMemberNumber, text });
+            for (const file of files) {
+                try {
+                    const url = await api.uploadFile(file);
+                    if (url) deliver([url]);
+                } catch (error) { console.warn('[FCM] Image upload failed', error); }
+            }
+        });
+    }
+    if (!button) return;
     button.hidden = typeof uploader()?.chooseImage !== 'function';
     if (bound.has(button)) return;
     bound.add(button);
