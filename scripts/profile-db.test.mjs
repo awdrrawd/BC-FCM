@@ -14,9 +14,36 @@ const imports = registerHooks({ load(url, context, next) {
     }
     return next(url, context);
 } });
-const { PDB, Snapshot, _pc } = await import('../src/data/profile-db.js');
+const { PDB, Snapshot, _pc, syncRoomAvatar } = await import('../src/data/profile-db.js');
 const { cfg } = await import('../src/core/config.js');
 imports.deregister();
+
+test('manual URL refresh downloads again while normal sync keeps its snapshot', async t => {
+    globalThis.Player = { MemberNumber: 1 };
+    const live = { MemberNumber: 7, OnlineSharedSettings: { FCM: {
+        avatarMode: 'url', avatarUrl: 'https://example.com/avatar.png', avatarUpdatedAt: 100,
+    } } };
+    t.mock.method(Snapshot, 'getRecord', async () => ({ sourceUpdatedAt: 100 }));
+    t.mock.method(Snapshot, 'get', async () => 'cached-avatar');
+    const save = t.mock.method(Snapshot, 'save', async () => {});
+    const download = t.mock.method(globalThis, 'fetch', async () => new Response(new Blob(['fresh'], { type: 'image/png' })));
+    assert.equal(await syncRoomAvatar(live), 'cached-avatar');
+    assert.equal(download.mock.callCount(), 0);
+    await syncRoomAvatar(live, { force: true });
+    assert.equal(download.mock.calls[0].arguments[1].cache, 'reload');
+    assert.equal(save.mock.callCount(), 1);
+});
+
+test('manual game refresh awaits a fresh canvas instead of the shared snapshot', async t => {
+    const live = { MemberNumber: 7, OnlineSharedSettings: { FCM: {
+        avatarMode: 'game', avatarSnapshot: 'data:image/png;base64,old',
+    } } };
+    const capture = t.mock.method(PDB, 'captureFace', async () => 'fresh-canvas');
+    const save = t.mock.method(Snapshot, 'save', async () => {});
+    await syncRoomAvatar(live, { force: true });
+    assert.equal(capture.mock.calls[0].arguments[0], live);
+    assert.equal(save.mock.calls[0].arguments[1], 'fresh-canvas');
+});
 
 function database(rows = [], fail = false, notes) {
     const records = new Map(rows.map(row => [row.memberNumber, structuredClone(row)]));
