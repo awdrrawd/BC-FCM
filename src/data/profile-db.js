@@ -383,12 +383,12 @@ function mergeProfile(existing, incoming) {
         return data && typeof data === 'object' ? data : null;
     }
 
-    async function _blobFromSharedProfile(shared) {
+    async function _blobFromSharedProfile(shared, { force = false } = {}) {
         if (typeof shared?.avatarUrl === 'string' && shared.avatarUrl) {
             const controller = new AbortController();
             const timeout = setTimeout(() => controller.abort(), 8000);
             try {
-                const response = await fetch(shared.avatarUrl, { cache: 'force-cache', referrerPolicy: 'no-referrer', signal: controller.signal });
+                const response = await fetch(shared.avatarUrl, { cache: force ? 'reload' : 'force-cache', referrerPolicy: 'no-referrer', signal: controller.signal });
                 const declaredSize = Number(response.headers.get('content-length')) || 0;
                 const mime = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
                 if (!response.ok || declaredSize > 2 * 1024 * 1024 || !mime.startsWith('image/')) throw new Error('invalid image response');
@@ -406,9 +406,22 @@ function mergeProfile(existing, incoming) {
     }
 
     // Room entry order: shared FCM data -> timestamp comparison -> legacy capture only when no data exists.
-    async function syncRoomAvatar(C) {
+    async function syncRoomAvatar(C, { force = false } = {}) {
         const mn = parseInt(C?.MemberNumber);
-        if (!mn || mn === parseInt(Player?.MemberNumber)) return null;
+        if (!mn || (!force && mn === parseInt(Player?.MemberNumber))) return null;
+        if (force) {
+            const shared = _sharedFcmProfile(C);
+            // Manual refresh bypasses saved snapshots and HTTP cache. Game avatars
+            // must wait for a freshly rendered canvas, not reuse a shared snapshot.
+            const received = shared?.avatarMode === 'url'
+                ? await _blobFromSharedProfile({ avatarUrl: shared.avatarUrl }, { force: true }) : null;
+            const fresh = received?.blob || await PDB.captureFace(C, 100);
+            if (!fresh) return null;
+            await Snapshot.save(mn, fresh, received
+                ? { ...received, sourceUpdatedAt: Number(shared?.avatarUpdatedAt) || 0 }
+                : { source: 'manual-room-reload', sourceUpdatedAt: Date.now() });
+            return Snapshot.get(mn);
+        }
         let record = await Snapshot.getRecord(mn);
         const shared = _sharedFcmProfile(C);
         const remoteTime = Number(shared?.avatarUpdatedAt) || 0;

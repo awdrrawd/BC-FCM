@@ -93,20 +93,13 @@ async function _forceLoadAvatar(mn, el) {
     const qi = _avQueue.findIndex(q => q.mn === mn); if (qi >= 0) _avQueue.splice(qi, 1);
     const live = ChatRoomCharacter?.find(character => Number(character.MemberNumber) === mn);
     if (live) {
-        await Snapshot.delete(mn);
-        let url = await syncRoomAvatar(live);
-        if (!url) {
-            const captured = PDB._face(live, 100);
-            if (captured?.length > 800) { await Snapshot.save(mn, captured, { source: 'manual-room-reload' }); url = await Snapshot.get(mn); }
-        }
+        const url = await syncRoomAvatar(live, { force: true });
         const target = el.isConnected ? el : _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
         if (url && target) { setAvatarImage(target, url); return; }
     }
-    if (_pc[mn] === undefined) await PDB.get(mn);
-    const profile = _pc[mn];
+    const profile = await PDB.get(mn);
     if (!profile) { el.textContent = '?'; return; }
     if (!profile.characterBundle) { el.textContent = '?'; return; }
-    await Snapshot.delete(mn);
     const url = await loadAvatarFromBundle(mn, profile);
     const target = el.isConnected ? el : _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
     if (url && target) {
