@@ -199,7 +199,7 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
         else updateSizes();
     }); observer.observe(stage);
     function zoom(factor) {
-        const width = Math.max(fitted.w / 8, Math.min(fitted.w * 10, view.w * factor));
+        const width = Math.max(fitted.w / 20, Math.min(fitted.w * 10, view.w * factor));
         const ratio = width / view.w;
         view = { x: view.x + (view.w - width) / 2, y: view.y + view.h * (1 - ratio) / 2, w: width, h: view.h * ratio }; scheduleView();
     }
