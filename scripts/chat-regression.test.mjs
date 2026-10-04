@@ -157,3 +157,24 @@ test('reset invalidates pending older-history requests', async () => {
     assert.deepEqual(controller.messages, []);
     assert.equal(controller.loading, false);
 });
+
+
+test('disabled whisper integration prevents storage and notifications while BEEPs still work', async () => {
+    const config = { communicationEnabled: true, mergeWhispers: false };
+    const saved = [], notifications = [];
+    const recorder = createChatMessageRecorder({ config, normalizeMessage: value => ({ ...value }),
+        chatStore: { put: async value => saved.push(value), recentIndex: async () => saved },
+        isPanelVisible: () => false, isSelectedMember: () => false, setMessageIndex() {},
+        notifyIncoming: value => notifications.push(value),
+    });
+    const message = { memberNumber: 3, direction: 'in', content: 'hello', channel: 'whisper' };
+    assert.equal(await recorder.record(message), null);
+    assert.equal(saved.length, 0);
+    assert.equal(notifications.length, 0);
+    await recorder.record({ ...message, channel: 'beep' });
+    assert.equal(notifications.length, 1);
+    config.mergeWhispers = true;
+    await recorder.record(message);
+    assert.deepEqual(saved.map(row => row.channel), ['beep', 'whisper']);
+    assert.equal(notifications.length, 2);
+});

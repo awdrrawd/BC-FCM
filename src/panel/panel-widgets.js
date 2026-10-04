@@ -162,7 +162,7 @@ function buildPersonOps(mn, { isInRoom = false, isMe = false, oneSided = false, 
     actions.appendChild(vb);
 
     if (!isMe) {
-        if (isInRoom && whisper) actions.appendChild(mkBtn(T('btnWhisper'), '', () => cfg.takeoverFcmChatButtons && cfg.communicationEnabled ? openChat(mn) : doWhisper(mn)));
+        if (isInRoom && whisper) actions.appendChild(mkBtn(T('btnWhisper'), '', () => cfg.takeoverFcmChatButtons && cfg.communicationEnabled && cfg.mergeWhispers !== false ? openChat(mn) : doWhisper(mn)));
         // forceBeep：一律顯示私訊按鈕。私訊/BEEP 僅真正的好友（含主人／戀人／奴隸）可用，
         //  「同房間」不算可私訊條件，非好友時反灰停用。
         if (canBeep(mn) || forceBeep) {

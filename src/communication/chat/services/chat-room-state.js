@@ -1,4 +1,4 @@
-function createChatRoomStateService({ getRoomInfo, inRoom, isFriend, isOnline, getCurrentRoom, text }) {
+function createChatRoomStateService({ getRoomInfo, inRoom, isFriend, isOnline, getCurrentRoom, text, canWhisper = () => true }) {
     function get(memberNumber) {
         const target = Number(memberNumber);
         const roomInfo = getRoomInfo(target);
@@ -18,7 +18,7 @@ function createChatRoomStateService({ getRoomInfo, inRoom, isFriend, isOnline, g
             friend,
             sameRoom,
             privateRoom,
-            unavailable: !sameRoom && !friend,
+            unavailable: !(sameRoom && canWhisper()) && !friend,
             canOpenRoom: friend && !!roomInfo?.name && !privateRoom,
         };
     }

@@ -542,5 +542,7 @@
   "tabEdit": "Edit",
   "graphBusy": "Loading relationship graph…",
   "graphNames": "Namen anzeigen",
-  "panelLoading": "Daten werden geladen…"
+  "panelLoading": "Daten werden geladen…",
+    "mergeWhispers": "Flüstern integrieren",
+    "mergeWhispersNote": "Standardmäßig aktiviert. Deaktiviert verarbeitet FCM CHAT nur BEEPs und blendet Flüstern, zugehörige Benachrichtigungen und die Kanaltasten neben dem Eingabefeld aus."
 }

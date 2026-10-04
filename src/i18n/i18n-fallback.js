@@ -519,6 +519,8 @@ const FCM_FALLBACK = {
     "chatStatusBusy": { TW: "忙碌", EN: "Busy" },
     "chatStatusOnline": { TW: "在線", EN: "Online" },
     "chatStatusTab": { TW: "狀態", EN: "Status" },
+    "mergeWhispers": {"TW": "合併悄悄話功能", "EN": "Merge Whispers"},
+    "mergeWhispersNote": {"TW": "預設開啟。停用後 FCM CHAT 只處理 BEEP，不顯示或通知悄悄話，並隱藏輸入框左側的頻道切換按鈕。", "EN": "On by default. When disabled, FCM CHAT only handles BEEPs, hides whispers and their notifications, and hides the channel buttons beside the composer."},
     "chatTakeover": { TW: "接管 FCM 私訊／悄悄話按鈕", EN: "Take Over FCM PM/Whisper Buttons" },
     "chatTakeoverNote": { TW: "按下後開啟對應玩家的聊天", EN: "Opens that player's chat when pressed" },
     "chatThemeFollow": { TW: "跟隨 FCM", EN: "Follow FCM" },

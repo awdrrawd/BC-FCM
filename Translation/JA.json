@@ -542,5 +542,7 @@
   "tabEdit": "Edit",
   "graphBusy": "Loading relationship graph…",
   "graphNames": "名前を表示",
-  "panelLoading": "データを読み込み中…"
+  "panelLoading": "データを読み込み中…",
+    "mergeWhispers": "ささやきを統合",
+    "mergeWhispersNote": "初期設定はオンです。オフにすると FCM CHAT は BEEP のみを処理し、ささやきとその通知、入力欄左側のチャンネルボタンを非表示にします。"
 }

@@ -12,7 +12,7 @@ function createChatContactService({ config, snapshot, syncRoomAvatar, displayNam
         if (!isFriend(target)) return false;
         return getOnlineFriends().some(friend => Number(friend.MemberNumber) === target);
     };
-    const capability = memberNumber => inRoom(Number(memberNumber)) ? 'whisper' : isFriend(memberNumber) && isOnline(memberNumber) ? 'beep' : 'none';
+    const capability = memberNumber => config.mergeWhispers !== false && inRoom(Number(memberNumber)) ? 'whisper' : isFriend(memberNumber) && isOnline(memberNumber) ? 'beep' : 'none';
     const sharedProfile = memberNumber => Number(memberNumber) === Number(getPlayer()?.MemberNumber)
         ? getPlayer()?.OnlineSharedSettings?.FCM || {}
         : character(memberNumber)?.OnlineSharedSettings?.FCM || {};

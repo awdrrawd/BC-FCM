@@ -1,7 +1,7 @@
 import { WhisperMetadata, classifyIncomingBeep, findPendingOutgoingWhisper } from './chat-transport.js';
 import { PRIVATE_TAG, PRIVATE_BEEP, META_TAG, createPrivatePayloadReceiver } from './chat-private-payload.js';
 
-function createChatTransportHandler({ getPlayer, getMessages, getRoot, recordMessage, chatStore, setRemoteProfile, displayName, showRoomInvite, htmlText, warn, isEnabled, isOutgoingSuppressed, nativeTags, getOutgoing }) {
+function createChatTransportHandler({ getPlayer, getMessages, getRoot, recordMessage, chatStore, setRemoteProfile, displayName, showRoomInvite, htmlText, warn, isEnabled, isOutgoingSuppressed, nativeTags, getOutgoing, mergeWhispers = () => true }) {
     const whisperMetadata = new WhisperMetadata();
     const bypassPayloads = new WeakMap();
     const beepPayloads = new WeakMap();
@@ -14,6 +14,7 @@ function createChatTransportHandler({ getPlayer, getMessages, getRoot, recordMes
         const hidden = data?.Type === 'Hidden' && data?.Content === PRIVATE_TAG;
         if (!beep && !hidden) return false;
         const self = Number(getPlayer()?.MemberNumber);
+        if (hidden && !mergeWhispers()) return true;
         if (hidden && Number(data.Target) !== self) return true;
         const sender = Number(beep ? data.MemberNumber : data.Sender);
         const packet = beep ? data.Message : (Array.isArray(data.Dictionary) ? data.Dictionary.find(entry => entry?.Tag === PRIVATE_TAG)?.Packet : null);
@@ -63,7 +64,7 @@ function createChatTransportHandler({ getPlayer, getMessages, getRoot, recordMes
     }
 
     function incomingWhisper(data) {
-        if (!data || data.Type !== 'Whisper' || !data.Content || Number(data.Sender) === Number(getPlayer()?.MemberNumber)) return;
+        if (!mergeWhispers() || !data || data.Type !== 'Whisper' || !data.Content || Number(data.Sender) === Number(getPlayer()?.MemberNumber)) return;
         const payload = inlinePayload(data);
         if (payload) bypassPayloads.set(data, payload);
         recordMessage({ memberNumber: data.Sender, direction: 'in', channel: 'whisper', content: data.Content, timestamp: data.Time,
@@ -72,7 +73,7 @@ function createChatTransportHandler({ getPlayer, getMessages, getRoot, recordMes
     }
 
     function incomingWhisperDisplay(data, displayedMessage, senderCharacter, element) {
-        if (!data || data.Type !== 'Whisper') return;
+        if (!mergeWhispers() || !data || data.Type !== 'Whisper') return;
         const payload = bypassPayloads.get(data) || inlinePayload(data);
         bypassPayloads.delete(data);
         const peer = Number(data.Sender) === Number(getPlayer()?.MemberNumber) ? Number(data.Target) : Number(data.Sender);
@@ -103,7 +104,7 @@ function createChatTransportHandler({ getPlayer, getMessages, getRoot, recordMes
         if (!isEnabled() || isOutgoingSuppressed() || !data) return;
         if (type === 'AccountBeep' && data.MemberNumber && data.Message && !data.BeepType) {
             recordMessage({ memberNumber: data.MemberNumber, direction: 'out', channel: 'beep', content: data.Message }, { notify: false });
-        } else if (type === 'ChatRoomChat' && data.Type === 'Whisper' && data.Target && data.Content) {
+        } else if (mergeWhispers() && type === 'ChatRoomChat' && data.Type === 'Whisper' && data.Target && data.Content) {
             recordMessage({ memberNumber: data.Target, direction: 'out', channel: 'whisper', content: data.Content }, { notify: false });
         }
     }
@@ -116,8 +117,8 @@ function createChatTransportHandler({ getPlayer, getMessages, getRoot, recordMes
             if (payload) nativeTags.decorateBeep(element, payload, Number(data.MemberNumber));
         },
         incomingBeep, incomingFriendRequest, incomingWhisper, incomingWhisperDisplay, outgoing,
-        receiveMessageId: data => isEnabled() && Number(data?.Target) === Number(getPlayer()?.MemberNumber) && whisperMetadata.receiveMessageId(data),
-        receiveReplyTag: data => isEnabled() && Number(data?.Target) === Number(getPlayer()?.MemberNumber) && whisperMetadata.receiveReplyTag(data),
+        receiveMessageId: data => isEnabled() && mergeWhispers() && Number(data?.Target) === Number(getPlayer()?.MemberNumber) && whisperMetadata.receiveMessageId(data),
+        receiveReplyTag: data => isEnabled() && mergeWhispers() && Number(data?.Target) === Number(getPlayer()?.MemberNumber) && whisperMetadata.receiveReplyTag(data),
     };
 }
 

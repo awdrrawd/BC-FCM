@@ -542,5 +542,7 @@
   "tabEdit": "Edit",
   "graphBusy": "Loading relationship graph…",
   "graphNames": "이름 표시",
-  "panelLoading": "데이터 불러오는 중…"
+  "panelLoading": "데이터 불러오는 중…",
+    "mergeWhispers": "귓속말 통합",
+    "mergeWhispersNote": "기본적으로 켜져 있습니다. 끄면 FCM CHAT은 BEEP만 처리하며 귓속말, 관련 알림 및 입력란 왼쪽의 채널 버튼을 숨깁니다."
 }

@@ -542,5 +542,7 @@
   "tabEdit": "編輯",
   "graphBusy": "正在載入關係網…",
   "graphNames": "显示名称",
-  "panelLoading": "正在读取数据…"
+  "panelLoading": "正在读取数据…",
+    "mergeWhispers": "合并悄悄话功能",
+    "mergeWhispersNote": "默认开启。停用后 FCM CHAT 只处理 BEEP，隐藏悄悄话、相关通知及输入框左侧的频道按钮。"
 }

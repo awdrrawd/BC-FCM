@@ -542,5 +542,7 @@
   "tabEdit": "Edit",
   "graphBusy": "Loading relationship graph…",
   "graphNames": "Show names",
-  "panelLoading": "Loading data…"
+  "panelLoading": "Loading data…",
+    "mergeWhispers": "Merge Whispers",
+    "mergeWhispersNote": "On by default. When disabled, FCM CHAT only handles BEEPs, hides whispers and their notifications, and hides the channel buttons beside the composer."
 }

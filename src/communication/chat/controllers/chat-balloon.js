@@ -110,6 +110,7 @@ function createChatBalloonController(context) {
                 document.body.appendChild(balloon);
                 installChatDrag(balloon, balloon, { configKey: 'chatUserBalloonPositions', isMaximized: context.isMaximized });
             }
+            balloon.dataset.channel = message.channel;
             paint(balloon);
             const saved = cfg.chatUserBalloonPositions?.[message.memberNumber];
             if (saved && Number.isFinite(saved.x) && Number.isFinite(saved.y)) placeSaved(balloon, saved);

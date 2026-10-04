@@ -15,9 +15,9 @@ const noop = () => {};
 const profile = { memberNumber: 77, seen: 100, characterBundle: JSON.stringify({ MemberNumber: 77, Name: '未見玩家', Appearance: [], Description: 'profile' }) };
 const payload = (extra = {}) => ({ id: 'message-123', target: 2, content: '@未見玩家 (77)', profiles: [profile], replyPreview: '', replyToId: '', ...extra });
 
-function receiverContext() {
+function receiverContext(mergeWhispers = () => true) {
     const records = [], native = [];
-    const handler = createChatTransportHandler({ getPlayer: () => ({ MemberNumber: 2 }), getMessages: () => records, getRoot: () => null,
+    const handler = createChatTransportHandler({ mergeWhispers, getPlayer: () => ({ MemberNumber: 2 }), getMessages: () => records, getRoot: () => null,
         recordMessage: value => records.push(value), chatStore: {}, setRemoteProfile: noop, displayName: String,
         showRoomInvite: noop, htmlText: String, warn: noop, isEnabled: () => true, isOutgoingSuppressed: () => false,
         nativeTags: { decorate: (element, data, peer) => native.push({ element, data, peer }), decorateBeep: (element, data, peer) => native.push({ element, data, peer }) },
@@ -262,4 +262,21 @@ test('legacy ordinary whisper metadata is recorded without decorating native cha
     ] }, 'hello', null, 'native-row');
     assert.equal(records.length, 1);
     assert.equal(native.length, 0);
+});
+
+
+test('disabled whisper integration ignores incoming, displayed and outgoing whispers but retains BEEPs', () => {
+    let enabled = false;
+    const { handler, records } = receiverContext(() => enabled);
+    const whisper = { Type: 'Whisper', Sender: 3, Target: 2, Content: 'secret' };
+    handler.incomingWhisper(whisper);
+    handler.incomingWhisperDisplay(whisper, 'secret', { MemberNumber: 3 }, null);
+    handler.outgoing('ChatRoomChat', { Type: 'Whisper', Target: 3, Content: 'reply' });
+    assert.equal(records.length, 0);
+    handler.incomingBeep({ MemberNumber: 3, Message: 'beep' });
+    handler.outgoing('AccountBeep', { MemberNumber: 3, Message: 'beep reply' });
+    assert.deepEqual(records.map(row => row.channel), ['beep', 'beep']);
+    enabled = true;
+    handler.incomingWhisper(whisper);
+    assert.equal(records.at(-1).channel, 'whisper');
 });

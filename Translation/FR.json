@@ -542,5 +542,7 @@
   "tabEdit": "Edit",
   "graphBusy": "Loading relationship graph…",
   "graphNames": "Afficher les noms",
-  "panelLoading": "Chargement des données…"
+  "panelLoading": "Chargement des données…",
+    "mergeWhispers": "Intégrer les chuchotements",
+    "mergeWhispersNote": "Activé par défaut. Sinon, FCM CHAT traite uniquement les BEEP et masque les chuchotements, leurs notifications et les boutons de canal à côté du champ de saisie."
 }

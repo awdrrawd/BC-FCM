@@ -542,5 +542,7 @@
   "tabEdit": "Edit",
   "graphBusy": "Loading relationship graph…",
   "graphNames": "Показати імена",
-  "panelLoading": "Завантаження даних…"
+  "panelLoading": "Завантаження даних…",
+    "mergeWhispers": "Об’єднувати шепіт",
+    "mergeWhispersNote": "Увімкнено за замовчуванням. Після вимкнення FCM CHAT обробляє лише BEEP і приховує шепіт, його сповіщення та кнопки каналів біля поля введення."
 }
