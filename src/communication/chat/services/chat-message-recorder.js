@@ -1,6 +1,6 @@
 function createChatMessageRecorder({ config, normalizeMessage, chatStore, conversation, isPanelVisible, isSelectedMember, setMessageIndex, appendMessage, refreshList, notifyIncoming, saveSharedProfile }) {
     async function record(data, { notify = true } = {}) {
-        if (!config.communicationEnabled || !data?.memberNumber) return null;
+        if (!config.communicationEnabled || !data?.memberNumber || (config.mergeWhispers === false && data.channel === 'whisper')) return null;
         const message = normalizeMessage(data);
         if (!message.content) return null;
         message.read = message.direction === 'out' || (isPanelVisible() && isSelectedMember(message.memberNumber));
@@ -9,6 +9,7 @@ function createChatMessageRecorder({ config, normalizeMessage, chatStore, conver
         }
         await chatStore.put(message);
         setMessageIndex(await chatStore.recentIndex());
+        if (config.mergeWhispers === false && message.channel === 'whisper') return message;
         if (isPanelVisible()) {
             if (isSelectedMember(message.memberNumber)) {
                 conversation.add(message);

@@ -542,5 +542,7 @@
   "tabEdit": "Edit",
   "graphBusy": "Loading relationship graph…",
   "graphNames": "Mostrar nombres",
-  "panelLoading": "Cargando datos…"
+  "panelLoading": "Cargando datos…",
+    "mergeWhispers": "Integrar susurros",
+    "mergeWhispersNote": "Activado por defecto. Al desactivarlo, FCM CHAT solo procesa BEEP y oculta los susurros, sus notificaciones y los botones de canal junto al campo de texto."
 }

@@ -5,6 +5,7 @@ import { hasCustomNotificationSound, playNotificationSound, saveCustomNotificati
 
 const TOGGLE_SETTING_KEYS = {
     takeover: 'takeoverFcmChatButtons',
+    mergeWhispers: 'mergeWhispers',
     bcxBypass: 'bypassBcxCommunication',
     animation: 'notificationAnimation',
     balloonSnap: 'balloonSnap',

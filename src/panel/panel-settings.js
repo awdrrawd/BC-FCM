@@ -359,6 +359,7 @@ function renderSettings(container) {
     sectionHeader(T('setSecCommunication'), 'communication');
     wrap.appendChild(settingRow(T('communicationEnabled'), T('communicationEnabledNote'), cfg.communicationEnabled, v => { cfg.communicationEnabled = v; saveCfg(); refreshChatSettings(); }));
     divider();
+    wrap.appendChild(settingRow(T('mergeWhispers'), T('mergeWhispersNote'), cfg.mergeWhispers !== false, v => { cfg.mergeWhispers = v; saveCfg(); refreshChatSettings(); }));
     wrap.appendChild(settingRow(T('takeoverChatButtons'), T('takeoverChatButtonsNote'), cfg.takeoverFcmChatButtons, v => { cfg.takeoverFcmChatButtons = v; saveCfg(); }));
     divider();
     wrap.appendChild(balloonSelectRow(T('persistentBalloon'), T('persistentBalloonNote'), 'balloonPlacement', 'persistentBalloon'));

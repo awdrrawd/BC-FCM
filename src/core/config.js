@@ -68,6 +68,7 @@ function isMobile() { return globalThis.CommonIsMobile === true; }
         persistentBalloon: false,
         balloonPlacement: 'off',
         takeoverFcmChatButtons: false,
+        mergeWhispers: true,
         individualBalloons: false,
         userBalloonPlacement: 'off',
         balloonSnap: true,

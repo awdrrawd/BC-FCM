@@ -28,7 +28,7 @@ function createChatConversationPresenter({ getMemberNumber, getConfig, getRoom, 
             roomText, roomName: roomInfo?.name || '', canOpenRoom,
             canSummon: !!getRoom() && online && !inRoom(memberNumber), groups: Object.entries(config.chatGroups || {}),
             contactCardHtml: isContactCardOpen() ? renderContactCard() : '', messagesHtml: conversationMessagesHtml(getMessages()),
-            canWhisper: inRoom(memberNumber), unread: getUnread(), multiSelect: isMultiSelect(), available, online,
+            mergeWhispers: config.mergeWhispers !== false, canWhisper: inRoom(memberNumber), unread: getUnread(), multiSelect: isMultiSelect(), available, online,
             canInvite: available !== 'none' && !inRoom(memberNumber), inputPlaceholder, unavailable,
             replyTarget: getReplyTarget(), selectedCount: getSelectedCount(), canForwardToRoom: !!getRoom(),
         });

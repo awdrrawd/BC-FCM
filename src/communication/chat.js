@@ -42,11 +42,13 @@ import { createChatTranslationController } from './chat/controllers/chat-transla
 
 import { createChatIndexRefresh } from './chat/controllers/chat-index-refresh.js';
 
+ChatStore.isMessageVisible = message => cfg.mergeWhispers !== false || message.channel !== 'whisper';
+let appliedMergeWhispers = cfg.mergeWhispers !== false;
 let root = null;
 let selectedMember = null;
 let messages = [];
 function setMessageIndex(value) {
-    if (Array.isArray(value)) messages = value;
+    if (Array.isArray(value)) messages = value.filter(ChatStore.isMessageVisible);
 }
 const conversation = new ChatConversationController(50, 40);
 let activeView = 'chat';
@@ -116,7 +118,7 @@ const chatSender = createChatSender({
             Nickname: live.Nickname || '', Description: live.Description || '', LabelColor: live.LabelColor,
             Appearance: globalThis.ServerAppearanceBundle(live.Appearance || []), Lovership: live.Lovership || [], Title: live.Title || '' }) };
     },
-    canSendWhisper: canSendBcxWhisper, sendServer: (...args) => ServerSend(...args),
+    canSendWhisper: target => cfg.mergeWhispers !== false && canSendBcxWhisper(target), sendServer: (...args) => ServerSend(...args),
     sendBeep: sendBcxAwareBeep, recordMessage: (...args) => recordMessage(...args), runWithoutOutgoingCapture,
 });
 const presence = createChatPresenceService({
@@ -125,7 +127,7 @@ const presence = createChatPresenceService({
     onError: error => warnLimited('chat presence sync failed', error),
 });
 const roomState = createChatRoomStateService({
-    getRoomInfo, inRoom: inRoomFn, isFriend: isFriendOf, isOnline,
+    getRoomInfo, inRoom: inRoomFn, isFriend: isFriendOf, isOnline, canWhisper: () => cfg.mergeWhispers !== false,
     getCurrentRoom: () => ChatRoomData, text: T,
 });
 const profileSuggestion = createProfileSuggestionController({
@@ -229,7 +231,7 @@ const conversationActions = createChatConversationActions({
     biography, avatarUrl, chatColors, onDeleted: renderChat,
 });
 const transportHandler = createChatTransportHandler({
-    nativeTags, getOutgoing: chatSender.getOutgoing,
+    nativeTags, getOutgoing: chatSender.getOutgoing, mergeWhispers: () => cfg.mergeWhispers !== false,
     getPlayer: () => Player, getMessages: () => messages, getRoot: () => root,
     recordMessage: (...args) => recordMessage(...args), chatStore: ChatStore,
     setRemoteProfile: (memberNumber, profile) => remoteProfiles.set(memberNumber, profile), displayName: getDisplayName,
@@ -407,6 +409,22 @@ function setStatus(status, rerender = true) {
 }
 
 function refreshChatSettings() {
+    const enabled = cfg.mergeWhispers !== false;
+    if (enabled !== appliedMergeWhispers) {
+        appliedMergeWhispers = enabled;
+        messages = messages.filter(ChatStore.isMessageVisible);
+        conversation.reset();
+        resetMessageSelectionState();
+        replyController.clear({ focus: false });
+        if (!enabled) document.querySelectorAll('.fcm-chat-user-balloon[data-channel="whisper"]').forEach(balloon => balloon.remove());
+        chatBalloons.refreshBadges();
+        void (async () => {
+            setMessageIndex(await ChatStore.recentIndex());
+            if (selectedMember) await loadConversation(selectedMember);
+            chatBalloons.refreshBadges();
+            chatRuntime.applySettings();
+        })();
+    }
     chatRuntime.applySettings();
 }
 

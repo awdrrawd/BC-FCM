@@ -71,3 +71,22 @@ test('chat and balloon share decoded sources, snapshot refresh, URL mode and fai
     assert.equal(retained.get('custom-url'), 1);
     for (const key of ['window', 'document', 'Image', 'Node']) delete globalThis[key];
 });
+
+
+test('turning off whisper integration forces same-room friends to BEEP and blocks non-friends', () => {
+    const previousWindow = globalThis.window;
+    globalThis.window = { addEventListener() {} };
+    try {
+        const config = {};
+        const contacts = createChatContactService({ config, inRoom: () => true,
+            isFriend: member => member === 42, getOnlineFriends: () => [],
+        });
+        assert.equal(contacts.capability(42), 'whisper');
+        assert.equal(contacts.capability(43), 'whisper');
+        config.mergeWhispers = false;
+        assert.equal(contacts.capability(42), 'beep');
+        assert.equal(contacts.capability(43), 'none');
+        config.mergeWhispers = true;
+        assert.equal(contacts.capability(43), 'whisper');
+    } finally { globalThis.window = previousWindow; }
+});

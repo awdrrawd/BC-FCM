@@ -41,6 +41,7 @@ const OfflineQueue = {
 };
 
 const ChatStore = {
+    isMessageVisible: () => true,
     db: null,
     opening: null,
     async init() {
@@ -90,7 +91,7 @@ const ChatStore = {
         return new Promise(resolve => {
             try {
                 const req = this.db.transaction('messages', 'readonly').objectStore('messages').getAll();
-                req.onsuccess = () => resolve((req.result || []).filter(message => Number(message.ownerMemberNumber) === ownerMemberNumber).sort((a, b) => a.timestamp - b.timestamp));
+                req.onsuccess = () => resolve((req.result || []).filter(message => this.isMessageVisible(message) && Number(message.ownerMemberNumber) === ownerMemberNumber).sort((a, b) => a.timestamp - b.timestamp));
                 req.onerror = () => { warnLimited('chat history read failed', req.error); resolve([]); };
             } catch (error) { warnLimited('chat history read failed', error); resolve([]); }
         });
@@ -119,7 +120,7 @@ const ChatStore = {
                     if (!cursor || Number(cursor.value.timestamp) < cutoff || (historyCount >= maxCount && contacts.size >= CHAT_RECENT_CONTACTS)) { resolve(rows.reverse()); return; }
                     const message = cursor.value;
                     const member = Number(message.memberNumber);
-                    if (Number(message.ownerMemberNumber) === ownerMemberNumber && member && member !== ownerMemberNumber) {
+                    if (this.isMessageVisible(message) && Number(message.ownerMemberNumber) === ownerMemberNumber && member && member !== ownerMemberNumber) {
                         // A busy conversation must not crowd other recent contacts out.
                         const newContact = !contacts.has(member) && contacts.size < CHAT_RECENT_CONTACTS;
                         if (newContact) contacts.add(member);
@@ -148,7 +149,7 @@ const ChatStore = {
                 const req = index.getAll(target);
                 req.onsuccess = () => {
                     const eligible = (req.result || [])
-                        .filter(message => Number(message.ownerMemberNumber) === ownerMemberNumber && (!Number.isFinite(before) || Number(message.timestamp) < before))
+                        .filter(message => this.isMessageVisible(message) && Number(message.ownerMemberNumber) === ownerMemberNumber && (!Number.isFinite(before) || Number(message.timestamp) < before))
                         .sort((a, b) => Number(a.timestamp) - Number(b.timestamp));
                     const start = Math.max(0, eligible.length - limit);
                     resolve({ messages: eligible.slice(start), hasMore: start > 0 });
@@ -166,7 +167,7 @@ const ChatStore = {
             try {
                 const index = this.db.transaction('messages', 'readonly').objectStore('messages').index('memberNumber');
                 const req = index.getAll(target);
-                req.onsuccess = () => resolve((req.result || []).filter(message => Number(message.ownerMemberNumber) === ownerMemberNumber).sort((a, b) => Number(a.timestamp) - Number(b.timestamp)));
+                req.onsuccess = () => resolve((req.result || []).filter(message => this.isMessageVisible(message) && Number(message.ownerMemberNumber) === ownerMemberNumber).sort((a, b) => Number(a.timestamp) - Number(b.timestamp)));
                 req.onerror = () => { warnLimited('member chat history read failed', req.error); resolve([]); };
             } catch (error) { warnLimited('member chat history read failed', error); resolve([]); }
         });
@@ -185,7 +186,7 @@ const ChatStore = {
                     const cursor = req.result;
                     if (!cursor) return;
                     const message = cursor.value;
-                    if (Number(message.ownerMemberNumber) === ownerMemberNumber && !message.read) cursor.update({ ...message, read: true });
+                    if (this.isMessageVisible(message) && Number(message.ownerMemberNumber) === ownerMemberNumber && !message.read) cursor.update({ ...message, read: true });
                     cursor.continue();
                 };
                 tx.oncomplete = () => resolve(true);
