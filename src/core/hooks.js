@@ -10,6 +10,7 @@ import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSH
 import { handleIncomingBeep, handleIncomingBeepDisplay, handleIncomingPrivateChat, handleIncomingChatMessageId, handleIncomingChatTag, handleIncomingFriendRequestNotice, handleIncomingWhisper, handleIncomingWhisperDisplay, handleOutgoingServerSend, handleOnlineFriendsUpdate } from '../communication/chat.js';
 import { shouldBypassBcxReceiveRules } from '../communication/bcx-compat.js';
 import { warnLimited } from './logger.js';
+import { drawLastSeen } from '../data/profile-seen.js';
 // ════════════════════════════════════════
 //  FCM module: hooks.js
 //  (split from Plugins/liko-FCM.user.js)
@@ -263,6 +264,11 @@ import { warnLimited } from './logger.js';
     });
 
     observeWpsOpenTokens();
+    // Profile 右上角「最後見面」：WCE / LCE 沒在畫時由 FCM 補上
+    modApi.hookFunction('InformationSheetRun', 9, (args, next) => {
+        drawLastSeen();
+        return next(args);
+    });
     modApi.hookFunction('DrawCharacter', 5, (args, next) => {
         try {
             const C = args[0];

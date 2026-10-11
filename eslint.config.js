@@ -18,6 +18,7 @@ const bcGlobals = [
   'Character', 'bcModSdk',
   'fbcSettings', 'BCE_VERSION', 'FBC_VERSION', 'MainHallRun', 'MainHallClick',
   'DrawProcess', 'ChatRoomClick', 'DrawCharacter', 'ServerAccountQueryResult',
+  'ServerChatMessageMaxLength', 'ServerSendRateLimitQueue', 'DrawText',
   'ChatRoomSync', 'ChatRoomSyncMemberJoin', 'ChatRoomSyncRoomProperties',
   'ChatRoomSyncMemberLeave', 'AccountBeep',
 ];
