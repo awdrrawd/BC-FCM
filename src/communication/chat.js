@@ -1,3 +1,4 @@
+import { markSeen } from '../data/profile-seen.js';
 import { processChatMedia } from './chat/controllers/chat-media.js';
 import { cfg, saveCfg, isMobile } from '../core/config.js';
 import { getDisplayName as getSharedDisplayName, getRoomInfo, inRoomFn, onlineFriends, requestOnlineFriends, buildFriendList, getAllRels, isFav, isFriendOf } from '../data/data.js';
@@ -145,7 +146,7 @@ const composer = createChatComposer({
 const profileViewer = createChatProfileViewer({
     findLiveCharacter: character, loadProfile: memberNumber => PDB.get(memberNumber),
     loadCharacter: (bundle, memberNumber) => globalThis.CharacterLoadOnline(bundle, memberNumber),
-    showInformationSheet: characterValue => globalThis.InformationSheetLoadCharacter?.(characterValue), warn: warnLimited,
+    showInformationSheet: characterValue => globalThis.InformationSheetLoadCharacter?.(characterValue), warn: warnLimited, markSeen,
 });
 const nativeTags = createNativeChatTags({ getSelf: () => Player?.MemberNumber, openProfile: profileViewer.open, displayName: getDisplayName });
 const contactCard = createChatContactCardController({

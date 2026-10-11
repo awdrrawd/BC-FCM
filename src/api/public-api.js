@@ -1,6 +1,7 @@
 import { PDB, Snapshot, loadAvatarFromBundle, syncRoomAvatar, updateOwnAvatarSnapshot } from '../data/profile-db.js';
 import { wpsShareProfile } from '../chat/wps-share.js';
 import { warnLimited } from '../core/logger.js';
+import { markSeen } from '../data/profile-seen.js';
 
 function memberNumberOf(value) {
     const memberNumber = Number(value);
@@ -67,6 +68,7 @@ async function openProfile(memberNumber) {
     try {
         const character = globalThis.CharacterLoadOnline(JSON.parse(profile.characterBundle), target);
         if (!character) return false;
+        markSeen(character, profile);
         globalThis.InformationSheetLoadCharacter(character);
         return true;
     } catch (error) {
