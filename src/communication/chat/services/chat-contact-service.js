@@ -1,3 +1,4 @@
+import { isSupportedAvatarUrl } from './chat-avatar-url.js';
 import { esc } from './chat-content.js';
 
 function createChatContactService({ config, snapshot, syncRoomAvatar, displayName, inRoom, isFriend, getPlayer, getRoomCharacters, getOnlineFriends, getRemoteProfiles }) {
@@ -25,15 +26,25 @@ function createChatContactService({ config, snapshot, syncRoomAvatar, displayNam
         if (typeof lian?.Signature === 'string' && lian.Signature) return lian.Signature;
         return getRemoteProfiles().get(Number(memberNumber))?.signature || '';
     };
+    // Anything a *remote* player controls (shared settings, profile payload) must be a
+    // supported avatar host or an inline image, and is normalised so raw quote
+    // characters can never reach markup. Locally generated sources are trusted as-is.
+    const remoteAvatar = url => {
+        if (typeof url !== 'string' || !url) return '';
+        if (url.startsWith('data:image/')) return url;
+        return isSupportedAvatarUrl(url) ? new URL(url).href : '';
+    };
     const avatarUrl = memberNumber => {
         const shared = sharedProfile(memberNumber);
         if (Number(memberNumber) === Number(getPlayer()?.MemberNumber) && config.chatAvatarMode !== 'follow') {
             if (config.chatAvatarMode === 'url') return config.chatAvatarUrl || config.avatarUrl || '';
             if (config.chatAvatarMode === 'game') return snapshot._cache[Number(memberNumber)] || shared.avatarSnapshot || '';
         }
-        if (shared.avatarMode === 'url' && shared.avatarUrl) return shared.avatarUrl;
-        return snapshot._cache[Number(memberNumber)] || (shared.avatarMode !== 'none' && shared.avatarSnapshot)
-            || getRemoteProfiles().get(Number(memberNumber))?.avatarUrl || '';
+        const sharedUrl = shared.avatarMode === 'url' ? remoteAvatar(shared.avatarUrl) : '';
+        if (sharedUrl) return sharedUrl;   // rejected URLs fall through to the local snapshot
+        return snapshot._cache[Number(memberNumber)]
+            || (shared.avatarMode !== 'none' && remoteAvatar(shared.avatarSnapshot))
+            || remoteAvatar(getRemoteProfiles().get(Number(memberNumber))?.avatarUrl) || '';
     };
     const avatarHtml = (memberNumber, size = 34, variant = 'normal') => {
         // Both chat and balloons show only a fully decoded image; keep the previous one during refresh.
@@ -50,6 +61,7 @@ function createChatContactService({ config, snapshot, syncRoomAvatar, displayNam
             if (readyAvatars.get(memberNumber) !== url) {
                 if (!pendingAvatars.has(url)) {
                     const image = new Image();
+                    image.referrerPolicy = 'no-referrer';
                     image.src = url;
                     const pending = image.decode().finally(() => pendingAvatars.delete(url));
                     pendingAvatars.set(url, pending);
@@ -68,6 +80,7 @@ function createChatContactService({ config, snapshot, syncRoomAvatar, displayNam
                 if (previous?.getAttribute('src') === url) return;
                 const image = document.createElement('img');
                 image.draggable = false;
+                image.referrerPolicy = 'no-referrer';
                 image.src = url;
                 if (previous) previous.replaceWith(image);
                 else element.insertBefore(image, element.firstChild);

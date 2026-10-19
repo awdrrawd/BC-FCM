@@ -6,12 +6,9 @@ import { PDB, _pc, Snapshot, _avQueue, _avBusy, _processAvQueue, loadAvatarFromB
 import { getDisplayName, REL_ORDER, getRel, isFriendOf, canBeep, inRoomFn, isFav, toggleFav } from '../data/data.js';
 import { roomOp, doView, doBeep, doWhisper, doToggleList, doRemoveFriend, showConfirm, showAddFriendConfirm } from '../chat/actions.js';
 import { openChat } from '../communication/chat.js';
-// ════════════════════════════════════════
-//  FCM module: panel-widgets.js  (split from panel.js)
-//  共用的元素工廠與列表輔助：頭像、關係/權限標籤、按鈕、搜尋框、
-//  人員操作按鈕組、房管按鈕組、排序/計數列、頭像佇列刷新。
-//  panelEl 恆等於 #fcm-panel，故此處直接以 getElementById 取用，避免與 panel.js 互相 import。
-// ════════════════════════════════════════
+// 共用的元素工廠與列表輔助：頭像、關係/權限標籤、按鈕、搜尋框、
+// 人員操作按鈕組、房管按鈕組、排序/計數列、頭像佇列刷新。
+// panelEl 恆等於 #fcm-panel，故此處直接以 getElementById 取用，避免與 panel.js 互相 import。
 
 const _panel = () => document.getElementById('fcm-panel');
 
@@ -90,23 +87,23 @@ async function _forceLoadAvatar(mn, el) {
     if (el.getAttribute('aria-busy') === 'true') return;
     setAvatarLoading(mn, true, el);
     try {
-    const qi = _avQueue.findIndex(q => q.mn === mn); if (qi >= 0) _avQueue.splice(qi, 1);
-    const live = ChatRoomCharacter?.find(character => Number(character.MemberNumber) === mn);
-    if (live) {
-        const url = await syncRoomAvatar(live, { force: true });
+        const qi = _avQueue.findIndex(q => q.mn === mn); if (qi >= 0) _avQueue.splice(qi, 1);
+        const live = ChatRoomCharacter?.find(character => Number(character.MemberNumber) === mn);
+        if (live) {
+            const url = await syncRoomAvatar(live, { force: true });
+            const target = el.isConnected ? el : _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
+            if (url && target) { setAvatarImage(target, url); return; }
+        }
+        const profile = await PDB.get(mn);
+        if (!profile) { el.textContent = '?'; return; }
+        if (!profile.characterBundle) { el.textContent = '?'; return; }
+        const url = await loadAvatarFromBundle(mn, profile);
         const target = el.isConnected ? el : _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
-        if (url && target) { setAvatarImage(target, url); return; }
-    }
-    const profile = await PDB.get(mn);
-    if (!profile) { el.textContent = '?'; return; }
-    if (!profile.characterBundle) { el.textContent = '?'; return; }
-    const url = await loadAvatarFromBundle(mn, profile);
-    const target = el.isConnected ? el : _panel()?.querySelector(`.fcm-av[data-mn="${mn}"]`);
-    if (url && target) {
-        setAvatarImage(target, url);
-    } else {
-        if (target) target.textContent = getDisplayName(mn).trim().slice(0, 2).toUpperCase() || '?';
-    }
+        if (url && target) {
+            setAvatarImage(target, url);
+        } else {
+            if (target) target.textContent = getDisplayName(mn).trim().slice(0, 2).toUpperCase() || '?';
+        }
     } finally {
         setAvatarLoading(mn, false, el);
     }
@@ -179,28 +176,28 @@ function buildPersonOps(mn, { isInRoom = false, isMe = false, oneSided = false, 
         const osSuffix = oneSided ? '\n\n' + T('peopleOneSidedWarn') : '';
 
         if (!isFriend) manage.appendChild(mkBtn(T('btnAddFriend'), 'fcm-btn-green',
-                                             () => showAddFriendConfirm(mn, _dname, oneSided)));
+            () => showAddFriendConfirm(mn, _dname, oneSided)));
         else manage.appendChild(mkBtn(T('btnRmFriend'), 'fcm-btn-red',
-                                   () => showConfirm(T('confirmDel', _dname), () => doRemoveFriend(mn), T('btnRemove'))));
+            () => showConfirm(T('confirmDel', _dname), () => doRemoveFriend(mn), T('btnRemove'))));
 
         manage.appendChild(mkBtn(_isWhl ? T('btnRmWhite') : T('btnAddWhite'), _isWhl ? 'fcm-btn-red' : 'fcm-btn-green',
-                              () => showConfirm(_isWhl
-                                                ? T('confirmRmWhite', _dname)
-                                                : T('confirmAddWhite', _dname) + osSuffix,
-                                                () => doToggleList(mn, 'white', !_isWhl))));
+            () => showConfirm(_isWhl
+                ? T('confirmRmWhite', _dname)
+                : T('confirmAddWhite', _dname) + osSuffix,
+            () => doToggleList(mn, 'white', !_isWhl))));
 
         manage.appendChild(mkBtn(_isBl ? T('btnRmBlack') : T('btnAddBlack'), 'fcm-btn-red',
-                              () => showConfirm(_isBl
-                                                ? T('confirmRmBlack', _dname)
-                                                : T('confirmAddBan', _dname) + osSuffix,
-                                                () => doToggleList(mn, 'black', !_isBl),
-                                                _isBl ? undefined : T('btnAddConfirm'))));
+            () => showConfirm(_isBl
+                ? T('confirmRmBlack', _dname)
+                : T('confirmAddBan', _dname) + osSuffix,
+            () => doToggleList(mn, 'black', !_isBl),
+            _isBl ? undefined : T('btnAddConfirm'))));
 
         manage.appendChild(mkBtn(_isGh ? T('btnRmGhost') : T('btnAddGhost'), _isGh ? 'fcm-btn-red' : 'fcm-btn-purple',
-                              () => showConfirm(_isGh
-                                                ? T('confirmRmGhost', _dname)
-                                                : T('confirmAddGhost', _dname) + osSuffix,
-                                                () => doToggleList(mn, 'ghost', !_isGh))));
+            () => showConfirm(_isGh
+                ? T('confirmRmGhost', _dname)
+                : T('confirmAddGhost', _dname) + osSuffix,
+            () => doToggleList(mn, 'ghost', !_isGh))));
     }
     return { actions, manage };
 }
@@ -289,4 +286,4 @@ async function refreshSnapshotsForList(mns) {
 }
 
 export { makeAvEl, makeFavStar, makeRelEl, makePermEl, mkBtn, mkToggle, makeSearchWrap,
-         buildMgmtBtns, buildPersonOps, makeSortSel, makeCountBar, paginate, makePageBar, _autoQueueVisible, refreshSnapshotsForList };
+    buildMgmtBtns, buildPersonOps, makeSortSel, makeCountBar, paginate, makePageBar, _autoQueueVisible, refreshSnapshotsForList };

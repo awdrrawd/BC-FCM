@@ -1,9 +1,6 @@
 import { T } from '../i18n/i18n.js';
 import { MOD_VER } from '../core/config.js';
-// ════════════════════════════════════════
-//  FCM module: panel-help.js  (split from panel.js)
-//  說明頁：純靜態內容，無共用狀態耦合。
-// ════════════════════════════════════════
+// 說明頁：純靜態內容，無共用狀態耦合。
 
 function renderHelp(container) {
     container.innerHTML = '';

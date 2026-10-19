@@ -7,11 +7,8 @@ import { mkBtn } from './panel-widgets.js';
 import { getRoomResults, setRoomResults, doRoomSearch } from './panel-rooms-data.js';
 import { cfg, saveCfg } from '../core/config.js';
 import { getRenderToken } from './panel-controller.js';
-// ════════════════════════════════════════
-//  FCM module: panel-roomsearch.js  (split from panel.js)
-//  房間搜尋頁。_roomZoneFilter / _roomSearchQ2 / _roomSortMode / _favRooms 為本頁狀態；
-//  closePanel 透過 resetRoomSearchQuery 清空搜尋字串。
-// ════════════════════════════════════════
+// 房間搜尋頁。_roomZoneFilter / _roomSearchQ2 / _roomSortMode / _favRooms 為本頁狀態；
+// closePanel 透過 resetRoomSearchQuery 清空搜尋字串。
 
 let _roomZoneFilter = 'X';
 let _roomSearchQ2 = '';

@@ -10,15 +10,15 @@ import { createPublicApi } from './api/public-api.js';
 const publicApi = createPublicApi();
 
 Object.assign(window.Liko.FCM, {
-        apiVersion: 1,
-        version: MOD_VER,
-        open: () => openPanel(),
-        close: () => closePanel(),
-        toggle: () => togglePanel(),
-        openChat: memberNumber => openChat(memberNumber),
-        closeChat: () => closeChat(),
-        avatar: publicApi.avatar,
-        profiles: publicApi.profiles,
+    apiVersion: 1,
+    version: MOD_VER,
+    open: () => openPanel(),
+    close: () => closePanel(),
+    toggle: () => togglePanel(),
+    openChat: memberNumber => openChat(memberNumber),
+    closeChat: () => closeChat(),
+    avatar: publicApi.avatar,
+    profiles: publicApi.profiles,
 });
 
 installThemeSelects();

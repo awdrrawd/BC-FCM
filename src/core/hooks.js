@@ -11,79 +11,75 @@ import { handleIncomingBeep, handleIncomingBeepDisplay, handleIncomingPrivateCha
 import { shouldBypassBcxReceiveRules } from '../communication/bcx-compat.js';
 import { warnLimited } from './logger.js';
 import { drawLastSeen } from '../data/profile-seen.js';
-// ════════════════════════════════════════
-//  FCM module: hooks.js
-//  (split from Plugins/liko-FCM.user.js)
-// ════════════════════════════════════════
 
-    // Profile 關係人快速搜尋：透過 hook DrawTextFit 擷取 BC 實際繪製的「關係列」
-    //  （主人 CollaredBy/TrialBy、戀人 Dating/Engaged/MarriedWith，皆結尾帶「(MemberNumber)」），
-    //  按鈕框剛好貼合文字寬度（不受欄位固定寬影響）。
-    //  _relCollect：InformationSheetRun 繪製期間暫存本幀擷取結果；_relRegions：供點擊命中測試。
-    let _relCollect = null;
-    let _introShown = false;   // 初始化提示只顯示一次
-    let _relRegions = [];
-    let _afcRegions = [];   // AFC 拓展戀人面板的可點區塊（透過 window.Liko.AFC 公開 API）
-    let _hooksRegistered = false;
+// Profile 關係人快速搜尋：透過 hook DrawTextFit 擷取 BC 實際繪製的「關係列」
+//  （主人 CollaredBy/TrialBy、戀人 Dating/Engaged/MarriedWith，皆結尾帶「(MemberNumber)」），
+//  按鈕框剛好貼合文字寬度（不受欄位固定寬影響）。
+//  _relCollect：InformationSheetRun 繪製期間暫存本幀擷取結果；_relRegions：供點擊命中測試。
+let _relCollect = null;
+let _introShown = false;   // 初始化提示只顯示一次
+let _relRegions = [];
+let _afcRegions = [];   // AFC 拓展戀人面板的可點區塊（透過 window.Liko.AFC 公開 API）
+let _hooksRegistered = false;
 
-    // 將 hex 顏色朝白色混合，用於 hover 時提亮底線（amt: 0~1）
-    function _lightenHex(hex, amt) {
-        try {
-            const h = String(hex).replace('#', '');
-            const n = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
-            const r = parseInt(n.substr(0, 2), 16), g = parseInt(n.substr(2, 2), 16), b = parseInt(n.substr(4, 2), 16);
-            const mix = c => Math.round(c + (255 - c) * amt);
-            return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
-        } catch { return hex; }
-    }
+// 將 hex 顏色朝白色混合，用於 hover 時提亮底線（amt: 0~1）
+function _lightenHex(hex, amt) {
+    try {
+        const h = String(hex).replace('#', '');
+        const n = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
+        const r = parseInt(n.substr(0, 2), 16), g = parseInt(n.substr(2, 2), 16), b = parseInt(n.substr(4, 2), 16);
+        const mix = c => Math.round(c + (255 - c) * amt);
+        return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
+    } catch { return hex; }
+}
 
-    function _afcPanelOpen() {
-        try { const A = window.Liko && window.Liko.AFC; return !!(A && typeof A.isProfilePanelOpen === 'function' && A.isProfilePanelOpen()); } catch { return false; }
-    }
+function _afcPanelOpen() {
+    try { const A = window.Liko && window.Liko.AFC; return !!(A && typeof A.isProfilePanelOpen === 'function' && A.isProfilePanelOpen()); } catch { return false; }
+}
 
-    // 量測文字依欄寬縮字級後的實際寬度與字級（給 AFC 面板底線用）
-    function _fittedTextWidth(text, maxW) {
-        let w = 0, size = 36;
-        try {
-            if (typeof DrawingGetTextSize === 'function' && typeof CommonGetFont === 'function' && typeof MainCanvas !== 'undefined' && MainCanvas) {
-                const res = DrawingGetTextSize(text, maxW);
-                size = parseInt(res[1]) || 36;
-                const prev = MainCanvas.font;
-                MainCanvas.font = CommonGetFont(String(res[1]));
-                w = MainCanvas.measureText(res[0]).width;
-                MainCanvas.font = prev;
-            }
-        } catch {}
-        if (!w && typeof MainCanvas !== 'undefined' && MainCanvas) { try { w = MainCanvas.measureText(text).width; } catch {} }
-        if (!w) w = Math.min(maxW || 500, String(text).length * 18);
-        return { w, size };
-    }
+// 量測文字依欄寬縮字級後的實際寬度與字級（給 AFC 面板底線用）
+function _fittedTextWidth(text, maxW) {
+    let w = 0, size = 36;
+    try {
+        if (typeof DrawingGetTextSize === 'function' && typeof CommonGetFont === 'function' && typeof MainCanvas !== 'undefined' && MainCanvas) {
+            const res = DrawingGetTextSize(text, maxW);
+            size = parseInt(res[1]) || 36;
+            const prev = MainCanvas.font;
+            MainCanvas.font = CommonGetFont(String(res[1]));
+            w = MainCanvas.measureText(res[0]).width;
+            MainCanvas.font = prev;
+        }
+    } catch { /* measurement is optional; falls back to an estimate */ }
+    if (!w && typeof MainCanvas !== 'undefined' && MainCanvas) { try { w = MainCanvas.measureText(text).width; } catch { /* fallback estimate follows */ } }
+    if (!w) w = Math.min(maxW || 500, String(text).length * 18);
+    return { w, size };
+}
 
-    // 由 DrawTextFit 的參數量測實際繪製後的文字寬度（BC 會依欄寬縮字級）
-    function _measureRelRegion(text, X, Y, Width) {
-        const m = typeof text === 'string' && text.match(/\((\d{2,})\)\s*$/);
-        if (!m) return null;
-        const mn = parseInt(m[1]);
-        if (!mn) return null;
-        let w = 0, drawText = text;
-        try {
-            if (typeof DrawingGetTextSize === 'function' && typeof CommonGetFont === 'function' && typeof MainCanvas !== 'undefined' && MainCanvas) {
-                const res = DrawingGetTextSize(text, Width);
-                drawText = res[0];
-                const prev = MainCanvas.font;
-                MainCanvas.font = CommonGetFont(String(res[1]));
-                w = MainCanvas.measureText(drawText).width;
-                MainCanvas.font = prev;
-            }
-        } catch {}
-        if (!w && typeof MainCanvas !== 'undefined' && MainCanvas) { try { w = MainCanvas.measureText(text).width; } catch {} }
-        if (!w) w = Math.min(Width || 600, String(text).length * 18);
-        const align = (typeof MainCanvas !== 'undefined' && MainCanvas && MainCanvas.textAlign) || 'left';
-        const left = align === 'center' ? X - w / 2 : align === 'right' ? X - w : X;
-        return { mn, x: left - 5, y: Y - 24, w: w + 10, h: 48 };  // textBaseline=middle → 以 Y 為垂直中心
-    }
+// 由 DrawTextFit 的參數量測實際繪製後的文字寬度（BC 會依欄寬縮字級）
+function _measureRelRegion(text, X, Y, Width) {
+    const m = typeof text === 'string' && text.match(/\((\d{2,})\)\s*$/);
+    if (!m) return null;
+    const mn = parseInt(m[1]);
+    if (!mn) return null;
+    let w = 0, drawText = text;
+    try {
+        if (typeof DrawingGetTextSize === 'function' && typeof CommonGetFont === 'function' && typeof MainCanvas !== 'undefined' && MainCanvas) {
+            const res = DrawingGetTextSize(text, Width);
+            drawText = res[0];
+            const prev = MainCanvas.font;
+            MainCanvas.font = CommonGetFont(String(res[1]));
+            w = MainCanvas.measureText(drawText).width;
+            MainCanvas.font = prev;
+        }
+    } catch { /* measurement is optional; falls back to an estimate */ }
+    if (!w && typeof MainCanvas !== 'undefined' && MainCanvas) { try { w = MainCanvas.measureText(text).width; } catch { /* fallback estimate follows */ } }
+    if (!w) w = Math.min(Width || 600, String(text).length * 18);
+    const align = (typeof MainCanvas !== 'undefined' && MainCanvas && MainCanvas.textAlign) || 'left';
+    const left = align === 'center' ? X - w / 2 : align === 'right' ? X - w : X;
+    return { mn, x: left - 5, y: Y - 24, w: w + 10, h: 48 };  // textBaseline=middle → 以 Y 為垂直中心
+}
 
-    function registerHooks() {
+function registerHooks() {
     if (_hooksRegistered) return;
     _hooksRegistered = true;
     const bypassedBeeps = new WeakSet();
@@ -132,11 +128,15 @@ import { drawLastSeen } from '../data/profile-seen.js';
         if (data?.Query === 'OnlineFriends') notifyPanelChange('presence');
         return r;
     });
-    modApi.hookFunction('ChatRoomSync', 0, (args, next) => {
+    // BC's ChatRoomSync is async (it awaits CommonSetScreen). Await it so the room
+    // state, screen and ChatRoomCharacter are ready before FCM reads them; otherwise
+    // the one-time intro hint is consumed while ChatRoomSendLocal is still a no-op.
+    modApi.hookFunction('ChatRoomSync', 0, async (args, next) => {
         const profiles = (args[0]?.Character || []).map(raw => ({
             memberNumber: raw.MemberNumber, bundle: PDB.capture(raw),
         }));
-        const r = next(args);
+        const r = await next(args);
+        if (typeof ChatRoomData === 'undefined' || !ChatRoomData) return r;   // sync was rejected by BC
         // 初始化提示：ChatRoomSendLocal 只在房內生效，故延到首次進房時顯示一次
         notifyPanelChange('room'); notifyPanelChange('presence');
         if (!_introShown) {
@@ -169,7 +169,7 @@ import { drawLastSeen } from '../data/profile-seen.js';
         return r;
     });
     modApi.hookFunction('ChatRoomSyncRoomProperties', 0, (args, next) => {
-        let r; try { r = next(args); } catch(e) { console.warn('🐈‍⬛ [FCM] SyncRoomProperties:', e); }
+        let r; try { r = next(args); } catch(e) { warnLimited('SyncRoomProperties', e); }
         try { notifyPanelChange('room'); } catch (error) { warnLimited('room panel refresh failed', error); }
         return r;
     });
@@ -279,114 +279,114 @@ import { drawLastSeen } from '../data/profile-seen.js';
         } catch (error) { warnLimited('ghost drawing suppression failed', error); }
         return next(args);
     });
-        // 擷取關係列座標：僅在 InformationSheet 繪製期間（_relCollect 非 null）作用
-        modApi.hookFunction('DrawTextFit', 0, (args, next) => {
-            const ret = next(args);
-            if (_relCollect && cfg.profileRelations) {
-                try { const reg = _measureRelRegion(args[0], args[1], args[2], args[3]); if (reg) _relCollect.push(reg); } catch (error) { warnLimited('profile relation region capture failed', error); }
-            }
-            return ret;
-        });
-        // BC 原生關係列：priority 5（與 BC 按鈕同層）→ AFC 面板(7) 會畫在其上，展開時自然被蓋住
-        modApi.hookFunction('InformationSheetRun', 5, (args, next) => {
-            const collecting = cfg.profileRelations && typeof CurrentScreen !== 'undefined' && CurrentScreen === 'InformationSheet'
+    // 擷取關係列座標：僅在 InformationSheet 繪製期間（_relCollect 非 null）作用
+    modApi.hookFunction('DrawTextFit', 0, (args, next) => {
+        const ret = next(args);
+        if (_relCollect && cfg.profileRelations) {
+            try { const reg = _measureRelRegion(args[0], args[1], args[2], args[3]); if (reg) _relCollect.push(reg); } catch (error) { warnLimited('profile relation region capture failed', error); }
+        }
+        return ret;
+    });
+    // BC 原生關係列：priority 5（與 BC 按鈕同層）→ AFC 面板(7) 會畫在其上，展開時自然被蓋住
+    modApi.hookFunction('InformationSheetRun', 5, (args, next) => {
+        const collecting = cfg.profileRelations && typeof CurrentScreen !== 'undefined' && CurrentScreen === 'InformationSheet'
                 && !(typeof InformationSheetSecondScreen !== 'undefined' && InformationSheetSecondScreen);
-            if (collecting) _relCollect = [];
-            const r = next(args);
-            // Profile 關係人快速搜尋：在 BC 已繪製的關係列文字上疊一個貼合文字的可點高亮框
-            if (collecting) {
-                let regions = _relCollect || [];
-                _relCollect = null;
-                // 只保留真正的關係人 MemberNumber（戀人＋主人），濾掉像「更多戀人 (10)」的計數
-                try {
-                    const C = (typeof InformationSheetSelection !== 'undefined') ? InformationSheetSelection : null;
-                    const valid = new Set();
-                    if (C && typeof C.GetLovership === 'function') for (const l of (C.GetLovership() || [])) if (l && l.MemberNumber) valid.add(parseInt(l.MemberNumber));
-                    try { if (C && typeof C.OwnerNumber === 'function') { const on = C.OwnerNumber(); if (on && on !== -1) valid.add(parseInt(on)); } } catch {}
-                    try { if (C && C.Ownership && C.Ownership.MemberNumber) valid.add(parseInt(C.Ownership.MemberNumber)); } catch {}
-                    regions = C ? regions.filter(reg => valid.has(reg.mn)) : [];
-                } catch (error) { warnLimited('profile relation filtering failed', error); }
-                _relRegions = regions;
-                try {
-                    for (const reg of _relRegions) {
-                        const hov = typeof MouseIn === 'function' && MouseIn(reg.x, reg.y, reg.w, reg.h);
-                        // 只畫底線（貼合文字寬度），不畫按鈕外框；hover 時加粗變亮；無色時不畫
-                        if (cfg.profileRelColor && typeof MainCanvas !== 'undefined' && MainCanvas) {
-                            MainCanvas.save();
-                            MainCanvas.fillStyle = hov ? _lightenHex(cfg.profileRelColor, 0.4) : cfg.profileRelColor;
-                            MainCanvas.fillRect(reg.x + 5, reg.y + reg.h - 6, Math.max(0, reg.w - 10), hov ? 3 : 2);
-                            MainCanvas.restore();
-                        }
+        if (collecting) _relCollect = [];
+        const r = next(args);
+        // Profile 關係人快速搜尋：在 BC 已繪製的關係列文字上疊一個貼合文字的可點高亮框
+        if (collecting) {
+            let regions = _relCollect || [];
+            _relCollect = null;
+            // 只保留真正的關係人 MemberNumber（戀人＋主人），濾掉像「更多戀人 (10)」的計數
+            try {
+                const C = (typeof InformationSheetSelection !== 'undefined') ? InformationSheetSelection : null;
+                const valid = new Set();
+                if (C && typeof C.GetLovership === 'function') for (const l of (C.GetLovership() || [])) if (l && l.MemberNumber) valid.add(parseInt(l.MemberNumber));
+                try { if (C && typeof C.OwnerNumber === 'function') { const on = C.OwnerNumber(); if (on && on !== -1) valid.add(parseInt(on)); } } catch (error) { warnLimited('profile relation owner lookup failed', error); }
+                try { if (C && C.Ownership && C.Ownership.MemberNumber) valid.add(parseInt(C.Ownership.MemberNumber)); } catch (error) { warnLimited('profile relation ownership lookup failed', error); }
+                regions = C ? regions.filter(reg => valid.has(reg.mn)) : [];
+            } catch (error) { warnLimited('profile relation filtering failed', error); }
+            _relRegions = regions;
+            try {
+                for (const reg of _relRegions) {
+                    const hov = typeof MouseIn === 'function' && MouseIn(reg.x, reg.y, reg.w, reg.h);
+                    // 只畫底線（貼合文字寬度），不畫按鈕外框；hover 時加粗變亮；無色時不畫
+                    if (cfg.profileRelColor && typeof MainCanvas !== 'undefined' && MainCanvas) {
+                        MainCanvas.save();
+                        MainCanvas.fillStyle = hov ? _lightenHex(cfg.profileRelColor, 0.4) : cfg.profileRelColor;
+                        MainCanvas.fillRect(reg.x + 5, reg.y + reg.h - 6, Math.max(0, reg.w - 10), hov ? 3 : 2);
+                        MainCanvas.restore();
                     }
-                } catch (error) { warnLimited('profile relation overlay draw failed', error); }
-            } else {
-                _relRegions = [];
-            }
-            const viewingSelf = (typeof InformationSheetSelection !== 'undefined') &&
-                  (InformationSheetSelection === Player.MemberNumber || InformationSheetSelection?.MemberNumber === Player.MemberNumber);
-            if (viewingSelf && cfg.btnShowProfile && typeof DrawButton === 'function') {
-                const btnColor = (panelOpen && !panelMini) ? '#3a1858' : 'White';
-                DrawButton(1715, 420, 90, 90, '', btnColor, '', 'FCM');
-                if (fcmIconImage && typeof DrawImageResize === 'function') {
-                    DrawImageResize(fcmIconImage, 1725, 428, 74, 74);
                 }
+            } catch (error) { warnLimited('profile relation overlay draw failed', error); }
+        } else {
+            _relRegions = [];
+        }
+        const viewingSelf = (typeof InformationSheetSelection !== 'undefined') &&
+                  (InformationSheetSelection === Player.MemberNumber || InformationSheetSelection?.MemberNumber === Player.MemberNumber);
+        if (viewingSelf && cfg.btnShowProfile && typeof DrawButton === 'function') {
+            const btnColor = (panelOpen && !panelMini) ? '#3a1858' : 'White';
+            DrawButton(1715, 420, 90, 90, '', btnColor, '', 'FCM');
+            if (fcmIconImage && typeof DrawImageResize === 'function') {
+                DrawImageResize(fcmIconImage, 1725, 428, 74, 74);
             }
-            return r;
-        });
-        modApi.hookFunction('InformationSheetClick', 5, (args, next) => {
-            const viewingSelf = (typeof InformationSheetSelection !== 'undefined') &&
+        }
+        return r;
+    });
+    modApi.hookFunction('InformationSheetClick', 5, (args, next) => {
+        const viewingSelf = (typeof InformationSheetSelection !== 'undefined') &&
                   (InformationSheetSelection === Player.MemberNumber || InformationSheetSelection?.MemberNumber === Player.MemberNumber);
         if (viewingSelf && cfg.btnShowProfile && typeof MouseIn === 'function' && MouseIn(1715, 420, 90, 90)) { openPanel(); return; }
-            // Profile 關係人快速搜尋：點到某一關係列（主人／戀人）→ 開啟人員查詢並帶入該 ID
-            if (cfg.profileRelations) {
-                try {
-                    for (const reg of _relRegions) {
-                        if (typeof MouseIn === 'function' && MouseIn(reg.x, reg.y, reg.w, reg.h)) { openPeopleSearch(reg.mn); return; }
-                    }
-                } catch (error) { warnLimited('profile relation click handling failed', error); }
-            }
-            return next(args);
-        });
-
-        // ── AFC 拓展戀人面板支援（priority 8，遵守 AFC 優先序契約）──────────
-        //  AFC 於 priority 7 繪製「更多戀人」面板並填好 getProfileLoverRegions()；
-        //  我們掛 priority 8（外層）→ next() 後 AFC 已畫完，於面板之上疊底線並優先吃點擊。
-        modApi.hookFunction('InformationSheetRun', 8, (args, next) => {
-            const r = next(args);
-            _afcRegions = [];
+        // Profile 關係人快速搜尋：點到某一關係列（主人／戀人）→ 開啟人員查詢並帶入該 ID
+        if (cfg.profileRelations) {
             try {
-                const AFC = window.Liko && window.Liko.AFC;
-                if (cfg.profileRelations && _afcPanelOpen() && AFC && typeof AFC.getProfileLoverRegions === 'function') {
-                    for (const e of (AFC.getProfileLoverRegions() || [])) {
-                        if (!e || !e.memberNumber) continue;
-                        const nameStr = `♥ ${e.name} (${e.memberNumber})`;   // 對齊 AFC 的名稱行格式
-                        const fit = _fittedTextWidth(nameStr, e.w);
-                        const w = Math.max(0, Math.min(fit.w, e.w));
-                        const hit = { mn: parseInt(e.memberNumber), x: e.x - 5, y: e.y, w: w + 10, h: 46 };
-                        _afcRegions.push(hit);
-                        const hov = typeof MouseIn === 'function' && MouseIn(hit.x, hit.y, hit.w, hit.h);
-                        if (cfg.profileRelColor && typeof MainCanvas !== 'undefined' && MainCanvas) {
-                            MainCanvas.save();
-                            MainCanvas.fillStyle = hov ? _lightenHex(cfg.profileRelColor, 0.4) : cfg.profileRelColor;
-                            // AFC: region.y = 名稱行中心 - 26；底線畫在名稱文字正下方
-                            MainCanvas.fillRect(e.x, e.y + 26 + fit.size * 0.5 + 1, w, hov ? 3 : 2);
-                            MainCanvas.restore();
-                        }
+                for (const reg of _relRegions) {
+                    if (typeof MouseIn === 'function' && MouseIn(reg.x, reg.y, reg.w, reg.h)) { openPeopleSearch(reg.mn); return; }
+                }
+            } catch (error) { warnLimited('profile relation click handling failed', error); }
+        }
+        return next(args);
+    });
+
+    // ── AFC 拓展戀人面板支援（priority 8，遵守 AFC 優先序契約）──────────
+    //  AFC 於 priority 7 繪製「更多戀人」面板並填好 getProfileLoverRegions()；
+    //  我們掛 priority 8（外層）→ next() 後 AFC 已畫完，於面板之上疊底線並優先吃點擊。
+    modApi.hookFunction('InformationSheetRun', 8, (args, next) => {
+        const r = next(args);
+        _afcRegions = [];
+        try {
+            const AFC = window.Liko && window.Liko.AFC;
+            if (cfg.profileRelations && _afcPanelOpen() && AFC && typeof AFC.getProfileLoverRegions === 'function') {
+                for (const e of (AFC.getProfileLoverRegions() || [])) {
+                    if (!e || !e.memberNumber) continue;
+                    const nameStr = `♥ ${e.name} (${e.memberNumber})`;   // 對齊 AFC 的名稱行格式
+                    const fit = _fittedTextWidth(nameStr, e.w);
+                    const w = Math.max(0, Math.min(fit.w, e.w));
+                    const hit = { mn: parseInt(e.memberNumber), x: e.x - 5, y: e.y, w: w + 10, h: 46 };
+                    _afcRegions.push(hit);
+                    const hov = typeof MouseIn === 'function' && MouseIn(hit.x, hit.y, hit.w, hit.h);
+                    if (cfg.profileRelColor && typeof MainCanvas !== 'undefined' && MainCanvas) {
+                        MainCanvas.save();
+                        MainCanvas.fillStyle = hov ? _lightenHex(cfg.profileRelColor, 0.4) : cfg.profileRelColor;
+                        // AFC: region.y = 名稱行中心 - 26；底線畫在名稱文字正下方
+                        MainCanvas.fillRect(e.x, e.y + 26 + fit.size * 0.5 + 1, w, hov ? 3 : 2);
+                        MainCanvas.restore();
                     }
                 }
-            } catch (error) { warnLimited('AFC profile region capture failed', error); _afcRegions = []; }
-            return r;
-        });
-        modApi.hookFunction('InformationSheetClick', 8, (args, next) => {
-            if (cfg.profileRelations && _afcPanelOpen()) {
-                try {
-                    for (const reg of _afcRegions) {
-                        if (typeof MouseIn === 'function' && MouseIn(reg.x, reg.y, reg.w, reg.h)) { openPeopleSearch(reg.mn); return; }
-                    }
-                } catch (error) { warnLimited('AFC profile click handling failed', error); }
             }
-            return next(args);
-        });
-    }
+        } catch (error) { warnLimited('AFC profile region capture failed', error); _afcRegions = []; }
+        return r;
+    });
+    modApi.hookFunction('InformationSheetClick', 8, (args, next) => {
+        if (cfg.profileRelations && _afcPanelOpen()) {
+            try {
+                for (const reg of _afcRegions) {
+                    if (typeof MouseIn === 'function' && MouseIn(reg.x, reg.y, reg.w, reg.h)) { openPeopleSearch(reg.mn); return; }
+                }
+            } catch (error) { warnLimited('AFC profile click handling failed', error); }
+        }
+        return next(args);
+    });
+}
 
 export { registerHooks };

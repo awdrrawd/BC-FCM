@@ -225,7 +225,7 @@ function installChatDrag(element, handle, { configKey, isMaximized = () => false
             handle.removeEventListener('lostpointercapture', cancel);
             if (moveFrame) cancelAnimationFrame(moveFrame);
             if (queued) renderMove(queued);
-            try { if (handle.hasPointerCapture(next.pointerId)) handle.releasePointerCapture(next.pointerId); } catch {}
+            try { if (handle.hasPointerCapture(next.pointerId)) handle.releasePointerCapture(next.pointerId); } catch { /* pointer capture may already be released */ }
             if (isBalloon && moved) {
                 element.classList.remove('dragging');
                 element.classList.add('release-water');

@@ -1,3 +1,4 @@
+import { warnLimited } from '../../../core/logger.js';
 // Optional media plugins own upload/playback; FCM owns UI, routing and drafts.
 const bound = new WeakSet();
 const panels = new WeakMap();
@@ -7,7 +8,7 @@ function processChatMedia(scope) {
     const api = globalThis.LikoVideoPlayerInstance;
     if (typeof api?.processMessage !== 'function') return;
     scope?.querySelectorAll?.('.fcm-chat-content').forEach(element => {
-        try { api.processMessage(element); } catch (error) { console.warn('[FCM] Media rendering failed', error); }
+        try { api.processMessage(element); } catch (error) { warnLimited('Media rendering failed', error); }
     });
 }
 
@@ -51,7 +52,7 @@ function bindMediaComposer(main, { getMemberNumber, text }) {
                 try {
                     const url = await api.uploadFile(file);
                     if (url) deliver([url]);
-                } catch (error) { console.warn('[FCM] Image upload failed', error); }
+                } catch (error) { warnLimited('Image upload failed', error); }
             }
         });
     }
@@ -63,7 +64,7 @@ function bindMediaComposer(main, { getMemberNumber, text }) {
         event.preventDefault(); event.stopPropagation();
         const deliver = captureDestination(input, { getMemberNumber, text });
         try { uploader()?.chooseImage(url => deliver([url])); }
-        catch (error) { console.warn('[FCM] Image chooser failed', error); }
+        catch (error) { warnLimited('Image chooser failed', error); }
     });
 }
 
@@ -86,7 +87,7 @@ function bindPanelDrop(panel) {
             try {
                 const url = await api.uploadFile(file);
                 if (url) deliver([url]);
-            } catch (error) { console.warn('[FCM] Image upload failed', error); }
+            } catch (error) { warnLimited('Image upload failed', error); }
         }
     });
 }

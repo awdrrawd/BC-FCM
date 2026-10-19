@@ -58,17 +58,22 @@ test('chat and balloon share decoded sources, snapshot refresh, URL mode and fai
     await flush();
     assert.deepEqual(rows.map(row => row.image.src), ['new-snapshot', 'new-snapshot']);
     assert.equal(retained.get('complete-cache'), 0);
-    shared.avatarMode = 'url'; shared.avatarUrl = 'custom-url';
+    shared.avatarMode = 'url'; shared.avatarUrl = 'https://i.imgur.com/custom.png';
     const custom = service.hydrateAvatars(); await flush();
-    decoding.get('custom-url').resolve(); await custom;
-    assert.deepEqual(rows.map(row => row.image.src), ['custom-url', 'custom-url']);
+    decoding.get('https://i.imgur.com/custom.png').resolve(); await custom;
+    assert.deepEqual(rows.map(row => row.image.src), ['https://i.imgur.com/custom.png', 'https://i.imgur.com/custom.png']);
     assert.equal(retained.get('new-snapshot'), 0);
-    shared.avatarUrl = 'broken-url';
+    shared.avatarUrl = 'https://i.imgur.com/broken.png';
     const broken = service.hydrateAvatars(); await flush();
-    decoding.get('broken-url').reject(new Error('decode failed')); await broken;
-    assert.deepEqual(rows.map(row => row.image.src), ['custom-url', 'custom-url']);
-    assert.equal(retained.get('broken-url'), 0);
-    assert.equal(retained.get('custom-url'), 1);
+    decoding.get('https://i.imgur.com/broken.png').reject(new Error('decode failed')); await broken;
+    assert.deepEqual(rows.map(row => row.image.src), ['https://i.imgur.com/custom.png', 'https://i.imgur.com/custom.png']);
+    assert.equal(retained.get('https://i.imgur.com/broken.png'), 0);
+    assert.equal(retained.get('https://i.imgur.com/custom.png'), 1);
+    // Remote-controlled sources: unsupported hosts and quote-injection payloads are dropped.
+    shared.avatarUrl = 'https://evil.example/a.png';
+    assert.equal(service.avatarUrl(7), 'new-snapshot', 'non-allow-listed remote host is ignored');
+    shared.avatarUrl = 'https://i.imgur.com/a.png?x=" onerror="alert(1)';
+    assert.ok(!service.avatarUrl(7).includes('"'), 'raw quotes never survive normalisation');
     for (const key of ['window', 'document', 'Image', 'Node']) delete globalThis[key];
 });
 

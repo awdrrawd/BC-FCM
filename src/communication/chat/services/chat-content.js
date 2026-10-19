@@ -4,10 +4,12 @@ import { imageOriginTrusted } from '../../image-trust.js';
 const CHAT_IMAGE_EXT = /\.(?:png|jpe?g|gif|webp|bmp|avif|apng|jfif|svg|ico)$/iu;
 const BALLOON_PREVIEW_MAX_CHARS = 80;
 
+const HTML_ESCAPES = { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' };
+
+// Safe for text nodes AND quoted attribute values. (The previous textContent ->
+// innerHTML round-trip left " and ' untouched, allowing attribute injection.)
 function esc(value) {
-    const el = document.createElement('div');
-    el.textContent = String(value ?? '');
-    return el.innerHTML;
+    return String(value ?? '').replace(/[&<>"']/g, char => HTML_ESCAPES[char]);
 }
 
 function cleanMessage(value) {

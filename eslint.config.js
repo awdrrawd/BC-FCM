@@ -51,7 +51,9 @@ export default [
     },
     rules: {
       'no-unused-vars': ['warn', { args: 'none', varsIgnorePattern: '^_' }],
-      'no-empty': 'off',
+      // A silent catch must say why (a comment satisfies the rule); otherwise log via warnLimited.
+      'no-empty': ['error', { allowEmptyCatch: false }],
+      indent: ['error', 4, { SwitchCase: 1 }],
       'no-cond-assign': 'off',
       'no-extra-boolean-cast': 'off',
     },

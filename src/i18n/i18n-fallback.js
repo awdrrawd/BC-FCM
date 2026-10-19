@@ -1,9 +1,6 @@
-// ════════════════════════════════════════
-//  FCM module: i18n-fallback.js  （內建後備字庫：TW + EN）
-//  執行期 fetch Translation/<LANG>.json 失敗／未完成時的安全網——載入時同步註冊進共用引擎，
-//  之後 fetch 到的完整字庫會覆蓋這裡。翻譯以 Translation/*.json（一國一檔）為準；
-//  這份僅需維持 TW/EN 可用即可（由 scripts 生成，勿手動大改）。
-// ════════════════════════════════════════
+// 執行期 fetch Translation/<LANG>.json 失敗／未完成時的安全網——載入時同步註冊進共用引擎，
+// 之後 fetch 到的完整字庫會覆蓋這裡。翻譯以 Translation/*.json（一國一檔）為準；
+// 這份僅需維持 TW/EN 可用即可（由 scripts 生成，勿手動大改）。
 import './i18n-engine.js';   // 確保 window.Liko.__Sys_i18n__ 存在（引擎自帶防重載）
 
 const FCM_FALLBACK = {
@@ -555,12 +552,13 @@ const FCM_FALLBACK = {
     "chatTranslateProvider": { TW: "翻譯服務", EN: "Translation Service" },
     "chatTranslateTarget": { TW: "目標語言", EN: "Target Language" },
     "chatTranslateTitle": { TW: "訊息翻譯", EN: "Message Translation" },
-  "chatProvMyMemory": { "TW": "MyMemory", "EN": "MyMemory" },
-  "chatProvLibre": { "TW": "LibreTranslate", "EN": "LibreTranslate" },
-  "chatProvCustom": { "TW": "自訂", "EN": "Custom" },
-  "chatProvDeepl": { "TW": "DeepL", "EN": "DeepL" },
-  "chatProvGoogle": { "TW": "Google 翻譯", "EN": "Google Translate" },
+    "chatProvMyMemory": { "TW": "MyMemory", "EN": "MyMemory" },
+    "chatProvLibre": { "TW": "LibreTranslate", "EN": "LibreTranslate" },
+    "chatProvCustom": { "TW": "自訂", "EN": "Custom" },
+    "chatProvDeepl": { "TW": "DeepL", "EN": "DeepL" },
+    "chatProvGoogle": { "TW": "Google 翻譯", "EN": "Google Translate" },
 };
+import { warnLimited } from '../core/logger.js';
 
 try { window.Liko?.__Sys_i18n__?.register('FCM', FCM_FALLBACK); }
-catch (e) { console.warn('🐈‍⬛ [FCM] fallback register 失敗:', e && e.message); }
+catch (e) { warnLimited('fallback register 失敗', e && e); }

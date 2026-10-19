@@ -8,11 +8,8 @@ import { showRoomJoinConfirm, roomInfoFromResult, makeIdCell } from '../chat/act
 import { makeAvEl, makeFavStar, makeRelEl, mkBtn, makeSearchWrap, makeSortSel, makeCountBar, paginate, makePageBar, buildMgmtBtns, buildPersonOps, _autoQueueVisible, refreshSnapshotsForList } from './panel-widgets.js';
 import { queryRoomInfo, getCachedRoomInfo, fetchRoomFull } from './panel-rooms-data.js';
 import { renderCurrent, refreshPanel, getRenderToken } from './panel-controller.js';
-// ════════════════════════════════════════
-//  FCM module: panel-friends.js  (split from panel.js)
-//  好友（個人關係）頁。searchQ / sortMode / filters 為本頁狀態；
-//  closePanel 透過 resetFriendsSearch 清空搜尋字串。
-// ════════════════════════════════════════
+// 好友（個人關係）頁。searchQ / sortMode / filters 為本頁狀態；
+// closePanel 透過 resetFriendsSearch 清空搜尋字串。
 
 const FRIENDS_PAGE_SIZE = 100;
 let searchQ = '', sortMode = 'fav', friendsPage = 0;
@@ -80,8 +77,8 @@ async function renderFriends(container, _myToken) {
 
     let friends = buildFriendList();
     if (searchQ.trim()) { const q = searchQ.trim();
-                         friends = friends.filter(f => matchesSearch(f.mn, q));
-                        }
+        friends = friends.filter(f => matchesSearch(f.mn, q));
+    }
     friends = friends.filter(applyFilters);
     switch (sortMode) {
         // 關係：關係 > 最愛 > ID
