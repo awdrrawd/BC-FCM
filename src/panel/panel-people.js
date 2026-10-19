@@ -10,12 +10,9 @@ import { wpsShareProfile } from '../chat/wps-share.js';
 import { getRenderToken } from './panel-controller.js';
 import { warnLimited } from '../core/logger.js';
 import { beginPanelView } from './panel-lifecycle.js';
-// ════════════════════════════════════════
-//  FCM module: panel-people.js  (split from panel.js)
-//  人員查詢頁（renderPeople）＋ Profile 匯出/匯入。
-//  _peopleQ / _peoplePage 為本頁狀態；外部（closePanel / 頁籤切換 / openPeopleSearch）
-//  透過 resetPeopleSearch / setPeopleQuery 存取。
-// ════════════════════════════════════════
+// 人員查詢頁（renderPeople）＋ Profile 匯出/匯入。
+// _peopleQ / _peoplePage 為本頁狀態；外部（closePanel / 頁籤切換 / openPeopleSearch）
+// 透過 resetPeopleSearch / setPeopleQuery 存取。
 
 const PEOPLE_PAGE_SIZE = 100;
 let _peopleQ = '';
@@ -74,8 +71,8 @@ async function renderPeople(container, _myToken) {
         const isNumId = /^\d+$/.test(numericQuery) && parseInt(numericQuery) > 0;
         const profileFields = profile => [profile.memberNumber, profile.name, profile.lastNick];
         let filtered = q
-        ? allProfiles.filter(profile => matchesSearchFields(profileFields(profile), q))
-        : allProfiles;
+            ? allProfiles.filter(profile => matchesSearchFields(profileFields(profile), q))
+            : allProfiles;
         // 相關性排序：BC ID 是依序分配的，兩個人的 ID 很可能剛好相近（例如搜「123」會連帶找到
         // 「3123」「12345」），因此把「最接近」的結果（完全相同 → 開頭相符 → 其餘）排到最前面，
         // 其餘結果維持原本（最近見面）的相對順序。
@@ -127,7 +124,7 @@ async function renderPeople(container, _myToken) {
         const show = page.items;
         countBar.textContent = q
             ? T('peopleTotal', totalFiltered, allProfiles.length)
-        : T('peopleTotal', Math.min(allProfiles.length, PEOPLE_PAGE_SIZE * (_peoplePage + 1)), allProfiles.length);
+            : T('peopleTotal', Math.min(allProfiles.length, PEOPLE_PAGE_SIZE * (_peoplePage + 1)), allProfiles.length);
         if (!show.length && !(isNumId && !allProfiles.find(p => p.memberNumber === parseInt(numericQuery)))) {
             if (!scroll.querySelector('.fcm-unknown-id-box')) {
                 const em = document.createElement('div'); em.className = 'fcm-empty'; em.textContent = T('peopleNoResults');
@@ -229,13 +226,13 @@ async function exportProfiles() {
         const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
         const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `bce-past-profiles-${ymd}.json`; a.click(); URL.revokeObjectURL(a.href);
         return data.profiles.length;
-    } catch(e) { console.error('🐈‍⬛ [FCM] export error:', e); return 0; }
+    } catch(e) { warnLimited('export error', e); return 0; }
 }
 
 async function importProfiles(file, options) {
     try {
         return await importProfileFile(file, options);
-    } catch(e) { console.error('🐈‍⬛ [FCM] import error:', e); throw e; }
+    } catch(e) { warnLimited('import error', e); throw e; }
 }
 
 export { renderPeople, exportProfiles, importProfiles, resetPeopleSearch, setPeopleQuery };

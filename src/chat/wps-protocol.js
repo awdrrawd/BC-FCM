@@ -1,17 +1,14 @@
-// ════════════════════════════════════════
-//  FCM module: wps-protocol.js
-//  PROFILESHARE 線路協定：編碼、分塊與「安全的接收組裝」。純邏輯，不碰 DOM 與 BC 全域。
+// PROFILESHARE 線路協定：編碼、分塊與「安全的接收組裝」。純邏輯，不碰 DOM 與 BC 全域。
 //
-//  線路格式與 Liko-WPS / LCE 互通，不可更動：
-//    Hidden 聊天訊息 Content = `[PROFILESHARE] <shareId> <i>/<n> <chunk>`（i 從 1 起算）
-//    所有 chunk 依序串接 = base64( UTF-8( JSON.stringify(payload) ) )
-//    payload = { sharedAt, from: { memberNumber, name }, profile: { memberNumber, name, lastNick, seen, characterBundle } }
-//  每塊大小只由送出端決定，接收端靠 i/n 重組。LCE 會依 BC 單則訊息上限送出最大 1800 字元的分塊，
-//  所以接收端必須接受到 2000 字元（舊版 FCM 只收 800，會靜默丟掉 LCE 的分享）。
+// 線路格式與 Liko-WPS / LCE 互通，不可更動：
+//   Hidden 聊天訊息 Content = `[PROFILESHARE] <shareId> <i>/<n> <chunk>`（i 從 1 起算）
+//   所有 chunk 依序串接 = base64( UTF-8( JSON.stringify(payload) ) )
+//   payload = { sharedAt, from: { memberNumber, name }, profile: { memberNumber, name, lastNick, seen, characterBundle } }
+// 每塊大小只由送出端決定，接收端靠 i/n 重組。LCE 會依 BC 單則訊息上限送出最大 1800 字元的分塊，
+// 所以接收端必須接受到 2000 字元（舊版 FCM 只收 800，會靜默丟掉 LCE 的分享）。
 //
-//  接收端的訊息來自房內任何人，一律視為不可信：嚴格解析、以「送出者 + shareId」為鍵、
-//  同時組裝數／每人組裝數／總字元數／存活時間皆有上限、組完後逐欄驗證。
-// ════════════════════════════════════════
+// 接收端的訊息來自房內任何人，一律視為不可信：嚴格解析、以「送出者 + shareId」為鍵、
+// 同時組裝數／每人組裝數／總字元數／存活時間皆有上限、組完後逐欄驗證。
 
 export const PROFILE_SHARE_PREFIX = '[PROFILESHARE]';
 

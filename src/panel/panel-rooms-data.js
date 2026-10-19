@@ -1,10 +1,7 @@
-// ════════════════════════════════════════
 
 import { warnLimited } from '../core/logger.js';
-//  FCM module: panel-rooms-data.js  (split from panel.js)
-//  房間搜尋 / 房間資訊快取。被「好友」與「房間搜尋」兩頁共用。
-//  _roomResults 由房間搜尋頁寫入，getCachedRoomInfo 會讀取，故以 getter/setter 共享。
-// ════════════════════════════════════════
+// 房間搜尋 / 房間資訊快取。被「好友」與「房間搜尋」兩頁共用。
+// _roomResults 由房間搜尋頁寫入，getCachedRoomInfo 會讀取，故以 getter/setter 共享。
 
 let _roomResults = [];
 const _roomCache = new Map();
@@ -41,7 +38,7 @@ async function doRoomSearch(query, zone) {
         if (!res || res.err || !res.value) return [];
         _cacheRooms(res.value);
         return res.value;
-    } catch(e) { console.warn('🐈‍⬛ [FCM] doRoomSearch:', e); return []; }
+    } catch(e) { warnLimited('doRoomSearch', e); return []; }
 }
 
 async function queryRoomInfo(roomName, space, onUpdate) {

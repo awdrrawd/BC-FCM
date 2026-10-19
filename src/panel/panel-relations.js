@@ -7,6 +7,7 @@ import { minimizePanel } from './panel-controller.js';
 import { T } from '../i18n/i18n.js';
 import { createRelationWorker } from '../data/relation-worker.js';
 import { beginPanelView } from './panel-lifecycle.js';
+import { warnLimited } from '../core/logger.js';
 
 let query = '', sidebarVisible = true;
 const CANVAS_LABEL_THRESHOLD = 200, LARGE_GRAPH_THRESHOLD = 1000;
@@ -349,7 +350,7 @@ export async function renderRelations(container, { openPeopleSearch, initialFocu
         select(graph.nodes[0], { highlight: false });
         fitGraph();
     }
-    const showError = error => { if (active() && error?.name !== 'AbortError') { status.textContent = T('graphError'); console.warn('[FCM] relation graph:', error); } };
+    const showError = error => { if (active() && error?.name !== 'AbortError') { status.textContent = T('graphError'); warnLimited('relation graph', error); } };
     function ensureService() {
         return service ||= createRelationWorker(ownSocialRelations(globalThis.Player));
     }

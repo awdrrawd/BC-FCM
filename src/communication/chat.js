@@ -105,7 +105,7 @@ const offlineDelivery = createOfflineDeliveryService({
             chatList.refreshVisible();
         }
     },
-    onError: error => console.warn('🐈‍⬛ [FCM] offline message delivery failed:', error),
+    onError: error => warnLimited('offline message delivery failed', error),
 });
 const chatSender = createChatSender({
     offlineQueue: OfflineQueue, isFriend: isFriendOf,

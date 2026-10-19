@@ -1,55 +1,51 @@
 import { cfg, THEME_DEFAULTS } from '../core/config.js';
 import { chatFontFamily } from '../communication/chat-font.js';
-// ════════════════════════════════════════
-//  FCM module: styles.js
-//  (split from Plugins/liko-FCM.user.js)
-// ════════════════════════════════════════
 
-    // ── 主題顏色覆蓋 ─────────────────────────────────────────────
-    //  由三個基色（面板底色 / 字體顏色 / 強調色）以 color-mix 推導出整套深淺色，
-    //  注入一份 id="fcm-theme" 的覆蓋樣式；三者皆為預設時移除覆蓋、保留原生配色。
-    //  ★ 語意化的關係／權限標籤與彩色按鈕（紅／綠／紫…）刻意不覆蓋，維持辨識度。
-    function applyTheme() {
-        const p = (cfg && cfg.panelColor)  || THEME_DEFAULTS.panelColor;
-        const t = (cfg && cfg.fontColor)   || THEME_DEFAULTS.fontColor;
-        const a = (cfg && cfg.accentColor) || THEME_DEFAULTS.accentColor;
-        let el = document.getElementById('fcm-theme');
-        if (!el) { el = document.createElement('style'); el.id = 'fcm-theme'; document.head.appendChild(el); }
-        const mix = (c1, pct, c2) => `color-mix(in srgb, ${c1} ${pct}%, ${c2})`;
-        const presetTokens = {
-            violet: ['#13101a','#322744','#2c2140','#2a2338','#9c93b8'],
-            eu: ['#1e2636','#262f44','#303a54','#2f3a52','#aab2c9'],
-            electronic: ['#10161d','#16202b','#17324a','#1c2a33','#6f8a99'],
-            jp: ['#efe8d8','#e6ddc8','#ded1b2','#d8cdb3','#7a7266'],
-            cn: ['#241a17','#2e211d','#3a2620','#4a332b','#b8a58f'],
-            silentblack: ['#121212','#1c1c1c','#262626','#232323','#7a7a7a'],
-            minimalwhite: ['#f2f2f2','#ececec','#e2e2e2','#e0e0e0','#8a8a8a'],
-        };
-        const preset = presetTokens[cfg?.themePreset];
-        const colorScheme = ['jp', 'minimalwhite'].includes(cfg?.themePreset) ? 'light' : 'dark';
-        const panel2     = preset?.[3] || mix(p, 88, '#000');
-        const panel1     = preset?.[0] || mix(p, 80, '#000');
-        const panelRaised = preset?.[1] || mix(p, 82, a);
-        const panelSelected = preset?.[2] || mix(p, 72, a);
-        const panelHead  = mix(p, 78, a);               // 帶強調色的表頭
-        const rowHover   = panelRaised;                 // 列 hover
-        const inputBg    = mix(p, 70, '#000');          // 輸入框底
-        const border     = preset?.[3] || mix(a, 55, '#000');
-        const borderSoft = mix(a, 40, p);               // 柔邊框
-        const textDim    = preset?.[4] || mix(t, 62, p);
-        const accentB    = mix(a, 72, '#fff');          // 亮強調（標題 / 選中分頁）
-        const hdrGrad    = mix(p, 84, a);               // 標題列漸層起點
-        // 卷軸滑軌底色：與 CHAT 面板的 --surface-alt 公式對齊（面板色與黑混合，不摻強調色），
-        //  讓兩套面板的卷軸看起來明度一致，而不是 FCM 這邊偏強調色調的另一種顏色。
-        const surfaceAlt = mix(p, 86, '#000');
-        const glow       = (px, pct) => `0 0 ${px}px color-mix(in srgb,${a} ${pct}%,transparent)`;
-        // 字體大小／字型與 CHAT 面板共用同一組設定（cfg.chatFontSize / cfg.chatFontFamily），
-        //  這樣兩邊看到的是「同一套」文字尺寸與字型，而不是各自寫死、各調各的。
-        const baseFontSize = Number(cfg.chatFontSize) || 13;
-        // 只主題化「純色」按鈕（查看／悄悄話／重新整理…）；語意化的彩色按鈕
-        //  （私訊藍／好友綠／黑單紅／幽靈紫／管理橘…）排除在外，保留辨識色。
-        const _plainBtn = ':not(.fcm-btn-red):not(.fcm-btn-green):not(.fcm-btn-purple):not(.fcm-btn-blue):not(.fcm-btn-orange)';
-        el.textContent = `
+// ── 主題顏色覆蓋 ─────────────────────────────────────────────
+//  由三個基色（面板底色 / 字體顏色 / 強調色）以 color-mix 推導出整套深淺色，
+//  注入一份 id="fcm-theme" 的覆蓋樣式；三者皆為預設時移除覆蓋、保留原生配色。
+//  ★ 語意化的關係／權限標籤與彩色按鈕（紅／綠／紫…）刻意不覆蓋，維持辨識度。
+function applyTheme() {
+    const p = (cfg && cfg.panelColor)  || THEME_DEFAULTS.panelColor;
+    const t = (cfg && cfg.fontColor)   || THEME_DEFAULTS.fontColor;
+    const a = (cfg && cfg.accentColor) || THEME_DEFAULTS.accentColor;
+    let el = document.getElementById('fcm-theme');
+    if (!el) { el = document.createElement('style'); el.id = 'fcm-theme'; document.head.appendChild(el); }
+    const mix = (c1, pct, c2) => `color-mix(in srgb, ${c1} ${pct}%, ${c2})`;
+    const presetTokens = {
+        violet: ['#13101a','#322744','#2c2140','#2a2338','#9c93b8'],
+        eu: ['#1e2636','#262f44','#303a54','#2f3a52','#aab2c9'],
+        electronic: ['#10161d','#16202b','#17324a','#1c2a33','#6f8a99'],
+        jp: ['#efe8d8','#e6ddc8','#ded1b2','#d8cdb3','#7a7266'],
+        cn: ['#241a17','#2e211d','#3a2620','#4a332b','#b8a58f'],
+        silentblack: ['#121212','#1c1c1c','#262626','#232323','#7a7a7a'],
+        minimalwhite: ['#f2f2f2','#ececec','#e2e2e2','#e0e0e0','#8a8a8a'],
+    };
+    const preset = presetTokens[cfg?.themePreset];
+    const colorScheme = ['jp', 'minimalwhite'].includes(cfg?.themePreset) ? 'light' : 'dark';
+    const panel2     = preset?.[3] || mix(p, 88, '#000');
+    const panel1     = preset?.[0] || mix(p, 80, '#000');
+    const panelRaised = preset?.[1] || mix(p, 82, a);
+    const panelSelected = preset?.[2] || mix(p, 72, a);
+    const panelHead  = mix(p, 78, a);               // 帶強調色的表頭
+    const rowHover   = panelRaised;                 // 列 hover
+    const inputBg    = mix(p, 70, '#000');          // 輸入框底
+    const border     = preset?.[3] || mix(a, 55, '#000');
+    const borderSoft = mix(a, 40, p);               // 柔邊框
+    const textDim    = preset?.[4] || mix(t, 62, p);
+    const accentB    = mix(a, 72, '#fff');          // 亮強調（標題 / 選中分頁）
+    const hdrGrad    = mix(p, 84, a);               // 標題列漸層起點
+    // 卷軸滑軌底色：與 CHAT 面板的 --surface-alt 公式對齊（面板色與黑混合，不摻強調色），
+    //  讓兩套面板的卷軸看起來明度一致，而不是 FCM 這邊偏強調色調的另一種顏色。
+    const surfaceAlt = mix(p, 86, '#000');
+    const glow       = (px, pct) => `0 0 ${px}px color-mix(in srgb,${a} ${pct}%,transparent)`;
+    // 字體大小／字型與 CHAT 面板共用同一組設定（cfg.chatFontSize / cfg.chatFontFamily），
+    //  這樣兩邊看到的是「同一套」文字尺寸與字型，而不是各自寫死、各調各的。
+    const baseFontSize = Number(cfg.chatFontSize) || 13;
+    // 只主題化「純色」按鈕（查看／悄悄話／重新整理…）；語意化的彩色按鈕
+    //  （私訊藍／好友綠／黑單紅／幽靈紫／管理橘…）排除在外，保留辨識色。
+    const _plainBtn = ':not(.fcm-btn-red):not(.fcm-btn-green):not(.fcm-btn-purple):not(.fcm-btn-blue):not(.fcm-btn-orange)';
+    el.textContent = `
 #fcm-panel{--ac:${a};--surface-alt:${surfaceAlt};--tx:${t};--dim:${textDim};background:${p}!important;border-color:${a}!important;color:${t}!important;}
 #fcm-panel,#fcm-panel *{font-family:${chatFontFamily()}!important;}
 /* 語言下拉需要保留「Twemoji Country Flags」萬國旗字體，不能被上面這條全域字型覆蓋掉；
@@ -157,13 +153,13 @@ import { chatFontFamily } from '../communication/chat-font.js';
 .fcm-tog:hover{border-color:${a}!important;background:color-mix(in srgb,${a} 14%,${panel1})!important;box-shadow:${glow(9,22)}!important;}
 .fcm-tog:hover .fcm-tog-dot{background:color-mix(in srgb,${a} 70%,${t})!important;}
 `;
-        window.dispatchEvent(new CustomEvent('fcm-theme-change'));
-    }
+    window.dispatchEvent(new CustomEvent('fcm-theme-change'));
+}
 
-    function injectStyles() {
-        if (document.getElementById('fcm-css')) return;
-        const s = document.createElement('style'); s.id = 'fcm-css';
-        s.textContent = `
+function injectStyles() {
+    if (document.getElementById('fcm-css')) return;
+    const s = document.createElement('style'); s.id = 'fcm-css';
+    s.textContent = `
 #fcm-panel,#fcm-panel *{box-sizing:border-box;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;}
 .fcm-overlay{position:fixed;inset:0;z-index:100001;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55)}
 .fcm-dialog{width:min(380px,88vw);padding:28px 24px;display:flex;flex-direction:column;gap:20px;background:#241840;color:#e8d0ff;border:2px solid #7060c0;border-radius:14px;box-shadow:0 8px 40px rgba(0,0,0,.8);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
@@ -391,8 +387,8 @@ import { chatFontFamily } from '../communication/chat-font.js';
 .fcm-chk-row label{color:#c4a0e0;font-size:13px;cursor:pointer;}
 .fcm-chk-row label.fcm-chk-disabled{color:#ff8080;}
         `;
-        document.head.appendChild(s);
-        applyTheme();   // 套用使用者主題顏色（若非預設）
-    }
+    document.head.appendChild(s);
+    applyTheme();   // 套用使用者主題顏色（若非預設）
+}
 
 export { injectStyles, applyTheme };

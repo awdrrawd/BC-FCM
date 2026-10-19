@@ -3,7 +3,7 @@ function profileHtml({ Player, cfg, T, TH, esc, avatarHtml, editIcon }) {
     const signature = mine.signature || Player?.OnlineSharedSettings?.LCData?.MessageSetting?.Signature || '';
     const nickname = Player?.Nickname || '';
     let canEditNickname = true;
-    try { canEditNickname = typeof globalThis.CharacterCanChangeNickname !== 'function' || globalThis.CharacterCanChangeNickname(Player); } catch {}
+    try { canEditNickname = typeof globalThis.CharacterCanChangeNickname !== 'function' || globalThis.CharacterCanChangeNickname(Player); } catch { /* capability check unavailable: nickname stays editable */ }
     return `<div class="fcm-chat-profile">
         <div class="fcm-chat-profile-overview">
             <div class="fcm-chat-profile-avatar-column">${avatarHtml(Player?.MemberNumber || 0, 88, 'profile')}<button class="fcm-chat-profile-snapshot" data-profile-snapshot>${TH('chatProfileSnapshot')}</button></div>

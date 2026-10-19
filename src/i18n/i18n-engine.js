@@ -260,8 +260,8 @@
         // 中文各種寫法歸一：zh / zh-TW / zh-Hant → TW；zh-CN / zh-Hans → CN
         if (code === 'ZH' || low.startsWith('zh')) {
             code = (low.includes('tw') || low.includes('hant')) ? 'TW'
-                 : (low.includes('cn') || low.includes('hans')) ? 'CN'
-                 : 'TW';
+                : (low.includes('cn') || low.includes('hans')) ? 'CN'
+                    : 'TW';
         } else if (code.includes('-')) {
             code = code.split('-')[0];
         }
@@ -275,7 +275,7 @@
 
     function detectLang() {
         let raw = '';
-        try { raw = (typeof localStorage !== 'undefined' && localStorage.getItem('BondageClubLanguage')) || ''; } catch {}
+        try { raw = (typeof localStorage !== 'undefined' && localStorage.getItem('BondageClubLanguage')) || ''; } catch { /* storage may be blocked; detectLang falls back to other sources */ }
         if (!raw && typeof TranslationLanguage !== 'undefined' && TranslationLanguage) raw = String(TranslationLanguage);
         if (!raw && typeof navigator !== 'undefined') raw = navigator.language || '';
         return normalizeLang(raw);
@@ -445,7 +445,7 @@
             const d = dict && dict.find(x => x && x.Tag === L10N_TAG && x.key);
             if (!d) return false;
             let arr = [];
-            try { const p = JSON.parse(d.data ?? '[]'); if (Array.isArray(p)) arr = p; } catch {}
+            try { const p = JSON.parse(d.data ?? '[]'); if (Array.isArray(p)) arr = p; } catch { /* malformed optional payload is treated as empty */ }
             const local = msg_tl(detectLang(), d.ns, d.key, ...arr);
             if (local == null) return false;
             const custom = dict.find(x => x && typeof x.Tag === 'string' && x.Tag.includes(CUSTOM_TAG));
@@ -467,7 +467,7 @@
                     { Tag: L10N_TAG, ns, key: String(key), data: JSON.stringify(args) },
                 ],
             });
-        } catch {}
+        } catch { /* best-effort local notice */ }
     }
 
     function msg_install(modApi) {

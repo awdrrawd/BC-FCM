@@ -1,16 +1,14 @@
 import { cfg } from '../core/config.js';
 import './i18n-engine.js';     // 執行共用引擎 IIFE：window.Liko.__Sys_i18n__ / __Sys_L10N__（自帶防重載）
 import './i18n-fallback.js';   // 內建後備字庫（TW+EN）同步註冊，離線／fetch 失敗時可用
-// ════════════════════════════════════════
-//  FCM module: i18n.js  （薄轉接層，不含引擎、不含完整文本）
-//  結構參考 BC-AFC：i18n-engine.js（共用引擎）＋ i18n-fallback.js（TW+EN 後備）＋ 一國一檔的
-//    Translation/<LANG>.json（純資料、載入至 FCM 命名空間、{0} 相容佔位）。
-//  介面字串走共用引擎 window.Liko.__Sys_i18n__；完整文本改為「執行期 fetch JSON」：
-//    翻譯者只需改 Translation/<LANG>.json，build 會複製到 public/ 部署，免動程式。
-//    載入前／離線時用內建後備（fallback）；fetch 到的完整字庫會覆蓋後備。
-// ════════════════════════════════════════
+// 結構參考 BC-AFC：i18n-engine.js（共用引擎）＋ i18n-fallback.js（TW+EN 後備）＋ 一國一檔的
+//   Translation/<LANG>.json（純資料、載入至 FCM 命名空間、{0} 相容佔位）。
+// 介面字串走共用引擎 window.Liko.__Sys_i18n__；完整文本改為「執行期 fetch JSON」：
+//   翻譯者只需改 Translation/<LANG>.json，build 會複製到 public/ 部署，免動程式。
+//   載入前／離線時用內建後備（fallback）；fetch 到的完整字庫會覆蓋後備。
 
 const I18N_NS = 'FCM';
+import { warnLimited } from '../core/logger.js';
 // 手動語言選單（auto + 各語系）；auto 依 BC TranslationLanguage
 const FCM_LANGS = ['auto', 'TW', 'CN', 'EN', 'JA', 'KO', 'DE', 'FR', 'ES', 'VI', 'RU', 'UA'];
 const FCM_LANG_NAMES = { auto: 'Auto', TW: '繁體中文', CN: '简体中文', EN: 'English', JA: '日本語', KO: '한국어', DE: 'Deutsch', FR: 'Français', ES: 'Español', VI: 'Tiếng Việt', RU: 'Русский', UA: 'Українська' };
@@ -37,7 +35,7 @@ async function ensureI18n() {
         const urlMap = {};
         for (const c of T_LANGS) urlMap[c] = assetUrl('Translation/' + c + '.json');
         await eng.ensure(I18N_NS, urlMap, fcmLang());
-    } catch (e) { console.warn('🐈‍⬛ [FCM] 翻譯載入失敗，改用內建後備:', e.message); }
+    } catch (e) { warnLimited('翻譯載入失敗，改用內建後備', e); }
 }
 
 // Settings can switch language after startup. Load that language before the
@@ -51,7 +49,7 @@ async function ensureLang(lang) {
         const urlMap = {};
         for (const c of T_LANGS) urlMap[c] = assetUrl('Translation/' + c + '.json');
         await eng.ensure(I18N_NS, urlMap, code);
-    } catch (e) { console.warn('🐈‍⬛ [FCM] 語系載入失敗:', e.message); }
+    } catch (e) { warnLimited('語系載入失敗', e); }
 }
 
 // BC 遊戲語系碼 → 檔案碼：中文各寫法歸 TW；BC 的國家碼 JP/KR → ISO 639-1 語言碼 JA/KO

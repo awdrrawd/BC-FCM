@@ -10,12 +10,9 @@ import { wpsShareProfile } from '../chat/wps-share.js';
 import { renderRoomOrder } from './panel-room-order.js';
 import { disposePanelView } from './panel-lifecycle.js';
 import { getRenderToken } from './panel-controller.js';
-// ════════════════════════════════════════
-//  FCM module: panel-room.js  (split from panel.js)
-//  房間管理頁（房內人員／玩家排序／管理員／白名單／黑名單）。
-//  roomSubTab / roomSearchQ / roomSortMode 為本頁狀態；closePanel 透過
-//  resetRoomAdminSearch 清空搜尋字串。renderRoom 以自身遞迴重繪，不需 renderCurrent。
-// ════════════════════════════════════════
+// 房間管理頁（房內人員／玩家排序／管理員／白名單／黑名單）。
+// roomSubTab / roomSearchQ / roomSortMode 為本頁狀態；closePanel 透過
+// resetRoomAdminSearch 清空搜尋字串。renderRoom 以自身遞迴重繪，不需 renderCurrent。
 
 let roomSubTab = 'members';
 let roomSearchQ = '', roomSortMode = 'name';
@@ -63,7 +60,7 @@ async function renderRoom(container) {
             if (token !== getRenderToken()) return;
             const ns = container.querySelector('.fcm-room-search');
             const na = container.querySelector('.fcm-add-btn');
-            if (ns) { ns.focus(); try { ns.setSelectionRange(pos, pos); } catch {} }
+            if (ns) { ns.focus(); try { ns.setSelectionRange(pos, pos); } catch { /* selection range is a cosmetic nicety */ } }
             if (na) na.disabled = !(canAddHere && isNumericQ(roomSearchQ));
         }, 400);
     }, 'fcm-room-search');
