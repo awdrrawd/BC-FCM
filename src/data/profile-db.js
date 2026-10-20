@@ -3,6 +3,7 @@ import { T } from '../i18n/i18n.js';
 import { inRoomFn } from './data.js';
 import { profileCache as _pc } from './profile-cache.js';
 import { warnLimited } from '../core/logger.js';
+import { openVersionless } from './idb-open.js';
 
 function normalizeProfile(profile, allowNameOnly) {
     const memberNumber = Number(profile?.memberNumber);
@@ -37,29 +38,24 @@ const PDB = {
     async init() {
         if (this.db) return true;
         if (this.opening) return this.opening;
-        this.opening = new Promise(res => {
-            try {
-                // Shared with WCE/LCE: omit the version to retain the existing DB version.
-                // Never raise it without explicit user direction; discuss schema changes first,
-                // since a higher version breaks plugins that still request an older version.
-                // Liko.LCE.profileDatabase exposes compatibility metadata, not upgrade authority.
-                const req = indexedDB.open('bce-past-profiles');
-                req.onsuccess = () => {
-                    const db = req.result;
-                    if (!db.objectStoreNames.contains('profiles')) { db.close(); res(false); return; }
-                    this.db = db;
-                    db.onversionchange = () => {
-                        db.close();
-                        if (this.db === db) this.db = null;
-                        for (const key of Object.keys(_pc)) delete _pc[key];
-                        // Reopen without a version after yielding to the pending upgrade.
-                        setTimeout(() => { void this.init(); }, 0);
-                    };
-                    res(true);
-                };
-                req.onerror = () => res(false);
-                req.onupgradeneeded = e => { const db = e.target.result; if (!db.objectStoreNames.contains('profiles')) db.createObjectStore('profiles', { keyPath: 'memberNumber' }); };
-            } catch (error) { warnLimited('profile database open failed', error); res(false); }
+        // Shared with WCE/LCE: the version is never requested (see openVersionless).
+        // Never raise it without explicit user direction; discuss schema changes first,
+        // since a higher version breaks plugins that still request an older version.
+        // Liko.LCE.profileDatabase exposes compatibility metadata, not upgrade authority.
+        this.opening = openVersionless('bce-past-profiles', {
+            upgrade: db => { if (!db.objectStoreNames.contains('profiles')) db.createObjectStore('profiles', { keyPath: 'memberNumber' }); },
+            onLost: db => {
+                if (this.db !== db) return;
+                this.db = null;
+                for (const key of Object.keys(_pc)) delete _pc[key];
+                // Reopen without a version after yielding to the pending upgrade.
+                setTimeout(() => { void this.init(); }, 0);
+            },
+        }).then(db => {
+            if (!db) return false;
+            if (!db.objectStoreNames.contains('profiles')) { db.close(); return false; }
+            this.db = db;
+            return true;
         });
         try { return await this.opening; }
         finally { this.opening = null; }
@@ -265,26 +261,31 @@ const Snapshot = {
     db: null,
     _cache: {},
     _records: {},
+    opening: null,
     async init() {
-        return new Promise(res => {
-            try {
-                // Do not force-upgrade the shared avatar DB. Existing v1/v2 databases
-                // both keep the same `avatars` store and record key.
-                const req = indexedDB.open('fcm-snapshot');
-                req.onupgradeneeded = e => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains('avatars')) {
-                        db.createObjectStore('avatars', { keyPath: 'memberNumber' });
-                    }
-                };
-                req.onsuccess = () => { this.db = req.result; res(true); };
-                req.onerror = () => res(false);
-            } catch (error) { warnLimited('avatar database open failed', error); res(false); }
+        if (this.db) return true;
+        if (this.opening) return this.opening;
+        // Do not force-upgrade the shared avatar DB. Existing v1/v2 databases
+        // both keep the same `avatars` store and record key.
+        this.opening = openVersionless('fcm-snapshot', {
+            upgrade: db => { if (!db.objectStoreNames.contains('avatars')) db.createObjectStore('avatars', { keyPath: 'memberNumber' }); },
+            onLost: db => {
+                if (this.db !== db) return;
+                this.db = null;
+                // Reopen after yielding to the pending upgrade; readers also reopen lazily.
+                setTimeout(() => { void this.init(); }, 0);
+            },
+        }).then(db => {
+            if (!db) return false;
+            this.db = db;
+            return true;
         });
+        try { return await this.opening; }
+        finally { this.opening = null; }
     },
     async save(mn, data, meta = {}) {
         mn = parseInt(mn);
-        if (!this.db || !data) return;
+        if (!data || !await this.init()) return;
         let blob = data;
         if (typeof data === 'string') {
             try { blob = await (await fetch(data)).blob(); } catch (error) { warnLimited('avatar data conversion failed', error); return; }
@@ -308,7 +309,9 @@ const Snapshot = {
     getRecord(mn) {
         mn = parseInt(mn);
         if (this._records[mn] !== undefined) return Promise.resolve(this._records[mn]);
-        if (!this.db) { this._records[mn] = null; return Promise.resolve(null); }
+        return this.init().then(ready => ready ? this._readRecord(mn) : (this._records[mn] = null));
+    },
+    _readRecord(mn) {
         return new Promise(res => {
             try {
                 const req = this.db.transaction('avatars', 'readonly').objectStore('avatars').get(mn);
@@ -326,7 +329,12 @@ const Snapshot = {
                     res(r);
                 };
                 req.onerror = () => { this._records[mn] = null; res(null); };
-            } catch (error) { warnLimited('avatar cache read failed', error); this._records[mn] = null; res(null); }
+            } catch (error) {
+                warnLimited('avatar cache read failed', error);
+                // A connection closed by a pending upgrade is transient: don't remember it as "no avatar".
+                if (error?.name !== 'InvalidStateError') this._records[mn] = null;
+                res(null);
+            }
         });
     },
     get(mn) {
@@ -351,7 +359,7 @@ const Snapshot = {
         this._retireUrl(url);
         delete this._cache[mn];
         delete this._records[mn];
-        if (!this.db) return;
+        if (!await this.init()) return;
         return new Promise(res => {
             try {
                 const req = this.db.transaction('avatars', 'readwrite').objectStore('avatars').delete(mn);
@@ -363,7 +371,7 @@ const Snapshot = {
         Object.values(this._cache).forEach(url => this._retireUrl(url));
         Object.keys(this._cache).forEach(k => delete this._cache[k]);
         Object.keys(this._records).forEach(k => delete this._records[k]);
-        if (!this.db) return;
+        if (!await this.init()) return;
         return new Promise(res => {
             try {
                 const req = this.db.transaction('avatars', 'readwrite').objectStore('avatars').clear();

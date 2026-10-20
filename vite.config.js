@@ -18,7 +18,9 @@ export default defineConfig({
       input: 'src/main.js',
       output: {
         entryFileNames: 'assets/[name].js',
-        chunkFileNames: 'assets/[name].js',
+        // main.js imports ./app.js by name, so app.js keeps a stable file name. Split-off tab chunks are
+        // content-hashed: a new app.js can then never load an older cached chunk (or the reverse).
+        chunkFileNames: chunk => (chunk.name === 'app' ? 'assets/app.js' : 'assets/[name]-[hash].js'),
         assetFileNames: 'assets/[name].[ext]',
       },
     },

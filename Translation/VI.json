@@ -546,6 +546,7 @@
   "graphBusy": "Loading relationship graph…",
   "graphNames": "Hiện tên",
   "panelLoading": "Đang tải dữ liệu…",
+  "panelPageLoadFailed": "Không thể tải trang này. Kiểm tra kết nối rồi chuyển tab để thử lại.",
     "mergeWhispers": "Tích hợp lời thì thầm",
     "mergeWhispersNote": "Mặc định bật. Khi tắt, FCM CHAT chỉ xử lý BEEP và ẩn lời thì thầm, thông báo liên quan cùng các nút kênh bên trái ô nhập."
 }

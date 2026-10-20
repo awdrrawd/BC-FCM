@@ -546,6 +546,7 @@
   "graphBusy": "Loading relationship graph…",
   "graphNames": "Afficher les noms",
   "panelLoading": "Chargement des données…",
+  "panelPageLoadFailed": "Impossible de charger cette page. Vérifiez votre connexion puis changez d’onglet pour réessayer.",
     "mergeWhispers": "Intégrer les chuchotements",
     "mergeWhispersNote": "Activé par défaut. Sinon, FCM CHAT traite uniquement les BEEP et masque les chuchotements, leurs notifications et les boutons de canal à côté du champ de saisie."
 }

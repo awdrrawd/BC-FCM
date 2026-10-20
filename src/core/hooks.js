@@ -128,6 +128,13 @@ function registerHooks() {
         if (data?.Query === 'OnlineFriends') notifyPanelChange('presence');
         return r;
     });
+    // Replaces the old 2-second language poll: BC changes language only here.
+    modApi.hookFunction('TranslationSwitchLanguage', 0, (args, next) => {
+        const result = next(args);
+        window.Liko?.__Sys_i18n__?.refreshLanguage?.();   // optional: an older engine that won the load race still polls
+        return result;
+    });
+
     // BC's ChatRoomSync is async (it awaits CommonSetScreen). Await it so the room
     // state, screen and ChatRoomCharacter are ready before FCM reads them; otherwise
     // the one-time intro hint is consumed while ChatRoomSendLocal is still a no-op.

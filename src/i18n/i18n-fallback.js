@@ -35,6 +35,7 @@ const FCM_FALLBACK = {
     "graphCenter": { TW: "中心人物", EN: "Center person" },
     "graphDepthReached": { TW: "目前資料最多連接到 {0} 層", EN: "Available data reaches {0} hop(s)" },
     "panelLoading": { TW: "正在讀取資料…", EN: "Loading data…" },
+    "panelPageLoadFailed": { TW: "無法載入此頁面。請檢查網路連線後重新切換頁籤。", EN: "Could not load this page. Check your connection and switch tabs to retry." },
     "graphNames": { TW: "顯示名稱", EN: "Show names" },
     "graphSelf": { TW: "以我為中心", EN: "Center on me" },
     "graphRefresh": { TW: "重新讀取", EN: "Reload data" },

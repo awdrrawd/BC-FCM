@@ -546,6 +546,7 @@
   "graphBusy": "Loading relationship graph…",
   "graphNames": "Mostrar nombres",
   "panelLoading": "Cargando datos…",
+  "panelPageLoadFailed": "No se pudo cargar esta página. Revisa tu conexión y cambia de pestaña para reintentar.",
     "mergeWhispers": "Integrar susurros",
     "mergeWhispersNote": "Activado por defecto. Al desactivarlo, FCM CHAT solo procesa BEEP y oculta los susurros, sus notificaciones y los botones de canal junto al campo de texto."
 }

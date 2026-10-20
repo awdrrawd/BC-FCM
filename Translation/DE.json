@@ -546,6 +546,7 @@
   "graphBusy": "Loading relationship graph…",
   "graphNames": "Namen anzeigen",
   "panelLoading": "Daten werden geladen…",
+  "panelPageLoadFailed": "Diese Seite konnte nicht geladen werden. Prüfe deine Verbindung und wechsle den Tab erneut.",
     "mergeWhispers": "Flüstern integrieren",
     "mergeWhispersNote": "Standardmäßig aktiviert. Deaktiviert verarbeitet FCM CHAT nur BEEPs und blendet Flüstern, zugehörige Benachrichtigungen und die Kanaltasten neben dem Eingabefeld aus."
 }
