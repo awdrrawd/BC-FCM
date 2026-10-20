@@ -1,0 +1,10 @@
+#!/bin/sh
+set -eu
+cd "$(git rev-parse --show-toplevel)"
+echo "FCM: validating project and linting before commit..."
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        MSYS2_ARG_CONV_EXCL='*' MSYS_NO_PATHCONV=1 cmd.exe /d /s /c "npm.cmd run check:quick"
+        ;;
+    *) npm run check:quick ;;
+esac
