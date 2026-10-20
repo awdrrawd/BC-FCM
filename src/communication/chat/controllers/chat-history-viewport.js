@@ -30,6 +30,39 @@ function createChatHistoryViewportController({ getRoot, getMemberNumber, convers
         });
     }
 
+    function bindJoinButtons(scope) {
+        scope.querySelectorAll('[data-join-room]').forEach(button => button.addEventListener('click', () => {
+            if (button.dataset.joinRoom) joinRoom({ room: button.dataset.joinRoom });
+        }));
+    }
+
+    // Renders only the rows that are not in the DOM yet (everything before the first
+    // message currently shown) and prepends them, instead of rebuilding and rebinding
+    // the whole history for every page. Returns false when the DOM and the model do not
+    // line up, so the caller can fall back to a full render.
+    function prependOlder(log, messages) {
+        const first = log.querySelector(':scope > .fcm-chat-message');
+        const index = first ? messages.findIndex(message => String(message.id) === first.dataset.msgId) : -1;
+        if (index < 0) return false;
+        // Rows were merged somewhere other than the top: only a full render shows them.
+        if (log.querySelectorAll(':scope > .fcm-chat-message').length !== messages.length - index) return false;
+        if (index === 0) return true;   // nothing new to show
+        const batch = document.createElement('div');
+        batch.innerHTML = renderMessages(messages.slice(0, index));
+        const lastOlder = [...batch.querySelectorAll(':scope > .fcm-chat-message')].pop();
+        const leading = log.firstElementChild;
+        // The new batch carries its own separator for a day it shares with the old top.
+        if (leading?.classList.contains('fcm-chat-date-separator') && leading.dataset.messageDate === lastOlder?.dataset.messageDate) leading.remove();
+        const added = [...batch.childNodes];
+        log.prepend(...added);
+        // Bind after insertion (external media plugins expect attached elements), but only on the new nodes.
+        const scope = { querySelectorAll: selector => added.flatMap(node => node.nodeType === 1
+            ? [...(node.matches(selector) ? [node] : []), ...node.querySelectorAll(selector)] : []) };
+        bindImages(scope, log);
+        bindJoinButtons(scope);
+        return true;
+    }
+
     async function loadOlder(log) {
         const memberNumber = Number(getMemberNumber());
         if (!memberNumber) return;
@@ -37,12 +70,12 @@ function createChatHistoryViewportController({ getRoot, getMemberNumber, convers
         const oldTop = log.scrollTop;
         const loaded = await conversation.loadOlder(store, memberNumber, target => Number(getMemberNumber()) === target);
         if (!loaded || !log.isConnected) return;
-        log.innerHTML = renderMessages(conversation.messages);
-        bindImages(log, log);
+        if (!prependOlder(log, conversation.messages)) {
+            log.innerHTML = renderMessages(conversation.messages);
+            bindImages(log, log);
+            bindJoinButtons(log);
+        }
         syncSelection();
-        log.querySelectorAll('[data-join-room]').forEach(button => button.addEventListener('click', () => {
-            if (button.dataset.joinRoom) joinRoom({ room: button.dataset.joinRoom });
-        }));
         log.scrollTop = oldTop + (log.scrollHeight - oldHeight);
         updateDateBubble(log);
     }

@@ -6,9 +6,12 @@ async function openProfileDatabase(page) {
     await page.goto('/tests/browser/fixture.html');
     // Exercise the real module against native IndexedDB, replacing only game dependencies.
     const source = readFileSync('src/data/profile-db.js', 'utf8').replace(/^import .*;\r?\n/gm, '');
+    // profile-db.js opens its databases through the shared helper, so the helper is inlined as well.
+    const idbOpen = readFileSync('src/data/idb-open.js', 'utf8').replace(/^import .*;\r?\n/gm, '').replace(/^export \{[^}]*\};\r?\n/gm, '');
     await page.addScriptTag({ type: 'module', content: `
         const cfg = {}, T = key => key, inRoomFn = () => false, _pc = {};
         const warnLimited = () => {};
+        ${idbOpen}
         ${source}
         globalThis.profileImport = { PDB, cache: _pc };
     ` });

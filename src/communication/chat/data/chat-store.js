@@ -1,5 +1,6 @@
 import { CHAT_RECENT_CONTACTS, CHAT_HISTORY_MESSAGES, CHAT_HISTORY_AGE } from './chat-retention.js';
 import { warnLimited } from '../../../core/logger.js';
+import { openVersionless } from '../../../data/idb-open.js';
 
 const DB_NAME = 'fcm-chat';
 // Do not pass a version here. This database may be opened by other plugins;
@@ -47,27 +48,17 @@ const ChatStore = {
     async init() {
         if (this.db) return true;
         if (this.opening) return this.opening;
-        this.opening = new Promise(resolve => {
-            try {
-                const req = indexedDB.open(DB_NAME);
-                req.onupgradeneeded = e => {
-                    const db = e.target.result;
-                    if (!db.objectStoreNames.contains('messages')) {
-                        const store = db.createObjectStore('messages', { keyPath: 'id' });
-                        store.createIndex('memberNumber', 'memberNumber');
-                        store.createIndex('timestamp', 'timestamp');
-                    }
-                };
-                req.onsuccess = () => {
-                    const db = req.result;
-                    this.db = db;
-                    const release = () => { if (this.db === db) this.db = null; };
-                    db.onversionchange = () => { db.close(); release(); };
-                    db.onclose = release;
-                    resolve(true);
-                };
-                req.onerror = () => { warnLimited('chat database open failed', req.error); resolve(false); };
-            } catch (error) { warnLimited('chat database open failed', error); resolve(false); }
+        this.opening = openVersionless(DB_NAME, {
+            upgrade: db => {
+                if (db.objectStoreNames.contains('messages')) return;
+                const store = db.createObjectStore('messages', { keyPath: 'id' });
+                store.createIndex('memberNumber', 'memberNumber');
+                store.createIndex('timestamp', 'timestamp');
+            },
+            onLost: db => { if (this.db === db) this.db = null; },   // reopened lazily by the next read/write
+        }).then(db => {
+            this.db = db;
+            return !!db;
         });
         try { return await this.opening; } finally { this.opening = null; }
     },
@@ -233,13 +224,18 @@ const ChatStore = {
 
 const AudioStore = {
     db: null,
+    opening: null,
     async init() {
         if (this.db) return true;
-        return new Promise(resolve => {
-            const req = indexedDB.open('fcm-chat-audio');
-            req.onupgradeneeded = event => { const db = event.target.result; if (!db.objectStoreNames.contains('sounds')) db.createObjectStore('sounds', { keyPath: 'id' }); };
-            req.onsuccess = () => { this.db = req.result; resolve(true); }; req.onerror = () => resolve(false);
+        if (this.opening) return this.opening;
+        this.opening = openVersionless('fcm-chat-audio', {
+            upgrade: db => { if (!db.objectStoreNames.contains('sounds')) db.createObjectStore('sounds', { keyPath: 'id' }); },
+            onLost: db => { if (this.db === db) this.db = null; },
+        }).then(db => {
+            this.db = db;
+            return !!db;
         });
+        try { return await this.opening; } finally { this.opening = null; }
     },
     async save(file) {
         if (!await this.init()) return false;

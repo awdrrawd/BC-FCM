@@ -283,14 +283,21 @@
 
     const _languageListeners = new Set();
     let _lastDetectedLang = detectLang();
-    setInterval(() => {
+    // Event-driven instead of polling: BC changes language only through
+    // TranslationSwitchLanguage (same tab, hooked by plugins that call refreshLanguage)
+    // or another tab (storage event); focus/visibility catches anything else cheaply.
+    function refreshLanguage() {
         const next = detectLang();
-        if (next === _lastDetectedLang) return;
+        if (next === _lastDetectedLang) return false;
         _lastDetectedLang = next;
         for (const listener of _languageListeners) {
             try { listener(next); } catch (e) { console.warn('[Liko i18n] language listener failed:', e); }
         }
-    }, 2000);
+        return true;
+    }
+    window.addEventListener('storage', event => { if (!event.key || event.key === 'BondageClubLanguage') refreshLanguage(); });
+    window.addEventListener('focus', refreshLanguage);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) refreshLanguage(); });
     function onChange(listener) {
         if (typeof listener !== 'function') return () => {};
         _languageListeners.add(listener);
@@ -414,6 +421,7 @@
         capabilities: Object.freeze({ json: true, script: true, onChange: true, normalizeLang: true, dynamicLanguages: true }),
         officialLanguages: OFFICIAL_LANGUAGES,
         detectLang,
+        refreshLanguage,   // additive: lets a plugin report a language switch immediately
         normalizeLang,
         onChange,
         register: (ns, strings) => _register('ui', ns, strings),

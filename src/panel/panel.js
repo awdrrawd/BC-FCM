@@ -3,16 +3,13 @@ import { panelTabs, tabPreferences } from '../data/panel-tabs.js';
 import { T, TH } from '../i18n/i18n.js';
 import { injectStyles } from './styles.js';
 import { _removeWhisperAvatar } from '../chat/chat-fx.js';
-import { renderHelp } from './panel-help.js';
 import { renderPeople, resetPeopleSearch, setPeopleQuery } from './panel-people.js';
-import { renderRelations } from './panel-relations.js';
 import { createPanelMaximizeButton, syncPanelMaximize } from './panel-maximize.js';
-import { renderSettings } from './panel-settings.js';
 import { renderFriends, resetFriendsSearch } from './panel-friends.js';
 import { renderRoom, resetRoomAdminSearch } from './panel-room.js';
 import { updatePanelView, disposePanelView } from './panel-lifecycle.js';
 import { createPanelRefresh, panelSnapshot } from './panel-refresh.js';
-import { renderRoomSearch, resetRoomSearchQuery } from './panel-roomsearch.js';
+import { showPanelLoading } from './panel-loading.js';
 import { installDragScroll } from '../ui/drag-scroll.js';
 import { setPanelController } from './panel-controller.js';
 import { requestOnlineFriends, onlineFriends, buildFriendList, inRoomFn } from '../data/data.js';
@@ -95,6 +92,22 @@ function buildPanel() {
     document.addEventListener('mouseup', () => { if (md.on) { mini.style.transition = ''; if (!md.moved) restorePanel(); } md.on = false; });
 }
 
+// Rarely opened tabs are separate chunks, fetched on first use (a failed fetch is retried on the next visit).
+const lazyTabs = {
+    relations: () => import('./panel-relations.js'),
+    roomSearch: () => import('./panel-roomsearch.js'),
+    help: () => import('./panel-help.js'),
+    settings: () => import('./panel-settings.js'),
+};
+const lazyTabLoads = {};
+const lazyTabModules = {};
+function loadLazyTab(name) {
+    return (lazyTabLoads[name] ??= lazyTabs[name]().then(module => (lazyTabModules[name] = module)).catch(error => {
+        delete lazyTabLoads[name];
+        throw error;
+    }));
+}
+
 // RENDER
 function renderCurrent() {
     if (!panelEl || !panelOpen || panelMini) return;
@@ -112,14 +125,36 @@ function renderCurrent() {
     const scrollEl = content.querySelector('.fcm-scroll');
     const savedScroll = scrollEl ? scrollEl.scrollTop : 0;
     const _myToken = ++_renderToken;
+    // Already-loaded tabs render synchronously, exactly like before. The first visit shows
+    // the loading indicator, then renders only if the user has not switched tabs meanwhile.
+    const renderLazyTab = (name, render) => {
+        const loaded = lazyTabModules[name];
+        if (loaded) return Promise.resolve(render(loaded));
+        content.replaceChildren();
+        const done = showPanelLoading(content);
+        return loadLazyTab(name).then(module => {
+            done();
+            if (_myToken === _renderToken) return render(module);
+        }, error => {
+            done();
+            warnLimited(`panel tab ${name} failed to load`, error);
+            if (_myToken === _renderToken) {
+                const notice = document.createElement('div');
+                notice.className = 'fcm-page-loading';
+                notice.setAttribute('role', 'alert');
+                notice.textContent = T('panelPageLoadFailed');
+                content.replaceChildren(notice);
+            }
+        });
+    };
     let p;
     if (uiTab === 'friends') p = renderFriends(content, _myToken);
     else if (uiTab === 'people') p = renderPeople(content, _myToken);
-    else if (uiTab === 'relations') p = renderRelations(content, { openPeopleSearch });
+    else if (uiTab === 'relations') p = renderLazyTab('relations', module => module.renderRelations(content, { openPeopleSearch }));
     else if (uiTab === 'room') p = renderRoom(content);
-    else if (uiTab === 'roomSearch') p = Promise.resolve(renderRoomSearch(content));
-    else if (uiTab === 'help') p = Promise.resolve(renderHelp(content));
-    else p = Promise.resolve(renderSettings(content));
+    else if (uiTab === 'roomSearch') p = renderLazyTab('roomSearch', module => module.renderRoomSearch(content));
+    else if (uiTab === 'help') p = renderLazyTab('help', module => module.renderHelp(content));
+    else p = renderLazyTab('settings', module => module.renderSettings(content));
     (p || Promise.resolve()).then(() => {
         if (_myToken !== _renderToken) return;
         if (savedScroll > 0) { const ns = content.querySelector('.fcm-scroll'); if (ns) ns.scrollTop = savedScroll; }
@@ -196,7 +231,7 @@ function closePanel() {
     panelOpen = false; panelMini = false;
     // 關閉時一併清空所有搜尋欄位狀態
     resetPeopleSearch();
-    resetFriendsSearch(); resetRoomAdminSearch(); resetRoomSearchQuery();
+    resetFriendsSearch(); resetRoomAdminSearch(); lazyTabModules.roomSearch?.resetRoomSearchQuery();
     _removeWhisperAvatar();
     document.getElementById('fcm-beep-overlay')?.remove();
     document.getElementById('fcm-confirm-overlay')?.remove();

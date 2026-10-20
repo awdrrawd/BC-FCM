@@ -81,3 +81,21 @@ npm run test:browser
 - [LianChat 相容性](./lianchat-compatibility.md)
 
 本輪不變更上述協定、公開 API 或資料庫 schema；FCM 仍不指定 PROFILES 開庫版本。
+
+## IndexedDB access
+
+All four databases (`bce-past-profiles`, `fcm-snapshot`, `fcm-chat`, `fcm-chat-audio`) are opened through
+`src/data/idb-open.js` (`openVersionless`). Rules it enforces for every store:
+
+- The version is never requested, so FCM cannot cause an upgrade that breaks other plugins sharing a database.
+- Stores are created only when the database does not exist yet (`onupgradeneeded` at version 1). To add a
+  store or index later, create a new database rather than raising the version of an existing one.
+- On `versionchange` the connection is closed immediately so another plugin's upgrade is never blocked; owners
+  drop their handle and reopen lazily (`init()` is idempotent and shared by concurrent callers).
+- An open that stays queued behind someone else's blocked upgrade resolves to `null` after 15 s instead of hanging.
+
+## Lazy panel tabs
+
+Settings, Relations, Room search and Help are separate chunks fetched on first visit (`lazyTabs` in
+`src/panel/panel.js`). Chunk names are content-hashed; `app.js` keeps a fixed name because `main.js` imports it.
+A failed fetch shows a retryable notice and is retried on the next visit.
