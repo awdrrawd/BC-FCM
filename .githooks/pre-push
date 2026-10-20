@@ -1,0 +1,24 @@
+#!/bin/sh
+set -eu
+cd "$(git rev-parse --show-toplevel)"
+# A deletion-only push has no new code to validate.
+has_updates=false
+while read -r local_ref local_oid remote_ref remote_oid; do
+    case "$local_oid" in
+        *[!0]*) has_updates=true ;;
+    esac
+done
+if [ "$has_updates" = false ]; then
+    exit 0
+fi
+echo "FCM: running all checks before push..."
+if [ -z "${FCM_TEST_CHANNEL:-}" ]; then
+    FCM_TEST_CHANNEL=$(git config --get fcm.testChannel || true)
+    export FCM_TEST_CHANNEL
+fi
+case "$(uname -s)" in
+    MINGW*|MSYS*|CYGWIN*)
+        MSYS2_ARG_CONV_EXCL='*' MSYS_NO_PATHCONV=1 cmd.exe /d /s /c "npm.cmd run check:all"
+        ;;
+    *) npm run check:all ;;
+esac

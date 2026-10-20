@@ -14,6 +14,7 @@ A BondageClub UserScript plugin for managing friends, rooms, profiles, and more.
 
 - [FCM 架構與擴充指南](docs/architecture.md)
 - [互動式功能分支圖](docs/fcm-architecture.html)
+- [開發自動化與本機 Git hooks](docs/automation.md)
 
 ---
 

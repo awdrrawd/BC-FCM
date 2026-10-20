@@ -74,3 +74,7 @@ Codex 排程附在目前任務，預定台北時間每週一 10:00。檢查 BC�
 | shell-quote | 1.8.4 | 1.9.0 |
 
 使用 `npm ci` 重現 lockfile，使用 `npm audit` 重新查詢目前公告。瀏覽器測試可驗證模擬同步與 UI，不代表真實 BC 伺服器相容性已驗證。
+
+## 提交與推送前檢查
+
+本機 Git hooks 的啟用、驗證與停用方式見 [Git hooks 設定](git-hooks.md)。
