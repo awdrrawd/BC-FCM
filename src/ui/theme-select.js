@@ -137,7 +137,7 @@ function openMenu(control) {
         const options = focusable();
         if (!options.length) return;
         const current = options.indexOf(document.activeElement);
-        let next = current;
+        let next;
         if (event.key === 'ArrowDown') next = (current + 1) % options.length;
         else if (event.key === 'ArrowUp') next = (current - 1 + options.length) % options.length;
         else if (event.key === 'Home') next = 0;

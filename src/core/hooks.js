@@ -61,11 +61,11 @@ function _measureRelRegion(text, X, Y, Width) {
     if (!m) return null;
     const mn = parseInt(m[1]);
     if (!mn) return null;
-    let w = 0, drawText = text;
+    let w = 0;
     try {
         if (typeof DrawingGetTextSize === 'function' && typeof CommonGetFont === 'function' && typeof MainCanvas !== 'undefined' && MainCanvas) {
             const res = DrawingGetTextSize(text, Width);
-            drawText = res[0];
+            const drawText = res[0];
             const prev = MainCanvas.font;
             MainCanvas.font = CommonGetFont(String(res[1]));
             w = MainCanvas.measureText(drawText).width;

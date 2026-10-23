@@ -541,11 +541,10 @@ async function loadAvatarFromBundle(mn, profile) {
     if (!profile?.characterBundle) return null;
     if (inRoomFn(mn)) return null;
     let C = null;
-    let existedBefore = false;
     try {
         const data = JSON.parse(profile.characterBundle);
         if (typeof CharacterLoadOnline !== 'function') return null;
-        existedBefore = Array.isArray(Character) && Character.some(character =>
+        const existedBefore = Array.isArray(Character) && Character.some(character =>
             String(character?.CharacterID) === String(data.ID) || Number(character?.MemberNumber) === mn);
         C = CharacterLoadOnline(data, mn);
         if (!C) return null;
