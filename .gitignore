@@ -11,3 +11,5 @@ public/
 playwright-report/
 test-results/
 .DS_Store
+# 本機 check:bc 用的 BC 原始碼（可選）
+BondageClub/

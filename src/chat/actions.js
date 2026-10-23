@@ -431,7 +431,7 @@ function handleIncomingRoomShare(data) {
         const log = document.getElementById('TextAreaChatLog');
         let msgEl = null;
         if (log) {
-            const nodes = log.querySelectorAll(`.ChatMessageAction[data-sender="${data.Sender}"]`);
+            const nodes = log.querySelectorAll(`.ChatMessageAction[data-sender="${Number(data.Sender) || 0}"]`);
             for (let i = nodes.length - 1; i >= 0; i--) { if (nodes[i].dataset.fcmRoomshare !== '1') { msgEl = nodes[i]; break; } }
         }
         if (msgEl) {
@@ -454,7 +454,7 @@ function handleIncomingRoomShare(data) {
             msgEl.appendChild(_buildRoomShareCard(info));
         } else {
             // 退回：找不到訊息元素（例如沙盒環境）→ 疊一張獨立卡片
-            const uiId = 'fcm-roomjoin-' + data.Sender + '-' + Date.now().toString(36);
+            const uiId = 'fcm-roomjoin-' + (Number(data.Sender) || 0) + '-' + Date.now().toString(36);
             const el = _appendChatCard(uiId); if (!el) return;
             el.appendChild(_buildRoomShareCard(info));
         }
