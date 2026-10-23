@@ -29,7 +29,7 @@ Git 環境誤用需要 Bash 的 npm shell script。安裝 Node.js 後，若 Desk
 
 本機 hooks 檢查目前整個工作目錄，不是暫存區或每個待推送 commit 的快照。
 部分暫存提交及推送其他分支時，以 GitHub 對該 commit 的 CI 結果為準。
-建置可能更新已追蹤的 `dist/assets`；請在提交前檢視變更並依發布流程納入。
+`dist/` 不納入版本控制：發布用的 `main.js`、`app.js` 由 CI 建置後部署到 GitHub Pages，本機建置的結果不需也不應提交。
 只刪除遠端分支的推送不執行本機驗證。
 
 可隨時手動執行：
