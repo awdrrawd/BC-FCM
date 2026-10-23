@@ -1,5 +1,4 @@
 import { PDB } from '../data/profile-db.js';
-import { cfg } from '../core/config.js';
 import { T, TH } from '../i18n/i18n.js';
 import { warnLimited } from '../core/logger.js';
 import { markSeen } from '../data/profile-seen.js';
@@ -149,9 +148,8 @@ function wpsHandleMessage(data) {
         if (typeof ChatRoomSendLocal === 'function') {
             ChatRoomSendLocal(T('shareRecvMsg', escapeHtml(fromName), `${openToken} ${escapeHtml(displayName)} (${p.memberNumber})`, seenText), 0);
         }
-        // 只在有啟用儲存（saveMode !== 'off'）時才寫入 DB；未開 Profiles 者仍可透過
-        // 記憶體快取＋「開啟」按鈕檢視分享內容，但不落地儲存。
-        if (cfg.saveMode !== 'off') void PDB.receiveShared(p);
+        // 收到就保存（與 LCE、獨立 WPS 一致），不必點「開啟」；只有比本機新的才會覆蓋。
+        void PDB.receiveShared(p);
     } catch (e) { warnLimited('WPS parse error', e); }
     return true;
 }
@@ -186,8 +184,8 @@ function wpsProcessOpenTokens(element) {
                     markSeen(C, p);
                     InformationSheetLoadCharacter(C);
                 } catch (error) { warnLimited('WPS shared profile open failed', error); }
-                // 檢視恆可（資料已在分享時完整送達、存於記憶體）；僅在啟用儲存時才落地寫入 DB
-                if (cfg.saveMode !== 'off') void PDB.receiveShared(p);
+                // 檢視的是分享當下的資料（記憶體快取），不受本機資料更新影響；收到時已保存，這裡再呼叫無害。
+                void PDB.receiveShared(p);
             });
         });
     }

@@ -228,6 +228,13 @@ test('shared profiles only commit newer valid bundles and refresh the cache', as
     assert.equal(PDB.db.records.get(7).seen, 124);
 });
 
+test('shared profiles never store an observation time in the future', async () => {
+    PDB.db = database([old]);
+    const future = Date.now() + 10 * 24 * 3600 * 1000;
+    assert.equal(await PDB.receiveShared({ ...old, seen: future }), true);
+    assert.ok(PDB.db.records.get(7).seen <= Date.now(), 'a future time must not block later genuine updates');
+});
+
 test('backup merge keeps newer observations, adds unseen IDs and handles duplicate IDs across batches', async () => {
     PDB.db = database([{ ...old, seen: 200 }]);
     const profiles = [

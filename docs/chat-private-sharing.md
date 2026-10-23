@@ -34,3 +34,14 @@ framework is introduced.
 
 Verification: node --test scripts/chat-private.test.mjs scripts/chat-regression.test.mjs
 Real two-account network interoperability still requires game testing.
+
+## 與 PROFILESHARE、LCE、獨立 WPS 的一致性
+
+私聊分享、房內 PROFILESHARE（FCM、LCE、獨立 WPS）只是傳輸方式不同，分享機制一致：
+
+1. 資料以文字分成多段送出，接收端合併還原。
+2. 收到就保存，不必點開；FCM 的 PROFILESHARE 與私聊分享都不受「儲存模式」影響。
+3. 只保存比本機新的（`seen` 較大）；相同或較舊的不保存。檢視分享時永遠顯示分享當下的資料（PROFILESHARE 用接收時的記憶體快取，私聊用該則訊息保存的快照），不會因為本機資料更新而改變。
+4. 寫入前 `seen` 一律不晚於現在（`PDB.receiveShared` 單一入口），與 LCE、獨立 WPS 相同。
+
+兩者仍保留各自的存活時間：PROFILESHARE 為 60 秒，私聊為 2 分鐘（需等待後續配對的文字訊息）。

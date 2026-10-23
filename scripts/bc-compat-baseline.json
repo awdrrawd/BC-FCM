@@ -1,0 +1,90 @@
+{
+  "gameVersion": "R133",
+  "commit": "0444daadce251b9529e1eaff1ccdde4f3bfea710",
+  "functions": {
+    "ChatRoomClick": {
+      "hash": "938A8D24",
+      "file": "Screens/Online/ChatRoom/ChatRoom.js"
+    },
+    "ChatRoomLeave": {
+      "hash": "D43FC635",
+      "file": "Screens/Online/ChatRoom/ChatRoom.js"
+    },
+    "ChatRoomMessage": {
+      "hash": "42605304",
+      "file": "Screens/Online/ChatRoom/ChatRoom.js"
+    },
+    "ChatRoomMessageDisplay": {
+      "hash": "98AEE505",
+      "file": "Screens/Online/ChatRoom/ChatRoom.js"
+    },
+    "ChatRoomSync": {
+      "hash": "DAEBD74D",
+      "file": "Screens/Online/ChatRoom/ChatRoom.js"
+    },
+    "ChatRoomSyncMemberJoin": {
+      "hash": "2A9CB40B",
+      "file": "Screens/Online/ChatRoom/ChatRoom.js"
+    },
+    "ChatRoomSyncMemberLeave": {
+      "hash": "546FCD39",
+      "file": "Screens/Online/ChatRoom/ChatRoom.js"
+    },
+    "ChatRoomSyncReorderPlayers": {
+      "hash": "26BC0667",
+      "file": "Screens/Online/ChatRoom/ChatRoom.js"
+    },
+    "ChatRoomSyncRoomProperties": {
+      "hash": "0BBD5F99",
+      "file": "Screens/Online/ChatRoom/ChatRoom.js"
+    },
+    "ChatRoomSyncSingle": {
+      "hash": "E5456B3F",
+      "file": "Screens/Online/ChatRoom/ChatRoom.js"
+    },
+    "DrawCharacter": {
+      "hash": "2CD2CA5F",
+      "file": "Scripts/Drawing.js"
+    },
+    "DrawProcess": {
+      "hash": "91C96D27",
+      "file": "Scripts/Drawing.js"
+    },
+    "DrawTextFit": {
+      "hash": "F9A1B11E",
+      "file": "Scripts/Drawing.js"
+    },
+    "InformationSheetClick": {
+      "hash": "A220F4FA",
+      "file": "Screens/Character/InformationSheet/InformationSheet.js"
+    },
+    "InformationSheetRun": {
+      "hash": "F33DBCA5",
+      "file": "Screens/Character/InformationSheet/InformationSheet.js"
+    },
+    "MainHallClick": {
+      "hash": "4B5BCAEE",
+      "file": "Screens/Room/MainHall/MainHall.js"
+    },
+    "MainHallRun": {
+      "hash": "DC0A55D5",
+      "file": "Screens/Room/MainHall/MainHall.js"
+    },
+    "ServerAccountBeep": {
+      "hash": "D1B35DC1",
+      "file": "Scripts/Server.js"
+    },
+    "ServerAccountQueryResult": {
+      "hash": "FE032740",
+      "file": "Scripts/Server.js"
+    },
+    "ServerSend": {
+      "hash": "A9337991",
+      "file": "Scripts/Server.js"
+    },
+    "TranslationSwitchLanguage": {
+      "hash": "C3CDB3D8",
+      "file": "Scripts/Translation.js"
+    }
+  }
+}

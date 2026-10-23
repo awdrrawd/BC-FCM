@@ -19,7 +19,7 @@ function normalizeProfile(profile, allowNameOnly) {
         return {
             memberNumber, name: bundle?.Name || profile.name || '',
             lastNick: bundle?.Nickname || profile.lastNick || bundle?.Name || profile.name || '',
-            seen: profile.seen, ...(bundle ? { characterBundle: profile.characterBundle } : {}),
+            seen: Math.min(profile.seen, Date.now()), ...(bundle ? { characterBundle: profile.characterBundle } : {}),
         };
     } catch { return null; }
 }
