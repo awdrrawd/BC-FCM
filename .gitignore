@@ -1,10 +1,6 @@
 node_modules/
-# 只追蹤可供 Loader 直接載入的發布本體；其他 build 產物仍忽略。
-dist/*
-!dist/assets/
-dist/assets/*
-!dist/assets/main.js
-!dist/assets/app.js
+# dist/ 全部由 CI 建置並部署到 GitHub Pages（Loader 載入的是 Pages 上的檔案），不納入版本控制。
+dist/
 # public/ 由 scripts/copy-assets.mjs 於 build 前從 Translation/ 產生
 public/
 *.log
