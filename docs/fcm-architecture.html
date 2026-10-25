@@ -143,7 +143,7 @@ footer{padding:26px;text-align:center;color:var(--muted);font-size:13px;border-t
   <nav class="side" id="nav" aria-label="功能分支"></nav>
   <main id="main"></main>
 </div>
-<footer>功能資料位於本檔 <code>features</code> 陣列；<code>npm run validate:project</code> 會檢查每個檔案路徑是否存在。完整說明見 <a href="architecture.md">architecture.md</a></footer>
+<footer>功能資料位於本檔 <code>features</code> 陣列；<code>npm run validate:project</code> 會檢查每個檔案路徑是否存在。完整說明見 <a href="https://github.com/awdrrawd/BC-FCM/blob/main/docs/architecture.md">architecture.md</a></footer>
 <div class="toast" id="toast" role="status"></div>
 
 <script>
@@ -181,6 +181,7 @@ const $=(s,r=document)=>r.querySelector(s);
 const el=(t,c,x)=>{const n=document.createElement(t);if(c)n.className=c;if(x!=null)n.textContent=x;return n};
 const nav=$('#nav'),main=$('#main'),q=$('#q');
 const state={view:'overview',query:''};
+const REPO='https://github.com/awdrrawd/BC-FCM/blob/main/';
 const pathOf=file=>file.startsWith('../')?file.slice(3):'src/'+file;
 const layerOf=files=>{
   const p=pathOf(files.split(',')[0]);
@@ -247,7 +248,7 @@ function renderFeature(){
     const cp=el('button','copy','複製');cp.type='button';cp.title='複製此群組的檔案路徑';cp.addEventListener('click',()=>copy(b[2].split(',').map(pathOf).join('\n')));t.append(cp);
     br.append(t,el('p',null,b[1]));
     const files=el('div','files');
-    for(const file of b[2].split(',')){const a=el('a','file',pathOf(file));a.href='../'+pathOf(file);a.title='開啟檔案';files.append(a)}
+    for(const file of b[2].split(',')){const a=el('a','file',pathOf(file));a.href=REPO+pathOf(file);a.title='開啟檔案';files.append(a)}
     row.append(br,files);rows.append(row);
   }
   bundle.append(rows);tree.append(bundle);
