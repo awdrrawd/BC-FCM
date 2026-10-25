@@ -71,7 +71,7 @@ function makeAvEl(mn, snapshotUrl) {
     return el;
 }
 
-// ── 關注星號：點擊切換 cfg.favorites；onToggle 供呼叫端重排（可略） ──
+// ── 置頂星號：點擊切換 cfg.favorites；onToggle 供呼叫端重排（可略） ──
 function makeFavStar(mn, onToggle) {
     mn = parseInt(mn);
     const s = document.createElement('span');

@@ -15,7 +15,7 @@ function createChatListPresenter({ getMessages, getFriendRows, getPlayerMemberNu
     function contactRows(rows, { history = false } = {}) {
         return contactRowsHtml(rows, {
             history, selectedMember: getSelectedMember(), justOpenedMember: getJustOpenedMember(), avatarHtml,
-            displayName, biography, cleanMessage, esc, text,
+            displayName, biography, cleanMessage, esc, text, isPinned: isFavorite,
         });
     }
 
@@ -39,7 +39,7 @@ function createChatListPresenter({ getMessages, getFriendRows, getPlayerMemberNu
             isFavorite, groups: config.chatGroups, memberGroups: config.chatMemberGroups, text,
         });
         const group = selectedGroupDefinition(definitions, state.groupMode, state.selectedGroup);
-        return { definitions, group, rows: filterGroupRows(group, state.groupSearch, displayName, biography) };
+        return { definitions, group, rows: filterGroupRows(group, state.groupSearch, displayName, biography, isFavorite) };
     }
 
     function viewHtml(view = getState().activeView) {

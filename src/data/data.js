@@ -235,7 +235,7 @@ function _getWhisperTargetMN() {
     } catch (error) { warnLimited('whisper target resolution failed', error); }
     return null;
 }
-// ── 最愛（個人關係頁星號）：存於 cfg.favorites，隨 cfg 一併持久化 ──
+// ── 置頂（FCM 星號／Chat 右鍵共用）：存於 cfg.favorites，隨 cfg 一併持久化 ──
 function isFav(mn) { return (cfg.favorites || []).includes(parseInt(mn)); }
 function toggleFav(mn) {
     mn = parseInt(mn);

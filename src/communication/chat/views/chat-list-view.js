@@ -1,16 +1,24 @@
 import { searchHtml } from './chat-search-view.js';
 
-function contactRowsHtml(rows, { history = false, selectedMember, justOpenedMember, avatarHtml, displayName, biography, cleanMessage, esc, text }) {
-    return rows.map(row => {
+function contactRowsHtml(rows, { history = false, selectedMember, justOpenedMember, avatarHtml, displayName, biography, cleanMessage, esc, text, isPinned }) {
+    // Pinned members are sorted to the front by the data layer; the divider is a full-width
+    // grid item, so it ends the pinned block in both the single-column and merged (grid) layouts.
+    const pinnedOf = row => !history && typeof isPinned === 'function' && isPinned(Number(row.memberNumber));
+    let lastPinned = -1;
+    rows.forEach((row, index) => { if (pinnedOf(row)) lastPinned = index; });
+    // Everyone pinned: nothing follows the pinned block, so no divider.
+    if (lastPinned === rows.length - 1) lastPinned = -1;
+    return rows.map((row, index) => {
         const memberNumber = Number(row.memberNumber);
         const direction = row.direction === 'out' ? text('chatSent') : text('chatReceived');
         const subtitle = history ? `${direction}: ${cleanMessage(row.content)}` : biography(memberNumber);
-        return `<button class="fcm-chat-row ${selectedMember === memberNumber ? 'selected' : ''} ${justOpenedMember === memberNumber ? 'just-opened' : ''}" data-member="${memberNumber}">
+        const pinned = pinnedOf(row);
+        return `<button class="fcm-chat-row ${selectedMember === memberNumber ? 'selected' : ''} ${justOpenedMember === memberNumber ? 'just-opened' : ''} ${pinned ? 'pinned' : ''}" data-member="${memberNumber}">
             ${avatarHtml(memberNumber)}
             <span class="fcm-chat-row-meta"><b>${esc(displayName(memberNumber))}</b><small>${esc(subtitle)}</small></span>
             ${history || row.timestamp ? `<time>${row.timestamp ? new Date(row.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}</time>` : ''}
             ${row.unread ? `<em>${row.unread}</em>` : ''}
-        </button>`;
+        </button>${index === lastPinned ? '<div class="fcm-chat-pin-divider" role="separator" aria-hidden="true"></div>' : ''}`;
     }).join('');
 }
 
