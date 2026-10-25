@@ -1,5 +1,6 @@
 export { createChatBalloonController } from './chat-balloon.js';
 export { createChatComposer } from './chat-composer.js';
+export { createChatDrafts } from './chat-drafts.js';
 export { createChatContactCardController } from './chat-contact-card.js';
 export { ChatConversationController } from './chat-conversation-controller.js';
 export { createChatConversationEvents } from './chat-conversation-events.js';
@@ -12,6 +13,7 @@ export { createChatLifecycle } from './chat-lifecycle.js';
 export { createChatListController } from './chat-list-controller.js';
 export { createChatListNavigation } from './chat-list-navigation.js';
 export { createChatMemberSelection } from './chat-member-selection.js';
+export { createChatMemberMenu } from './chat-member-menu.js';
 export { createChatMessageAppender } from './chat-message-appender.js';
 export { createChatMessageImagesController } from './chat-message-images.js';
 export { createChatMessageSelectionController } from './chat-message-selection.js';

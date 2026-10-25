@@ -185,6 +185,27 @@ const ChatStore = {
             } catch (error) { warnLimited('chat read state update failed', error); resolve(false); }
         });
     },
+    // Removes the given message ids for the current account only (this device's local history).
+    async deleteMessages(ids) {
+        const targets = [...new Set((ids || []).map(String))];
+        if (!targets.length) return true;
+        if (!this.db) await this.init();
+        if (!this.db) return false;
+        const ownerMemberNumber = accountNumber();
+        if (!ownerMemberNumber) return false;
+        return new Promise(resolve => {
+            try {
+                const tx = this.db.transaction('messages', 'readwrite');
+                const store = tx.objectStore('messages');
+                for (const id of targets) {
+                    const req = store.get(id);
+                    req.onsuccess = () => { if (req.result && Number(req.result.ownerMemberNumber) === ownerMemberNumber) store.delete(id); };
+                }
+                tx.oncomplete = () => resolve(true);
+                tx.onerror = () => { warnLimited('chat message deletion failed', tx.error); resolve(false); };
+            } catch (error) { warnLimited('chat message deletion failed', error); resolve(false); }
+        });
+    },
     async deleteMember(memberNumber) {
         if (!this.db) await this.init();
         if (!this.db) return false;

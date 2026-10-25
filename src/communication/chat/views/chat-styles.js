@@ -96,6 +96,8 @@ body>.fcm-chat-user-balloon.dragging,body>.fcm-chat-user-balloon.release-water,b
 .fcm-chat-message:not(.selected):hover .fcm-chat-message-reply{opacity:0;visibility:hidden;pointer-events:none}
 .fcm-chat-message.emote .fcm-chat-content{font-style:italic}.fcm-chat-message.ooc .fcm-chat-content{font-style:normal;opacity:.92}.fcm-chat-message.emote .fcm-chat-content,.fcm-chat-message.ooc .fcm-chat-content{white-space:pre-wrap}
 .fcm-chat-tools-menu button{color:var(--tx)}.fcm-chat-tools-menu button:hover{background:color-mix(in srgb,var(--ac) 18%,transparent);color:var(--ac)}
+.fcm-chat-member-menu button:disabled{opacity:.45;cursor:default}.fcm-chat-member-menu button:disabled:hover{background:transparent;color:var(--tx)}.fcm-chat-member-groups{margin:2px 0 4px 8px;padding-left:6px;border-left:1px solid var(--border);max-height:150px;overflow:auto}.fcm-chat-member-groups[hidden]{display:none}
+.fcm-chat-multi-actions [hidden]{display:none!important}.fcm-chat-multi-note{color:var(--dim);font-size:11.5px;line-height:1.35}.fcm-chat-multi-actions button.danger{color:#ff6b6b;border-color:#ff6b6b}.fcm-chat-multi-actions button.danger:hover:not(:disabled){color:#fff;background:#d64545;border-color:#d64545}
 .fcm-chat-pin-divider{grid-column:1/-1;flex:none;width:100%;height:0;margin:2px 0;border:0;border-bottom:.5pt solid var(--ac);pointer-events:none}
 `;
 

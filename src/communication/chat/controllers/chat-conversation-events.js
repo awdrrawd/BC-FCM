@@ -1,7 +1,7 @@
 import { bindMediaComposer } from './chat-media.js';
 import { T } from '../../../i18n/i18n.js';
 
-function createChatConversationEvents({ getRoot, getMemberNumber, config, saveConfig, closeStackedDetail, composer, historyViewport, forwardTargets, selectedActions, messageSelection, bindMessageActions, replyController, profileSuggestion, conversationActions, roomActions, showRoomJoin, getCachedRoomInfo, contactCard, promptGroupName, createGroup, rerender }) {
+function createChatConversationEvents({ getRoot, getMemberNumber, config, saveConfig, closeStackedDetail, composer, historyViewport, forwardTargets, selectedActions, messageSelection, bindMessageActions, replyController, profileSuggestion, conversationActions, roomActions, drafts = { bindInput() {}, restore() {} }, showRoomJoin, getCachedRoomInfo, contactCard, promptGroupName, createGroup, rerender }) {
     function openHeaderRoom(element) {
         if (!element?.dataset.roomName) return;
         const cached = getCachedRoomInfo(element.dataset.roomName);
@@ -39,12 +39,15 @@ function createChatConversationEvents({ getRoot, getMemberNumber, config, saveCo
         main.querySelector('[data-multi-forward-contact]')?.addEventListener('click', forwardTargets.show);
         main.querySelector('[data-multi-forward-room]')?.addEventListener('click', selectedActions.forwardToRoom);
         main.querySelectorAll('[data-multi-export]').forEach(button => button.addEventListener('click', () => selectedActions.exportMessages(button.dataset.multiExport)));
-        main.querySelector('[data-multi-cancel]')?.addEventListener('click', messageSelection.exit);
+        main.querySelector('[data-multi-delete]')?.addEventListener('click', selectedActions.deleteMessages);
+        main.querySelectorAll('[data-multi-cancel]').forEach(button => button.addEventListener('click', messageSelection.exit));
         if (messageSelection.isActive()) messageSelection.updateUi();
         bindMessageActions();
         main.querySelector('[data-cancel-reply]')?.addEventListener('click', replyController.clear);
         main.querySelector('[data-input]')?.addEventListener('keydown', composer.handleKeydown);
         main.querySelector('[data-input]')?.addEventListener('input', profileSuggestion.update);
+        drafts.bindInput(main.querySelector('[data-input]'));
+        drafts.restore();
         main.querySelector('[data-delete]')?.addEventListener('click', conversationActions.deleteCurrent);
         main.querySelectorAll('[data-export]').forEach(button => button.addEventListener('click', () => conversationActions.exportCurrent(button.dataset.export)));
         main.querySelector('[data-invite]')?.addEventListener('click', roomActions.inviteCurrent);

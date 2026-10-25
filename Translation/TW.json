@@ -389,7 +389,6 @@
   "chatMinimize": "縮小",
   "chatNewGroup": "新增自訂群組…",
   "chatNewUnread": "你有 {0} 則新訊息未讀",
-  "chatMultiSelect": "多選",
   "chatSelectedCount": "已選取 {0} 則訊息",
   "chatForwardContact": "轉傳其他人",
   "chatFriends": "好友",
@@ -521,5 +520,12 @@
   "mergeWhispers": "合併悄悄話功能",
   "mergeWhispersNote": "預設開啟。停用後 FCM CHAT 只處理 BEEP，不顯示或通知悄悄話，並隱藏輸入框左側的頻道切換按鈕。",
   "chatPin": "置頂",
-  "chatUnpin": "取消置頂"
+  "chatUnpin": "取消置頂",
+  "chatGoRoom": "前往房間",
+  "chatGoRoomLoading": "取得房名中…",
+  "chatGoRoomUnknown": "無法取得對方房名",
+  "chatExportMessages": "匯出信息",
+  "chatDeleteMessages": "刪除信息",
+  "chatDeleteMessagesNote": "刪除只對自己有效，對方仍可以看到被刪除信息",
+  "chatConfirmDeleteMessages": "確定刪除選取的 {0} 則信息？此操作無法復原。"
 }

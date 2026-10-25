@@ -13,7 +13,7 @@ test.beforeEach(async ({ page }) => {
         globalThis.Liko = { MAT: { translate() {} } };
         const root = document.createElement('div'); root.id = 'fcm-chat-root';
         const messages = ['first', 'second', 'third'].map((content, id) => messageHtml({ id: String(id), content, timestamp: 1, direction: 'in', channel: 'beep' })).join('');
-        root.innerHTML = `<div id="fcm-chat-panel" style="--s:#17131e;--tx:#eee;--ac:#a078e8"><div class="fcm-chat-main"><header class="fcm-chat-conversation-header" style="height:55px;flex:none">Contact</header><div class="fcm-chat-messages" style="padding-top:180px">${messages}</div><textarea data-input></textarea></div><div class="fcm-chat-context-menu" hidden>${['select', 'copy', 'multi', 'reply', 'translate', 'cancel'].map(action => `<button data-context-${action}>${action}</button>`).join('')}</div></div>`;
+        root.innerHTML = `<div id="fcm-chat-panel" style="--s:#17131e;--tx:#eee;--ac:#a078e8"><div class="fcm-chat-main"><header class="fcm-chat-conversation-header" style="height:55px;flex:none">Contact</header><div class="fcm-chat-messages" style="padding-top:180px">${messages}</div><textarea data-input></textarea></div><div class="fcm-chat-context-menu" hidden>${['select', 'copy', 'multi', 'delete', 'reply', 'translate', 'cancel'].map(action => `<button data-context-${action}>${action}</button>`).join('')}</div></div>`;
         document.body.append(root);
         globalThis.translationRequests = [];
         const controller = createChatTranslationController({

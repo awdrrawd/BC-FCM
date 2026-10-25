@@ -389,7 +389,6 @@
   "chatMinimize": "Minimizar",
   "chatNewGroup": "Nuevo grupo…",
   "chatNewUnread": "Tienes {0} mensajes nuevos sin leer",
-  "chatMultiSelect": "Selección múltiple",
   "chatSelectedCount": "{0} mensajes seleccionados",
   "chatForwardContact": "Reenviar a un contacto",
   "chatFriends": "Amigos",
@@ -521,5 +520,12 @@
   "mergeWhispers": "Integrar susurros",
   "mergeWhispersNote": "Activado por defecto. Al desactivarlo, FCM CHAT solo procesa BEEP y oculta los susurros, sus notificaciones y los botones de canal junto al campo de texto.",
   "chatPin": "Fijar",
-  "chatUnpin": "Desfijar"
+  "chatUnpin": "Desfijar",
+  "chatGoRoom": "Ir a la sala",
+  "chatGoRoomLoading": "Obteniendo el nombre de la sala…",
+  "chatGoRoomUnknown": "Nombre de sala no disponible",
+  "chatExportMessages": "Exportar mensajes",
+  "chatDeleteMessages": "Eliminar mensajes",
+  "chatDeleteMessagesNote": "Eliminar solo te afecta a ti; la otra persona sigue viendo los mensajes eliminados",
+  "chatConfirmDeleteMessages": "¿Eliminar los {0} mensajes seleccionados? Esta acción no se puede deshacer."
 }

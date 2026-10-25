@@ -1,6 +1,6 @@
 import { forEachForwardedMessage, forwardedMessageText } from '../data/chat-selection.js';
 
-function createChatSelectedActions({ selection, getPlayer, getConversationMemberNumber, displayName, cleanContent, capability, isFriend, sender, getRoom, sendRoomMessage, exportConversation, biography, avatarUrl, chatColors }) {
+function createChatSelectedActions({ selection, getPlayer, getConversationMemberNumber, displayName, cleanContent, capability, isFriend, sender, getRoom, sendRoomMessage, exportConversation, biography, avatarUrl, chatColors, confirm = async () => true, text = key => key, chatStore, offlineQueue, removeMessages = () => {}, afterDelete = () => {} }) {
     function format(message) {
         return forwardedMessageText(message, {
             player: getPlayer(), conversationMemberNumber: getConversationMemberNumber(), displayName, cleanContent,
@@ -33,7 +33,22 @@ function createChatSelectedActions({ selection, getPlayer, getConversationMember
         });
     }
 
-    return { exportMessages, forwardTo, forwardToRoom };
+    // Local-only deletion: the other side keeps their copy.
+    async function deleteMessages() {
+        const records = selection.records();
+        if (!records.length) return false;
+        if (!await confirm(text('chatConfirmDeleteMessages', records.length))) return false;
+        const ids = records.map(message => String(message.id));
+        if (!await chatStore.deleteMessages(ids)) return false;
+        const queueIds = records.map(message => message.queueId).filter(Boolean);
+        if (queueIds.length) offlineQueue?.remove(queueIds);
+        removeMessages(new Set(ids));
+        selection.exit();
+        afterDelete();
+        return true;
+    }
+
+    return { deleteMessages, exportMessages, forwardTo, forwardToRoom };
 }
 
 export { createChatSelectedActions };

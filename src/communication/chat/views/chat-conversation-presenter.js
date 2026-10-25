@@ -2,7 +2,7 @@ import { roomHeaderText } from '../services/chat-room-header.js';
 import { contactCardHtml, conversationHtml } from './chat-conversation-view.js';
 import { conversationMessagesHtml } from './chat-message-view.js';
 
-function createChatConversationPresenter({ getMemberNumber, getConfig, getRoom, getRoomCharacters, getCachedRoomInfo, capability, roomState, isFriend, inRoom, avatarHtml, displayName, biography, hasSavedProfile, isContactCardOpen, getMessages, getUnread, isMultiSelect, getReplyTarget, getSelectedCount, text }) {
+function createChatConversationPresenter({ getMemberNumber, getConfig, getRoom, getRoomCharacters, getCachedRoomInfo, capability, roomState, isFriend, inRoom, avatarHtml, displayName, biography, hasSavedProfile, isContactCardOpen, getMessages, getUnread, isMultiSelect, getSelectMode = () => 'export', getReplyTarget, getSelectedCount, text }) {
     function renderContactCard() {
         const memberNumber = Number(getMemberNumber());
         return contactCardHtml({
@@ -28,7 +28,7 @@ function createChatConversationPresenter({ getMemberNumber, getConfig, getRoom, 
             roomText, roomName: roomInfo?.name || '', canOpenRoom,
             canSummon: !!getRoom() && online && !inRoom(memberNumber), groups: Object.entries(config.chatGroups || {}),
             contactCardHtml: isContactCardOpen() ? renderContactCard() : '', messagesHtml: conversationMessagesHtml(getMessages()),
-            mergeWhispers: config.mergeWhispers !== false, canWhisper: inRoom(memberNumber), unread: getUnread(), multiSelect: isMultiSelect(), available, online,
+            mergeWhispers: config.mergeWhispers !== false, canWhisper: inRoom(memberNumber), unread: getUnread(), multiSelect: isMultiSelect(), selectMode: getSelectMode(), available, online,
             canInvite: available !== 'none' && !inRoom(memberNumber), inputPlaceholder, unavailable,
             replyTarget: getReplyTarget(), selectedCount: getSelectedCount(), canForwardToRoom: !!getRoom(),
         });

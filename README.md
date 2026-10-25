@@ -3,7 +3,7 @@
 
 <div align="center">
 
-![Version](https://img.shields.io/badge/version-1.6.8-purple.svg)
+![Version](https://img.shields.io/badge/version-1.6.9-purple.svg)
 ![License: MIT](https://img.shields.io/badge/License-MIT-purple.svg)
 ![BondageClub](https://img.shields.io/badge/BondageClub-Compatible-pink.svg)
 ![Languages](https://img.shields.io/badge/i18n-11%20languages-blue.svg)
@@ -23,7 +23,7 @@ Open it from the FCM icon in the chat room, main hall or profile screen. Tabs ca
 
 | 分頁 Tab | 說明 Description |
 |---|---|
-| **個人關係 Relations** | 好友、主人、戀人、奴隸、白名單、黑名單、幽靈名單一覽；在線狀態、區域、所在房間（點擊可傳送）。可依關注／關係／ID／名稱／加入時間／最後見面排序，切換暱稱或 BC 名稱。 |
+| **個人關係 Relations** | 好友、主人、戀人、奴隸、白名單、黑名單、幽靈名單一覽；在線狀態、區域、所在房間（點擊可傳送）。可依置頂／關係／ID／名稱／加入時間／最後見面排序，切換暱稱或 BC 名稱。 |
 | **房間管理 Room Mgmt** | 房內成員、管理員、白名單、黑名單；升降管理、白名單、封禁、逐出；房管可**拖曳或點選調整玩家順序**（交換／插入）；分享房間到聊天。 |
 | **房間查詢 Search Rooms** | 搜尋並加入公開房間，依區域篩選，收藏常用房間。 |
 | **人員查詢 People** | 搜尋曾遇見的角色（名稱或 ID），直接加好友、操作名單、分享 Profile；支援 `/profiles <名稱或ID>` 指令。 |
@@ -48,8 +48,8 @@ One-click actions: view profile, BEEP, message, add/remove friend (the other par
 通訊總開關在設定中，**預設關閉**。  
 Master switch in Settings — **off by default**.
 
-- **對話**：BEEP 與悄悄話合併於同一份對話（可關閉合併，只處理 BEEP）；最近聯絡人、關注、依關係分類、自訂快速群組；對方離線時，一般文字會排隊並在對方回來後送出。
-- **訊息工具**：回覆、複製、多選、轉傳給聯絡人或聊天室、翻譯（需安裝 Liko MAT 插件）、匯出 HTML／JSON、刪除本機紀錄。
+- **對話**：BEEP 與悄悄話合併於同一份對話（可關閉合併，只處理 BEEP）；最近聯絡人、置頂、依關係分類、自訂快速群組；人員右鍵可開啟聊天、置頂／取消置頂、加入群組、前往對方所在房間；每位聯絡人各自保留未送出的草稿；對方離線時，一般文字會排隊並在對方回來後送出。
+- **訊息工具**：回覆、複製、轉傳給聯絡人或聊天室、翻譯（需安裝 Liko MAT 插件）；訊息右鍵「匯出信息」可多選後匯出 HTML／JSON，「刪除信息」可多選刪除本機紀錄（只對自己有效，對方仍看得到）。
 - **Profile 分享**：在私訊中以 `@ID` 分享已保存的完整 Profile；收到後直接保存，只保留較新的資料。
 - **狀態與自動回覆**：上線／離開／忙碌，離開與忙碌可設定自動回覆訊息。
 - **通知**：浮動氣球（六個位置、可拖曳與吸附、可為每位對象建立獨立氣球）、通知動畫與音效（可上傳自訂音效）。

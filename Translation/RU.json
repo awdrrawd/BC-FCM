@@ -389,7 +389,6 @@
   "chatMinimize": "Свернуть",
   "chatNewGroup": "Новая группа…",
   "chatNewUnread": "У вас {0} новых непрочитанных сообщений",
-  "chatMultiSelect": "Выбрать несколько",
   "chatSelectedCount": "Выбрано сообщений: {0}",
   "chatForwardContact": "Переслать контакту",
   "chatFriends": "Друзья",
@@ -521,5 +520,12 @@
   "mergeWhispers": "Объединять шёпот",
   "mergeWhispersNote": "Включено по умолчанию. При отключении FCM CHAT обрабатывает только BEEP и скрывает шёпот, его уведомления и кнопки каналов рядом с полем ввода.",
   "chatPin": "Закрепить",
-  "chatUnpin": "Открепить"
+  "chatUnpin": "Открепить",
+  "chatGoRoom": "Перейти в комнату",
+  "chatGoRoomLoading": "Получение названия комнаты…",
+  "chatGoRoomUnknown": "Название комнаты недоступно",
+  "chatExportMessages": "Экспорт сообщений",
+  "chatDeleteMessages": "Удалить сообщения",
+  "chatDeleteMessagesNote": "Удаление действует только для вас; собеседник по-прежнему видит удалённые сообщения",
+  "chatConfirmDeleteMessages": "Удалить выбранные сообщения ({0})? Это нельзя отменить."
 }

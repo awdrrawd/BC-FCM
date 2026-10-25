@@ -102,7 +102,8 @@ function installMessageActions({ root, log, menu, isMultiSelectActive, selectedI
         hide();
         if (parts.length) await navigator.clipboard.writeText(parts.join('\n'));
     };
-    menu.querySelector('[data-context-multi]').onclick = () => { const message = target; hide(); enterMultiSelect(message); };
+    menu.querySelector('[data-context-multi]').onclick = () => { const message = target; hide(); enterMultiSelect(message, 'export'); };
+    menu.querySelector('[data-context-delete]').onclick = () => { const message = target; hide(); enterMultiSelect(message, 'delete'); };
     menu.querySelector('[data-context-cancel]').onclick = hide;
 
     return () => {

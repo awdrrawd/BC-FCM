@@ -10,7 +10,7 @@
 | `npm run check:all` | `check` + `test:browser`（push 前 hook 使用） |
 | `npm run check:bc -- --bc-dir <路徑>` | BC 函式掛鉤追蹤，見 [bc-compat.md](bc-compat.md) |
 
-`npm run validate:project` 檢查：docs 的相對連結、架構圖引用的檔案、`src` 的靜態相對匯入與循環、以及 EN 字典的翻譯缺漏（11 語系的鍵、空字串與 `{0}` 佔位符；外部連結不發網路請求）。這不是完整的 JavaScript 語意或動態依賴分析，仍搭配正式建置。`scripts/i18n.test.mjs` 另檢查非 i18n 模組中寫死的中文字串、靜態翻譯鍵與備援鍵一致；字型正式名稱、語言自稱與品牌不視為漏翻譯。
+`npm run validate:project` 檢查：docs 的相對連結、架構圖引用的檔案、`src` 的靜態相對匯入與循環、以及 EN 字典的翻譯缺漏（11 語系的鍵、空字串與 `{0}` 佔位符）與未引用的翻譯鍵（動態前綴自動放行，待確認的鍵列在 `PENDING_UNUSED`，見 [translation-review.md](translation-review.md)；外部連結不發網路請求）。這不是完整的 JavaScript 語意或動態依賴分析，仍搭配正式建置。`scripts/i18n.test.mjs` 另檢查非 i18n 模組中寫死的中文字串、靜態翻譯鍵與備援鍵一致；字型正式名稱、語言自稱與品牌不視為漏翻譯。
 
 ## 本機 Git hooks
 

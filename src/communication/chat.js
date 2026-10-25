@@ -2,22 +2,22 @@ import { markSeen } from '../data/profile-seen.js';
 import { processChatMedia } from './chat/controllers/chat-media.js';
 import { cfg, saveCfg, isMobile } from '../core/config.js';
 import { getDisplayName as getSharedDisplayName, getRoomInfo, inRoomFn, onlineFriends, requestOnlineFriends, buildFriendList, getAllRels, isFav, toggleFav, isFriendOf } from '../data/data.js';
-import { getCachedRoomInfo, queryRoomInfo } from '../panel/panel-rooms-data.js';
+import { getCachedRoomInfo, queryRoomInfo, fetchRoomFull } from '../panel/panel-rooms-data.js';
 import { PDB, _pc, Snapshot, loadAvatarFromBundle, syncRoomAvatar } from '../data/profile-db.js';
 import { ChatStore, OfflineQueue } from './chat/data/index.js';
 import { T, TH } from '../i18n/i18n.js';
 import { chatFontFamily } from './chat-font.js';
 import { installDragScroll } from '../ui/drag-scroll.js';
 import { themeColors } from '../core/themes.js';
-import { showAddFriendConfirm, showRoomJoinConfirm, showIncomingRoomInvite } from '../chat/actions.js';
+import { showAddFriendConfirm, showRoomJoinConfirm, showIncomingRoomInvite, roomInfoFromResult } from '../chat/actions.js';
 import { canSendBcxWhisper, sendBcxAwareBeep, sendBcxAwareWhisper } from './bcx-compat.js';
 import { warnLimited } from '../core/logger.js';
 import { initChatAudio, playNotificationSound } from './chat-audio.js';
 import {
     ChatConversationController, chatPanelSession, createChatBalloonController, createChatComposer,
-    createChatContactCardController, createChatConversationEvents, createChatConversationPresence,
+    createChatContactCardController, createChatConversationEvents, createChatDrafts, createChatConversationPresence,
     createChatDialogs, createChatForwardTargetsController, createChatHistoryViewportController,
-    createChatLifecycle, createChatListController, createChatListNavigation, createChatMemberSelection,
+    createChatLifecycle, createChatListController, createChatListNavigation, createChatMemberMenu, createChatMemberSelection,
     createChatMessageAppender, createChatMessageImagesController,
     createChatMessageSelectionController, createChatPanelControls, createChatRenderer,
     createChatReplyController, createChatRuntime, createChatShellEvents, createProfileSuggestionController,
@@ -137,7 +137,9 @@ const profileSuggestion = createProfileSuggestionController({
     avatarHtml, text: TH,
 });
 const replyController = createChatReplyController({ getRoot: () => root, cleanMessage, text: TH });
+const drafts = createChatDrafts({ getRoot: () => root, getMemberNumber: () => selectedMember });
 const composer = createChatComposer({
+    onSent: (memberNumber, original) => { if (drafts.get(memberNumber) === original) drafts.clear(memberNumber); },
     text: T,
     getRoot: () => root, getMemberNumber: () => selectedMember, displayName: getDisplayName,
     capability, isFriend: isFriendOf, sender: chatSender, getReplyTarget: replyController.get,
@@ -191,7 +193,7 @@ const conversationPresenter = createChatConversationPresenter({
     isFriend: isFriendOf, inRoom: inRoomFn, avatarHtml, displayName: getDisplayName, biography,
     hasSavedProfile: memberNumber => !!_pc[memberNumber]?.characterBundle,
     isContactCardOpen: contactCard.isOpen, getMessages: () => conversation.messages,
-    getUnread: () => conversation.unread, isMultiSelect: messageSelection.isActive,
+    getUnread: () => conversation.unread, isMultiSelect: messageSelection.isActive, getSelectMode: messageSelection.getMode,
     getReplyTarget: replyController.get, getSelectedCount: messageSelection.size, text: T,
 });
 const conversationPresence = createChatConversationPresence({
@@ -206,6 +208,12 @@ const selectedActions = createChatSelectedActions({
     sender: chatSender, getRoom: () => ChatRoomData,
     sendRoomMessage: (...args) => ServerSend(...args), exportConversation: exportConversationFile,
     biography, avatarUrl, chatColors,
+    confirm: (...args) => chatDialogs.confirm(...args), text: T, chatStore: ChatStore, offlineQueue: OfflineQueue,
+    removeMessages: ids => {
+        messages = messages.filter(message => !ids.has(String(message.id)));
+        conversation.messages = conversation.messages.filter(message => !ids.has(String(message.id)));
+    },
+    afterDelete: () => { refreshConversationMain({ scrollToLatest: false }); chatList.refreshVisible(); chatBalloons.refreshBadges(); },
 });
 const ownProfile = createChatOwnProfileService({
     config: cfg, saveConfig: saveCfg, getRoot: () => root, getPlayer: () => Player,
@@ -227,7 +235,7 @@ const roomActions = createChatRoomActions({
 const conversationActions = createChatConversationActions({
     getMemberNumber: () => selectedMember, displayName: getDisplayName, confirm: chatDialogs.confirm, text: T,
     chatStore: ChatStore, offlineQueue: OfflineQueue,
-    removeFromIndex: memberNumber => { messages = messages.filter(message => Number(message.memberNumber) !== memberNumber); },
+    removeFromIndex: memberNumber => { messages = messages.filter(message => Number(message.memberNumber) !== memberNumber); drafts.clear(memberNumber); },
     resetConversation: () => conversation.reset(), exportConversation: exportConversationFile,
     biography, avatarUrl, chatColors, onDeleted: renderChat,
 });
@@ -239,6 +247,38 @@ const transportHandler = createChatTransportHandler({
     showRoomInvite: showIncomingRoomInvite, htmlText: TH, warn: warnLimited,
     isEnabled: () => cfg.communicationEnabled, isOutgoingSuppressed: () => suppressOutgoing > 0,
 });
+const memberMenu = createChatMemberMenu({
+    getRoot: () => root, text: T, isPinned: isFav, togglePin: toggleFav,
+    openChat: memberNumber => memberSelection.select(memberNumber), refreshList: () => chatList.refreshVisible(),
+    getGroups: () => Object.entries(cfg.chatGroups || {}),
+    getMemberGroups: memberNumber => (Array.isArray(cfg.chatMemberGroups?.[memberNumber]) ? cfg.chatMemberGroups[memberNumber] : []),
+    toggleGroup: (memberNumber, groupId, forceAdd = false) => {
+        cfg.chatMemberGroups ||= {};
+        const list = Array.isArray(cfg.chatMemberGroups[memberNumber]) ? cfg.chatMemberGroups[memberNumber] : [];
+        const has = list.includes(groupId);
+        cfg.chatMemberGroups[memberNumber] = has && !forceAdd ? list.filter(id => id !== groupId) : has ? list : [...list, groupId];
+        if (!cfg.chatMemberGroups[memberNumber].length) delete cfg.chatMemberGroups[memberNumber];
+        saveCfg();
+    },
+    createGroup: async () => listNavigation.createGroup(await chatDialogs.promptGroupName(), 'groups'),
+    getRoomAccess: memberNumber => {
+        const state = roomState.get(memberNumber);
+        return { canOpenRoom: state.canOpenRoom, hideRoom: state.sameRoom || !!state.roomInfo?.isCurrent };
+    },
+    requestRoomName: memberNumber => { if (isFriendOf(memberNumber)) requestOnlineFriends(); },
+    goToRoom: memberNumber => {
+        const info = roomState.get(memberNumber).roomInfo;
+        if (!info?.name) return;
+        const cached = getCachedRoomInfo(info.name);
+        const space = onlineFriends.find(friend => Number(friend.MemberNumber) === Number(memberNumber))?.ChatRoomSpace;
+        const fallback = {
+            room: info.name, creator: cached?.Creator || '', count: cached?.MemberCount ?? info.memberCount ?? null,
+            limit: cached?.MemberLimit ?? info.memberLimit ?? null, desc: cached?.Description || '', priv: !!info.isPrivate, type: '',
+        };
+        const lookup = fetchRoomFull(info.name, space).then(full => (full ? roomInfoFromResult(full) : fallback)).catch(() => fallback);
+        showRoomJoinConfirm({ room: info.name, priv: !!info.isPrivate }, lookup);
+    },
+});
 const memberSelection = createChatMemberSelection({
     getRoot: () => root, getMemberNumber: () => selectedMember, setMemberNumber: value => { selectedMember = value; },
     resetSelection: resetMessageSelectionState, clearReply: replyController.clear, closeContactCard: contactCard.close,
@@ -247,7 +287,7 @@ const memberSelection = createChatMemberSelection({
     refreshList: () => chatList.refreshVisible(),
     refreshBadges: () => chatBalloons.refreshBadges(), getLayout: () => cfg.chatLayout,
     refreshConversation: refreshConversationMain,
-    isPinned: isFav, togglePin: toggleFav, text: T,
+    memberMenu,
 });
 const listNavigation = createChatListNavigation({
     refreshMessageIndex: () => indexRefresh.refresh(),
@@ -307,7 +347,7 @@ const conversationEvents = createChatConversationEvents({
     getRoot: () => root, getMemberNumber: () => selectedMember, config: cfg, saveConfig: saveCfg,
     closeStackedDetail: panelControls.closeStackedDetail, composer, historyViewport, forwardTargets,
     selectedActions, messageSelection, bindMessageActions: messageActions.bind, replyController, profileSuggestion,
-    conversationActions, roomActions, showRoomJoin: showRoomJoinConfirm, getCachedRoomInfo, contactCard,
+    conversationActions, roomActions, drafts, showRoomJoin: showRoomJoinConfirm, getCachedRoomInfo, contactCard,
     promptGroupName: chatDialogs.promptGroupName, createGroup: listNavigation.createGroup, rerender: renderChat,
 });
 const shellEvents = createChatShellEvents({
