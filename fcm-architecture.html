@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>FCM 架構與功能分支圖</title>
+<meta name="color-scheme" content="light dark">
+<style>
+:root{
+  --bg:#f7f5fb;--surface:#fff;--surface-2:#f1edf8;--line:#b9aed0;--text:#1d1830;--muted:#6b6381;
+  --brand:#7648fe;--brand-2:#c2417d;--ring:rgba(118,72,254,.35);--shadow:0 1px 2px rgba(40,20,80,.06),0 8px 24px rgba(40,20,80,.06);
+  --boot:#2f9e6b;--front:#0e93a6;--logic:#7c5cff;--data:#d98a12;--bc:#d6455d;--verify:#4f7cf0;
+  --code-bg:#f1edf8;--code-fg:#4a2f8f;--border:#e3dcef;
+}
+:root[data-theme="dark"]{
+  --bg:#0d0b11;--surface:#17131e;--surface-2:#211b2a;--line:#665778;--text:#f5f1fa;--muted:#a89fbd;
+  --brand:#a58bff;--brand-2:#f06aa5;--ring:rgba(165,139,255,.4);--shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+  --boot:#5ed49b;--front:#52d0dd;--logic:#a58bff;--data:#f0b44c;--bc:#ff7a8d;--verify:#7da2ff;
+  --code-bg:#251c38;--code-fg:#dccbff;--border:#352e40;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#0d0b11;--surface:#17131e;--surface-2:#211b2a;--line:#665778;--text:#f5f1fa;--muted:#a89fbd;
+    --brand:#a58bff;--brand-2:#f06aa5;--ring:rgba(165,139,255,.4);--shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);
+    --boot:#5ed49b;--front:#52d0dd;--logic:#a58bff;--data:#f0b44c;--bc:#ff7a8d;--verify:#7da2ff;
+    --code-bg:#251c38;--code-fg:#dccbff;--border:#352e40;
+  }
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.6 "Inter","Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;background:radial-gradient(800px 380px at 85% -5%,color-mix(in srgb,var(--brand) 16%,transparent),transparent 70%),radial-gradient(600px 300px at 5% 0,color-mix(in srgb,var(--brand-2) 10%,transparent),transparent 70%)}
+a{color:inherit}
+code,.file{font-family:ui-monospace,"JetBrains Mono","SFMono-Regular",Menlo,Consolas,monospace}
+button:focus-visible,a:focus-visible,input:focus-visible{outline:none;box-shadow:0 0 0 3px var(--ring)}
+
+.top{position:sticky;top:0;z-index:20;display:flex;align-items:center;gap:14px;padding:12px clamp(16px,4vw,40px);background:color-mix(in srgb,var(--bg) 78%,transparent);backdrop-filter:saturate(1.4) blur(14px);border-bottom:1px solid var(--border)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;white-space:nowrap;cursor:pointer;border:0;background:none;color:inherit;font-size:inherit;padding:0}
+.brand i{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:linear-gradient(135deg,var(--brand),var(--brand-2));color:#fff;font-style:normal;font-size:16px}
+.search{position:relative;flex:1;max-width:520px;margin-left:auto}
+.search input{width:100%;height:40px;padding:0 44px 0 40px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text);font:inherit;outline:none;transition:box-shadow .15s,border-color .15s}
+.search input:focus{border-color:var(--brand);box-shadow:0 0 0 4px var(--ring)}
+.search svg{position:absolute;left:13px;top:11px;width:18px;height:18px;color:var(--muted)}
+.search kbd{position:absolute;right:10px;top:9px;padding:1px 7px;border-radius:6px;border:1px solid var(--border);background:var(--surface-2);color:var(--muted);font:12px/20px ui-monospace,monospace}
+.icon-btn{display:grid;place-items:center;width:40px;height:40px;border-radius:12px;border:1px solid var(--border);background:var(--surface);color:var(--text);cursor:pointer;transition:transform .15s,border-color .15s}
+.icon-btn:hover{border-color:var(--brand);transform:translateY(-1px)}
+
+.shell{display:grid;grid-template-columns:250px minmax(0,1fr);gap:32px;max-width:1440px;margin:0 auto;padding:26px clamp(16px,4vw,40px) 60px}
+.side{position:sticky;top:78px;align-self:start;max-height:calc(100vh - 96px);overflow:auto;display:grid;gap:2px;font-size:14px;padding-right:4px}
+.side h4{margin:14px 0 4px 12px;color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.side h4:first-child{margin-top:0}
+.side button{display:flex;align-items:center;gap:10px;width:100%;padding:8px 12px;border:0;border-radius:10px;background:none;color:var(--muted);font:inherit;text-align:left;cursor:pointer;transition:background .15s,color .15s}
+.side button span{flex:none;width:8px;height:8px;border-radius:50%;background:var(--c);opacity:.6}
+.side button:hover{background:var(--surface-2);color:var(--text)}
+.side button.active{background:var(--surface);color:var(--text);box-shadow:var(--shadow)}
+.side button.active span{opacity:1;box-shadow:0 0 0 4px color-mix(in srgb,var(--c) 22%,transparent)}
+
+h1{margin:0 0 8px;font-size:clamp(28px,4vw,42px);line-height:1.15;letter-spacing:-.01em}
+h1 em{font-style:normal;background:linear-gradient(90deg,var(--brand),var(--brand-2));-webkit-background-clip:text;background-clip:text;color:transparent}
+.lead{margin:0;color:var(--muted);max-width:760px;font-size:16px}
+h2.sub{margin:30px 0 10px;font-size:15px;color:var(--muted);letter-spacing:.04em}
+
+/* 依賴管線 */
+.pipe{display:flex;align-items:stretch;gap:0;overflow-x:auto;padding:6px 2px 14px}
+.pnode{flex:1 0 170px;position:relative;padding:12px 14px;border-radius:14px;background:var(--surface);border:1px solid var(--border);border-top:3px solid var(--c);box-shadow:var(--shadow)}
+.pnode b{display:block;color:var(--c);font-size:13px;margin-bottom:2px}
+.pnode small{display:block;color:var(--muted);font-size:12.5px;line-height:1.5}
+.parrow{flex:0 0 34px;display:grid;place-items:center;color:var(--line);font-size:20px}
+.pnote{margin:8px 0 0;color:var(--muted);font-size:13.5px}
+.pnote b{color:var(--text)}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:14px}
+.tile{position:relative;display:flex;flex-direction:column;gap:6px;padding:16px;border-radius:16px;background:var(--surface);border:1px solid var(--border);box-shadow:var(--shadow);text-align:left;color:inherit;font:inherit;cursor:pointer;transition:transform .18s,border-color .18s}
+.tile:hover{transform:translateY(-3px);border-color:var(--brand)}
+.tile h3{margin:0;font-size:16px}
+.tile p{margin:0;color:var(--muted);font-size:13.5px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.layers{display:flex;flex-wrap:wrap;gap:5px;margin-top:auto;padding-top:8px}
+.badge{display:inline-block;padding:1px 8px;border-radius:999px;font-size:11.5px;font-weight:600;color:var(--c);background:color-mix(in srgb,var(--c) 14%,transparent);border:1px solid color-mix(in srgb,var(--c) 35%,transparent)}
+.tile.hide{display:none}
+
+/* 線性樹 */
+.crumb{display:flex;align-items:center;gap:8px;margin-bottom:14px;font-size:13px;color:var(--muted)}
+.crumb button{border:0;background:none;color:var(--brand);font:inherit;cursor:pointer;padding:0}
+.detail h2{margin:0 0 6px;font-size:26px;letter-spacing:-.01em}
+.detail .lead{margin-bottom:20px}
+.tree{overflow:auto;padding:28px 26px;border:1px solid var(--border);border-radius:18px;background:var(--surface);box-shadow:var(--shadow)}
+.bundle{display:grid;grid-template-columns:190px minmax(0,1fr);gap:56px;align-items:center;min-width:860px}
+.root{position:relative;padding:14px 16px;border-radius:14px;background:color-mix(in srgb,var(--brand) 9%,var(--surface-2));border:1px solid color-mix(in srgb,var(--brand) 65%,var(--border));color:var(--text);font-weight:700;line-height:1.35;box-shadow:0 0 0 3px color-mix(in srgb,var(--brand) 12%,transparent),0 0 20px color-mix(in srgb,var(--brand) 30%,transparent)}
+.root::after{content:"";position:absolute;left:100%;top:50%;width:28px;border-top:2px solid var(--line)}
+.rows{display:flex;flex-direction:column}
+.row{position:relative;display:grid;grid-template-columns:270px minmax(0,1fr);gap:50px;align-items:center;padding:7px 0}
+.row::before{content:"";position:absolute;left:-28px;top:50%;width:28px;border-top:2px solid var(--line)}
+.row::after,.down::before{content:"";position:absolute;left:-28px;top:0;bottom:0;border-left:2px solid var(--line)}
+.row:first-child::after{top:50%}
+.row:last-child::after{bottom:50%}
+.row:only-child::after{display:none}
+.branch{position:relative;padding:10px 14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border);border-left:4px solid var(--c)}
+.branch{transition:box-shadow .2s}
+.branch:hover{box-shadow:0 0 0 2px color-mix(in srgb,var(--c) 28%,transparent),0 0 16px color-mix(in srgb,var(--c) 28%,transparent)}
+.branch::after{content:"";position:absolute;left:100%;top:50%;width:50px;border-top:2px solid var(--line)}
+.branch .t{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-weight:700;font-size:14.5px}
+.branch p{margin:3px 0 0;color:var(--muted);font-size:13px;line-height:1.5}
+.copy{margin-left:auto;padding:1px 8px;border-radius:7px;border:1px solid var(--border);background:var(--surface);color:var(--muted);font:11.5px/1.6 inherit;cursor:pointer}
+.copy:hover{color:var(--text);border-color:var(--brand)}
+.files{position:relative;display:flex;flex-direction:column;gap:6px;align-items:flex-start}
+.files::before{content:"";position:absolute;left:-12px;top:50%;border:6px solid transparent;border-left:9px solid var(--line);border-right:0;transform:translateY(-50%)}
+.file{padding:4px 10px;border-radius:8px;background:var(--code-bg);color:var(--code-fg);font-size:12.5px;text-decoration:none;overflow-wrap:anywhere;border:1px solid transparent;transition:border-color .15s}
+.file:hover{border-color:var(--brand);text-decoration:underline}
+.down{position:relative;width:270px;height:24px;display:grid;place-items:center;color:var(--muted);font-size:12px}
+.down span{padding:0 8px;background:var(--surface);position:relative;z-index:1}
+.legend{display:flex;flex-wrap:wrap;gap:8px;margin:14px 2px 0;color:var(--muted);font-size:12.5px;align-items:center}
+
+.empty{display:none;padding:50px 20px;text-align:center;color:var(--muted);border:1px dashed var(--border);border-radius:16px;margin-top:14px}
+.empty.show{display:block}
+.toast{position:fixed;left:50%;bottom:26px;transform:translate(-50%,20px);padding:9px 16px;border-radius:999px;background:var(--text);color:var(--bg);font-size:13px;opacity:0;pointer-events:none;transition:all .25s}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+footer{padding:26px;text-align:center;color:var(--muted);font-size:13px;border-top:1px solid var(--border)}
+
+@media (max-width:900px){
+  .shell{display:block}
+  .side{position:sticky;top:65px;z-index:10;display:flex;max-height:none;overflow-x:auto;gap:6px;margin:0 -16px 20px;padding:10px 16px;background:color-mix(in srgb,var(--bg) 85%,transparent);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+  .side h4{display:none}
+  .side button{width:auto;white-space:nowrap;border:1px solid var(--border);background:var(--surface)}
+  .brand b{display:none}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header class="top">
+  <button class="brand" id="home" type="button" title="回到總覽"><i>👥</i><b>FCM 架構與功能分支圖</b></button>
+  <label class="search">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+    <input id="q" type="search" placeholder="搜尋功能、模組或檔案…" autocomplete="off" aria-label="搜尋">
+    <kbd>/</kbd>
+  </label>
+  <button class="icon-btn" id="theme" type="button" aria-label="切換深淺色" title="切換深淺色">
+    <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+  </button>
+</header>
+
+<div class="shell">
+  <nav class="side" id="nav" aria-label="功能分支"></nav>
+  <main id="main"></main>
+</div>
+<footer>功能資料位於本檔 <code>features</code> 陣列；<code>npm run validate:project</code> 會檢查每個檔案路徑是否存在。完整說明見 <a href="architecture.md">architecture.md</a></footer>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+const features=[
+ ['啟動與公開 API','main.js 只做重複載入檢查，app.js 組合功能並註冊 window.Liko.FCM；公開介面只暴露頭像與 Profiles，資料庫、HTML、封包與氣球細節不對外。',[['Bootstrap','入口與公開物件','main.js,app.js'],['Config','Mod SDK 註冊、預設設定、版本','core/config.js,core/version.js'],['Init','等待登入後初始化','core/core-init.js'],['Public API','頭像與 Profiles（apiVersion 1）','api/public-api.js'],['Docs','公開 API 說明','../docs/public-api.md']]],
+ ['核心 Hooks','21 個 BC 函式的 ModSDK 掛鉤集中在 core/hooks.js；更新來源包含 BEEP、人員進出、房間資料與語言切換。每週以雜湊比對偵測 BC 改版。',[['Hooks','所有 BC 掛鉤','core/hooks.js'],['Tracking','掛鉤函式雜湊巡檢','../scripts/check-bc-compat.mjs,../scripts/bc-compat-baseline.json'],['Workflow','每週比對與 issue','../.github/workflows/bc-compat.yml'],['Docs','相容性追蹤說明','../docs/bc-compat.md']]],
+ ['主面板與生命週期','panel.js 統一接收事件並比較顯示資料，不輪詢重繪；設定、關係圖、房間查詢、說明為延遲載入 chunk。容器管理頁面更新、清理與非同步有效範圍。',[['Controller','面板建立、分頁切換、渲染分派','panel/panel.js,panel/panel-controller.js'],['Lifecycle','單一有效頁面與清理','panel/panel-lifecycle.js'],['Refresh','資料快照與事件合併策略','panel/panel-refresh.js'],['Shared UI','共用元件、載入中、最大化、拖曳捲動','panel/panel-widgets.js,panel/panel-loading.js,panel/panel-maximize.js,ui/drag-scroll.js'],['Tabs','分頁顯示與排序偏好','data/panel-tabs.js,panel/panel-tab-settings.js'],['Tests','生命週期與瀏覽器回歸','../scripts/panel-lifecycle.test.mjs,../tests/browser/ui.spec.mjs']]],
+ ['個人關係','統一檢視好友、主人、戀人、奴隸與各名單；在線狀態、區域、房間，支援排序、暱稱切換、關注、召喚與好友申請通知。',[['Panel','好友分頁','panel/panel-friends.js'],['Actions','BEEP、好友、名單與召喚操作','chat/actions.js'],['Data','關係與名稱資料','data/data.js,data/relation-options.js'],['Tests','關係頁瀏覽器回歸','../tests/browser/relations.spec.mjs']]],
+ ['房間管理與排序','房內成員、管理員、白名單、黑名單與公開房查詢。房管可拖曳或點選交換／插入玩家順序，沿用 BC 原生靜默指令，同步就地確認，逾時回復實際順序。',[['Panel','房內成員與名單','panel/panel-room.js'],['Order','排序規則、原生指令與互動','panel/panel-room-order.js'],['Search','公開房查詢與收藏','panel/panel-roomsearch.js,panel/panel-rooms-data.js'],['Tests','排序、權限與事件刷新','../scripts/panel-room.test.mjs']]],
+ ['關係圖','依已保存的 Profile 繪製人際關係：搜尋人物、層數 1–100、線條樣式與顏色。模型為純邏輯，在 worker 中唯讀讀取共用資料庫，不建立也不升級。',[['UI','關係圖分頁與設定','panel/panel-relations.js,panel/panel-relation-settings.js'],['Canvas','單一圖層繪製密集連線','panel/relation-canvas.js'],['Model','索引與遍歷（worker 與測試共用）','data/relation-index.js'],['Worker','唯讀讀取 Profile 資料庫','data/relation-worker.js'],['Tests','關係索引','../scripts/relation-index.test.mjs']]],
+ ['Profile 與頭像保存','來源（遊戲快照／分享／匯入）→ PDB → IndexedDB → 提交後更新快取。與 WCE／LCE 共用 bce-past-profiles；頭像存於獨立 fcm-snapshot。FCM 不指定開庫版本。',[['People','人員查詢與匯出','panel/panel-people.js'],['Import','匯入與分批合併','data/profile-import.js,panel/panel-profile-import.js'],['Storage','PDB 與 Snapshot','data/profile-db.js'],['Cache','記憶體快取與最後見面','data/profile-cache.js,data/profile-seen.js'],['Open','不指定版本的開庫規則','data/idb-open.js'],['Tests','循環、合併、失敗與開庫','../scripts/profile-db.test.mjs,../scripts/idb-open.test.mjs']]],
+ ['分享協定','PROFILESHARE 與房間分享：分塊編碼與安全的接收組裝為純邏輯；與 LCE、獨立 Liko-WPS 互通，接收優先序 FCM > LCE > WPS。',[['Room Share','房間與好友分享','chat/actions.js'],['Share','Profile 收發','chat/wps-share.js'],['Protocol','編碼、分塊、接收限制','chat/wps-protocol.js'],['Tests','協定測試','../scripts/wps-protocol.test.mjs'],['Docs','私密分享與一致性規則','../docs/chat-private-sharing.md,../docs/integrations.md']]],
+ ['聊天室增強','悄悄話／BEEP 輸入框光暈、對象頭像、OOC 保護與幽靈名單隱身；個人資料頁的最後見面與關係人快速搜尋（與 AFC 面板相容）。',[['Effects','光暈、頭像、OOC、幽靈隱身','chat/chat-fx.js'],['Last Seen','個人資料頁最後見面','data/profile-seen.js'],['Profile Sheet','關係人底線與點擊優先序','core/hooks.js']]],
+ ['FCM CHAT 組合','chat.js 是 composition root，只組合依賴與公開聊天入口；控制器管理互動，服務處理行為，view 產生呈現，各子目錄 index 只匯出。',[['Composition','聊天組合根','communication/chat.js'],['Views','Presenter 與樣式','communication/chat/views/index.js'],['Events','DOM 事件綁定','communication/chat/events/index.js'],['Controllers','互動與生命週期','communication/chat/controllers/index.js'],['Services','通訊與領域服務','communication/chat/services/index.js'],['Data','索引、選取與儲存','communication/chat/data/index.js']]],
+ ['聊天傳輸','悄悄話走 Whisper，BEEP 走 AccountBeep；一般 BEEP 只含可見文字。@ 提及時先送私密 Profile 封包；離線文字排隊，回來後送出。',[['Sender','發送與回覆 metadata','communication/chat/services/chat-sender.js'],['Transport','傳輸與接收處理','communication/chat/services/chat-transport.js,communication/chat/services/chat-transport-handler.js'],['Private','私密 Profile 封包編解碼','communication/chat/services/chat-private-payload.js'],['Offline','離線投遞','communication/chat/services/chat-offline-delivery.js'],['BCX','BCX 限制與繞過選項','communication/bcx-compat.js'],['Tests','私密分享與回歸','../scripts/chat-private.test.mjs,../scripts/chat-regression.test.mjs']]],
+ ['對話與訊息工具','IndexedDB 訊息儲存、歷史分頁載入、多選、轉傳、匯出 HTML／JSON、翻譯與媒體；圖片來源信任後才載入。',[['Interaction','訊息選單與多選','communication/chat/events/chat-message-actions.js,communication/chat/controllers/chat-message-selection.js'],['History','歷史視窗與載入','communication/chat/controllers/chat-history-viewport.js'],['Media','圖片與影片','communication/chat/controllers/chat-media.js,communication/image-trust.js'],['Translate','翻譯（Liko MAT）','communication/chat/services/chat-translation.js,communication/chat/controllers/chat-translation.js'],['Export','匯出','communication/chat/services/chat-export.js'],['Store','fcm-chat 訊息庫與載入範圍','communication/chat/data/chat-store.js,communication/chat/data/chat-retention.js']]],
+ ['氣球與通知','浮動氣球的定位、還原、拖曳、碰撞與吸附共用同一套方向判斷；通知動畫與音效，可上傳自訂音效。',[['Card','聯絡人卡片','communication/chat/controllers/chat-contact-card.js,communication/chat/views/chat-conversation-view.js'],['Balloon','定位、內容與顯示','communication/chat/controllers/chat-balloon.js'],['Geometry','拖曳、碰撞、吸附與預覽方向','communication/chat/controllers/chat-drag.js'],['Audio','通知音效','communication/chat-audio.js'],['Tests','氣球與頭像','../scripts/chat-balloon.test.mjs,../scripts/chat-avatar.test.mjs']]],
+ ['聯絡人、狀態與設定','聯絡人分類與快速群組、上線／離開／忙碌狀態與自動回覆、自己的公開 Profile 發布，以及聊天設定頁。',[['Settings','設定畫面與事件','communication/chat/views/chat-settings-view.js,communication/chat/events/chat-settings-events.js'],['Contacts','聯絡人與分類','communication/chat/services/chat-contact-service.js'],['Presence','狀態與自動回覆','communication/chat/services/chat-presence.js,communication/chat/services/chat-auto-reply.js'],['Own Profile','發布 OnlineSharedSettings.FCM','communication/chat/services/chat-own-profile.js']]],
+ ['主題、字型與語系','七組預設主題與自訂配色，FCM 與 CHAT 可共用或獨立；面板與 CHAT 共用字型對照。11 語系字庫於啟動時載入並有離線 fallback。',[['Theme','主題與選擇器','ui/theme-select.js,core/themes.js'],['Font','共用字型表','communication/chat-font.js'],['i18n','翻譯入口、引擎與 fallback','i18n/i18n.js,i18n/i18n-engine.js,i18n/i18n-fallback.js'],['Tests','語系與語言切換','../scripts/i18n.test.mjs,../scripts/i18n-language-change.test.mjs']]],
+ ['驗證與自動化','專案驗證檢查文件引用、模組匯入循環與翻譯完整性；SVG 在開發與建置前檢查。CI 通過後才部署 Pages，本機 hooks 在提交與推送前執行。',[['Validation','文件、匯入、翻譯','../scripts/validate-project.mjs'],['Icons','SVG 結構與引用','../scripts/validate-icons.mjs'],['CI','品質檢查與 Pages 部署','../.github/workflows/deploy.yml'],['Hooks','提交與推送前檢查','../.githooks/pre-commit,../.githooks/pre-push'],['Guide','指令與設定','../docs/automation.md']]]
+];
+let active=features[0];
+const groupOf=['核心','核心','面板','面板','面板','面板','資料與分享','資料與分享','聊天室','FCM CHAT','FCM CHAT','FCM CHAT','FCM CHAT','FCM CHAT','外觀與維護','外觀與維護'];
+const LAYERS={boot:{n:'啟動',r:0,c:'--boot'},front:{n:'前端 UI',r:1,c:'--front'},logic:{n:'服務／協定',r:2,c:'--logic'},data:{n:'資料',r:3,c:'--data'},bc:{n:'BC 邊界',r:4,c:'--bc'},verify:{n:'驗證／文件',r:5,c:'--verify'}};
+const PIPE=[
+ ['玩家操作','boot','點擊 FCM 圖示、輸入指令、在聊天室送出訊息'],
+ ['前端 UI','front','panel/ · ui/ · communication/chat 的 views、controllers、events'],
+ ['服務／協定','logic','communication/chat/services · chat/ · api/ · i18n/'],
+ ['資料','data','data/ · fcm-chat 訊息庫 · IndexedDB · ExtensionSettings'],
+ ['BC 邊界','bc','core/hooks.js · ServerSend／AccountBeep／ChatRoomMessage'],
+ ['遊戲與其他玩家','verify','BC 伺服器、對方的 FCM／AFC／LCE／WCE']
+];
+
+const $=(s,r=document)=>r.querySelector(s);
+const el=(t,c,x)=>{const n=document.createElement(t);if(c)n.className=c;if(x!=null)n.textContent=x;return n};
+const nav=$('#nav'),main=$('#main'),q=$('#q');
+const state={view:'overview',query:''};
+const pathOf=file=>file.startsWith('../')?file.slice(3):'src/'+file;
+const layerOf=files=>{
+  const p=pathOf(files.split(',')[0]);
+  if(!p.startsWith('src/'))return 'verify';
+  const s=p.slice(4);
+  if(s==='main.js'||s==='app.js'||s.startsWith('core/core-init')||s==='core/config.js'||s==='core/version.js')return 'boot';
+  if(s==='core/hooks.js'||s==='communication/bcx-compat.js')return 'bc';
+  if(s.startsWith('data/')||s.startsWith('communication/chat/data/'))return s==='data/panel-tabs.js'?'front':'data';
+  if(s.startsWith('panel/')||s.startsWith('ui/')||s==='communication/chat.js'||/^communication\/chat\/(views|controllers|events)\//.test(s)||s==='communication/chat-font.js'||s==='core/themes.js')return 'front';
+  return 'logic';
+};
+const branchesOf=f=>f[2].map((b,k)=>({b,k,layer:layerOf(b[2])})).sort((x,y)=>LAYERS[x.layer].r-LAYERS[y.layer].r||x.k-y.k);
+const layersOf=f=>[...new Set(branchesOf(f).map(x=>x.layer))];
+const groupColor=g=>({'核心':'--boot','面板':'--front','資料與分享':'--data','聊天室':'--bc','FCM CHAT':'--logic','外觀與維護':'--verify'}[g]);
+const matches=(f,qs)=>!qs||JSON.stringify(f).toLowerCase().includes(qs);
+
+function renderNav(){
+  const qs=state.query.trim().toLowerCase();nav.replaceChildren();let last='';
+  features.forEach((f,i)=>{
+    if(!matches(f,qs))return;
+    if(groupOf[i]!==last){last=groupOf[i];nav.append(el('h4',null,last))}
+    const b=el('button',f===active&&state.view==='feature'?'active':'');b.type='button';b.style.setProperty('--c','var('+groupColor(groupOf[i])+')');
+    b.append(el('span'),document.createTextNode(f[0]));b.addEventListener('click',()=>open(i));nav.append(b);
+  });
+}
+function pipeline(){
+  const wrap=el('div','pipe');
+  PIPE.forEach(([t,l,d],i)=>{
+    if(i)wrap.append(el('div','parrow','→'));
+    const n=el('div','pnode');n.style.setProperty('--c','var('+LAYERS[l].c+')');n.append(el('b',null,t),el('small',null,d));wrap.append(n);
+  });
+  return wrap;
+}
+function renderOverview(){
+  const qs=state.query.trim().toLowerCase();main.replaceChildren();
+  const h=el('h1');h.append(document.createTextNode('FCM 架構與功能分支圖'),document.createElement('br'),el('em','','依賴由前端到後端'));
+  main.append(h,el('p','lead','好友、房間、Profile 保存、關係圖與 FCM CHAT 的模組邊界。上方是整體呼叫方向；選擇功能後，樹狀圖依「前端 → 服務 → 資料 → BC 邊界」排列模組與實際檔案，點擊檔案可開啟原始碼。'));
+  main.append(el('h2','sub','整體呼叫方向'),pipeline());
+  const note=el('p','pnote');note.append(document.createTextNode('反向路徑：'),el('b',null,'BC 事件'),document.createTextNode(' 經 core/hooks.js 進入，由 notifyPanelChange 判斷後通知面板更新；遠端訊息經 chat-transport-handler 寫入 fcm-chat，再通知 CHAT 畫面。'));
+  main.append(note,el('h2','sub','功能分支'));
+  const grid=el('div','grid');let shown=0;
+  features.forEach((f,i)=>{
+    if(!matches(f,qs))return;shown++;
+    const t=el('button','tile');t.type='button';t.append(el('h3',null,f[0]),el('p',null,f[1]));
+    const ls=el('div','layers');for(const l of layersOf(f)){const b=el('span','badge',LAYERS[l].n);b.style.setProperty('--c','var('+LAYERS[l].c+')');ls.append(b)}
+    t.append(ls);t.addEventListener('click',()=>open(i));grid.append(t);
+  });
+  main.append(grid,el('div','empty'+(shown?'':' show'),'找不到符合的項目，試試其他關鍵字。'));
+}
+function renderFeature(){
+  const i=features.indexOf(active),f=active;main.replaceChildren();
+  const crumb=el('div','crumb');const back=el('button',null,'← 總覽');back.type='button';back.addEventListener('click',()=>{state.view='overview';render()});
+  crumb.append(back,document.createTextNode('/ '+groupOf[i]));
+  const d=el('section','detail');d.append(el('h2',null,f[0]),el('p','lead',f[1]));
+  const tree=el('div','tree'),bundle=el('div','bundle');
+  bundle.append(el('div','root',f[0]));
+  const rows=el('div','rows');let prev=null;
+  for(const {b,layer} of branchesOf(f)){
+    if(prev){const dn=el('div','down');dn.append(el('span',null,prev===layer?'↓':'↓ '+LAYERS[prev].n+' → '+LAYERS[layer].n));rows.append(dn)}
+    prev=layer;
+    const row=el('div','row'),br=el('div','branch');br.style.setProperty('--c','var('+LAYERS[layer].c+')');
+    const t=el('div','t');t.append(document.createTextNode(b[0]));
+    const bd=el('span','badge',LAYERS[layer].n);bd.style.setProperty('--c','var('+LAYERS[layer].c+')');t.append(bd);
+    const cp=el('button','copy','複製');cp.type='button';cp.title='複製此群組的檔案路徑';cp.addEventListener('click',()=>copy(b[2].split(',').map(pathOf).join('\n')));t.append(cp);
+    br.append(t,el('p',null,b[1]));
+    const files=el('div','files');
+    for(const file of b[2].split(',')){const a=el('a','file',pathOf(file));a.href='../'+pathOf(file);a.title='開啟檔案';files.append(a)}
+    row.append(br,files);rows.append(row);
+  }
+  bundle.append(rows);tree.append(bundle);
+  const lg=el('div','legend');lg.append(document.createTextNode('依賴方向由上而下：'));
+  for(const l of ['boot','front','logic','data','bc','verify']){const b=el('span','badge',LAYERS[l].n);b.style.setProperty('--c','var('+LAYERS[l].c+')');lg.append(b)}
+  d.append(tree,lg);main.append(crumb,d);
+}
+function render(){renderNav();state.view==='overview'?renderOverview():renderFeature()}
+function open(i){active=features[i];state.view='feature';try{history.replaceState(null,'','#f'+i)}catch{}window.scrollTo({top:0});render()}
+$('#home').addEventListener('click',()=>{state.view='overview';state.query='';q.value='';try{history.replaceState(null,'','#')}catch{}render()});
+q.addEventListener('input',()=>{state.query=q.value;state.view='overview';render()});
+document.addEventListener('keydown',e=>{
+  if(e.key==='/'&&document.activeElement!==q&&!e.metaKey&&!e.ctrlKey){e.preventDefault();q.focus()}
+  else if(e.key==='Escape'&&document.activeElement===q){q.value='';state.query='';render();q.blur()}
+});
+const toast=$('#toast');let timer;
+function showToast(m){toast.textContent=m;toast.classList.add('show');clearTimeout(timer);timer=setTimeout(()=>toast.classList.remove('show'),1400)}
+async function copy(text){try{await navigator.clipboard.writeText(text);showToast('已複製路徑')}catch{showToast('無法存取剪貼簿')}}
+const root=document.documentElement;
+try{const s=localStorage.getItem('fcm-doc-theme');if(s)root.dataset.theme=s}catch{}
+$('#theme').addEventListener('click',()=>{
+  const dark=root.dataset.theme?root.dataset.theme==='dark':matchMedia('(prefers-color-scheme: dark)').matches;
+  root.dataset.theme=dark?'light':'dark';
+  try{localStorage.setItem('fcm-doc-theme',root.dataset.theme)}catch{}
+});
+const m=/^#f(\d+)$/.exec(location.hash);
+if(m&&features[Number(m[1])]){active=features[Number(m[1])];state.view='feature'}
+render();
+</script>
+</body>
+</html>

@@ -23,3 +23,8 @@ function stageTranslations(srcDir, dstDir) {
 mkdirSync(root + 'public', { recursive: true });
 rmSync(root + 'public/Translation/', { recursive: true, force: true });
 stageTranslations('Translation/', 'public/Translation/');
+
+// 互動式架構圖：隨 Pages 一併發布（https://awdrrawd.github.io/BC-FCM/docs/fcm-architecture.html）
+mkdirSync(root + 'public/docs/', { recursive: true });
+copyFileSync(root + 'docs/fcm-architecture.html', root + 'public/docs/fcm-architecture.html');
+console.log('🐈‍⬛ [FCM] docs/fcm-architecture.html -> public/docs/');

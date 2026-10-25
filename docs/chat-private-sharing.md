@@ -27,11 +27,6 @@ mentions cannot be queued: the composer retains the text for manual sharing when
 the recipient is online. Legacy queued Profile shares are not automatically sent.
 Sending and forwarding share the same sender and offline eligibility rules.
 
-Module boundaries are unchanged except for the dedicated private packet codec and
-native-chat DOM adapter. Sending, receiving, profile persistence and message
-recording remain in their existing modules. No new database or generic transport
-framework is introduced.
-
 Verification: node --test scripts/chat-private.test.mjs scripts/chat-regression.test.mjs
 Real two-account network interoperability still requires game testing.
 
