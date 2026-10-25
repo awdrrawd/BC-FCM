@@ -3,6 +3,7 @@ import { selectedMessages } from '../data/chat-selection.js';
 function createChatMessageSelectionController({ getPanel, getMessages, canForwardToRoom, renderUi, selectedCountText, onExit }) {
     const ids = new Set();
     let active = false;
+    let mode = 'export';
 
     function isActive() {
         return active;
@@ -19,6 +20,7 @@ function createChatMessageSelectionController({ getPanel, getMessages, canForwar
     function updateUi() {
         renderUi(getPanel(), {
             active,
+            mode,
             selectedIds: ids,
             canForwardToRoom: canForwardToRoom(),
             selectedCountText,
@@ -27,11 +29,17 @@ function createChatMessageSelectionController({ getPanel, getMessages, canForwar
 
     function reset() {
         active = false;
+        mode = 'export';
         ids.clear();
     }
 
-    function enter(messageElement) {
+    function getMode() {
+        return mode;
+    }
+
+    function enter(messageElement, nextMode = 'export') {
         active = true;
+        mode = nextMode === 'delete' ? 'delete' : 'export';
         if (messageElement?.dataset.msgId) ids.add(String(messageElement.dataset.msgId));
         getPanel()?.querySelectorAll('.fcm-chat-message.selected').forEach(message => message.classList.remove('selected'));
         updateUi();
@@ -43,7 +51,7 @@ function createChatMessageSelectionController({ getPanel, getMessages, canForwar
         updateUi();
     }
 
-    return { enter, exit, ids, isActive, records, reset, size, updateUi };
+    return { enter, exit, getMode, ids, isActive, records, reset, size, updateUi };
 }
 
 export { createChatMessageSelectionController };

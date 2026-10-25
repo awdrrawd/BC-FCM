@@ -1,4 +1,4 @@
-function createChatComposer({ getRoot, getMemberNumber, displayName, capability, isFriend, sender, getReplyTarget, clearReplyTarget, text = key => key, sendingDelay = 600 }) {
+function createChatComposer({ getRoot, getMemberNumber, displayName, capability, isFriend, sender, getReplyTarget, clearReplyTarget, text = key => key, sendingDelay = 600, onSent = () => {} }) {
     let sending = false;
     const channels = new Map();
     function getChannel(memberNumber = getMemberNumber()) {
@@ -41,6 +41,7 @@ function createChatComposer({ getRoot, getMemberNumber, displayName, capability,
         sending = true;
         try {
             const sent = await sender.send({ memberNumber, content, channel: available, replyTarget: reply });
+            if (sent) onSent(memberNumber, original);   // even if the user already switched conversation
             if (Number(getMemberNumber()) !== memberNumber || !input.isConnected) return;
             if (!sent) {
                 if (notice?.hidden) { notice.textContent = text('chatSendFailed'); notice.hidden = false; }

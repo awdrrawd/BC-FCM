@@ -27,10 +27,10 @@
 
 | 層 | 責任 |
 |---|---|
-| `controllers/` | 互動、選取、導覽、視窗、歷史載入、氣球、拖曳、生命週期 |
+| `controllers/` | 互動、選取（匯出／刪除兩種模式）、人員右鍵選單、草稿、導覽、視窗、歷史載入、氣球、拖曳、生命週期 |
 | `services/` | 發送、接收、離線投遞、聯絡人、匯出、翻譯、私密 Profile 封包、狀態與自動回覆 |
 | `views/` | HTML presenter 與集中樣式（`chat-styles.js`） |
-| `data/` | 對話索引、選取狀態、IndexedDB 訊息儲存（`chat-store.js`）、保留規則 |
+| `data/` | 對話索引、選取狀態、IndexedDB 訊息儲存（`chat-store.js`，含單則刪除）、保留規則 |
 | `events/` | 訊息選單、設定與個人頁事件綁定 |
 
 各子目錄的 `index.js` 只是分類匯入入口，不承載行為。`communication/` 根目錄另有 `bcx-compat.js`、`image-trust.js`、`chat-audio.js`、`chat-font.js`。
@@ -90,6 +90,8 @@ FCM 掛鉤 21 個 BC 函式；改版後是否仍有效由 [bc-compat.md](bc-comp
 | IndexedDB `fcm-snapshot` | 頭像快照 |
 | IndexedDB `fcm-chat` | 聊天訊息；索引範圍為 7 天內、最近聯絡人 15 人、每次載入 100 則（`chat-retention.js`） |
 | IndexedDB `fcm-chat-audio` | 自訂通知音效 |
+| localStorage `FCM_chat_outbox_<帳號>` | 對方離線時排隊的訊息（48 小時） |
+| localStorage `FCM_chat_drafts_<帳號>` | 每位聯絡人未送出的草稿（最多 200 筆，送出成功或刪除對話後清除） |
 
 ### IndexedDB 存取規則
 

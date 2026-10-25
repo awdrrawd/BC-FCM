@@ -24,7 +24,7 @@ function bindForwardTargetEvents(scope, { onCancel, onSelect, onTab }) {
     scope?.querySelectorAll('[data-forward-tab]').forEach(button => button.addEventListener('click', () => onTab(button.dataset.forwardTab)));
 }
 
-function updateMultiSelectUi(panel, { active, selectedIds, canForwardToRoom, selectedCountText }) {
+function updateMultiSelectUi(panel, { active, mode = 'export', selectedIds, canForwardToRoom, selectedCountText }) {
     panel?.querySelector('.fcm-chat-messages')?.classList.toggle('multi-selecting', active);
     panel?.querySelectorAll('.fcm-chat-message').forEach(message => message.classList.toggle('multi-selected', selectedIds.has(String(message.dataset.msgId))));
     const actions = panel?.querySelector('.fcm-chat-actions');
@@ -33,11 +33,13 @@ function updateMultiSelectUi(panel, { active, selectedIds, canForwardToRoom, sel
     if (actions) actions.hidden = active;
     if (compose) compose.hidden = active;
     if (multi) multi.hidden = !active;
+    multi?.querySelectorAll('[data-multi-mode]').forEach(group => { group.hidden = group.dataset.multiMode !== mode; });
     const count = multi?.querySelector('[data-multi-count]');
     if (count) count.textContent = selectedCountText(selectedIds.size);
     multi?.querySelectorAll('button:not([data-multi-cancel])').forEach(button => {
         button.disabled = !selectedIds.size || (button.hasAttribute('data-multi-forward-room') && !canForwardToRoom);
     });
+    multi?.classList.toggle('delete-mode', mode === 'delete');
 }
 
 export { bindForwardTargetEvents, forwardTargetRowsHtml, forwardTargetsHtml, updateMultiSelectUi };

@@ -389,7 +389,6 @@
   "chatMinimize": "Minimize",
   "chatNewGroup": "New custom group…",
   "chatNewUnread": "You have {0} unread new messages",
-  "chatMultiSelect": "Select multiple",
   "chatSelectedCount": "{0} messages selected",
   "chatForwardContact": "Forward to contact",
   "chatFriends": "Friends",
@@ -521,5 +520,12 @@
   "mergeWhispers": "Merge Whispers",
   "mergeWhispersNote": "On by default. When disabled, FCM CHAT only handles BEEPs, hides whispers and their notifications, and hides the channel buttons beside the composer.",
   "chatPin": "Pin",
-  "chatUnpin": "Unpin"
+  "chatUnpin": "Unpin",
+  "chatGoRoom": "Go to room",
+  "chatGoRoomLoading": "Fetching room name…",
+  "chatGoRoomUnknown": "Room name unavailable",
+  "chatExportMessages": "Export messages",
+  "chatDeleteMessages": "Delete messages",
+  "chatDeleteMessagesNote": "Deleting only affects you; the other person can still see the deleted messages",
+  "chatConfirmDeleteMessages": "Delete the {0} selected messages? This cannot be undone."
 }

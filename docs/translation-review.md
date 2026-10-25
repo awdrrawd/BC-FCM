@@ -42,7 +42,14 @@
 
 `scripts/validate-project.mjs` 特別註明公開房間不顯示標籤（允許空字串），刪除前需同步調整該檢查。
 
-## 後續建議
+## 自動檢查
 
-- `validate-project.mjs` 目前只檢查「缺 key」；確認清理完成後可加入「未引用 key」檢查（需把上述動態前綴列為白名單）。
-- 待觀察項目確認後，直接從 11 個語言檔與 `i18n-fallback.js` 一併刪除，並更新本文件。
+`npm run validate:project` 會檢查「未引用的 key」：
+
+- 動態前綴（`themePreset_` `graphStyle_` `roomTab_` `roomOrder_` `saveModeDesc_`）自動視為使用中。
+- 上面「待觀察」的 key 列在 `scripts/validate-project.mjs` 的 `PENDING_UNUSED`；刪除某個 key 時要同時從該清單移除（清單內的 key 若已不存在或開始被引用，檢查也會報錯，提醒你同步清單）。
+- 新增翻譯 key 卻沒有程式碼引用，會直接讓檢查失敗。
+
+## 後續
+
+待觀察項目確認後，從 11 個語言檔、`i18n-fallback.js`、`PENDING_UNUSED` 一併刪除，並更新本文件。

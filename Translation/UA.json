@@ -389,7 +389,6 @@
   "chatMinimize": "Згорнути",
   "chatNewGroup": "Нова група…",
   "chatNewUnread": "У вас {0} нових непрочитаних повідомлень",
-  "chatMultiSelect": "Вибрати кілька",
   "chatSelectedCount": "Вибрано повідомлень: {0}",
   "chatForwardContact": "Переслати контакту",
   "chatFriends": "Друзі",
@@ -521,5 +520,12 @@
   "mergeWhispers": "Об’єднувати шепіт",
   "mergeWhispersNote": "Увімкнено за замовчуванням. Після вимкнення FCM CHAT обробляє лише BEEP і приховує шепіт, його сповіщення та кнопки каналів біля поля введення.",
   "chatPin": "Закріпити",
-  "chatUnpin": "Відкріпити"
+  "chatUnpin": "Відкріпити",
+  "chatGoRoom": "Перейти до кімнати",
+  "chatGoRoomLoading": "Отримання назви кімнати…",
+  "chatGoRoomUnknown": "Назва кімнати недоступна",
+  "chatExportMessages": "Експорт повідомлень",
+  "chatDeleteMessages": "Видалити повідомлення",
+  "chatDeleteMessagesNote": "Видалення діє лише для вас; співрозмовник і далі бачить видалені повідомлення",
+  "chatConfirmDeleteMessages": "Видалити вибрані повідомлення ({0})? Це неможливо скасувати."
 }

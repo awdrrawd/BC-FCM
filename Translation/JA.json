@@ -389,7 +389,6 @@
   "chatMinimize": "最小化",
   "chatNewGroup": "新規グループ…",
   "chatNewUnread": "未読の新着メッセージが {0} 件あります",
-  "chatMultiSelect": "複数選択",
   "chatSelectedCount": "{0} 件のメッセージを選択中",
   "chatForwardContact": "他の相手に転送",
   "chatFriends": "フレンド",
@@ -521,5 +520,12 @@
   "mergeWhispers": "ささやきを統合",
   "mergeWhispersNote": "初期設定はオンです。オフにすると FCM CHAT は BEEP のみを処理し、ささやきとその通知、入力欄左側のチャンネルボタンを非表示にします。",
   "chatPin": "ピン留め",
-  "chatUnpin": "ピン留め解除"
+  "chatUnpin": "ピン留め解除",
+  "chatGoRoom": "部屋へ移動",
+  "chatGoRoomLoading": "部屋名を取得中…",
+  "chatGoRoomUnknown": "部屋名を取得できません",
+  "chatExportMessages": "メッセージをエクスポート",
+  "chatDeleteMessages": "メッセージを削除",
+  "chatDeleteMessagesNote": "削除は自分だけに適用されます。相手には削除したメッセージが引き続き表示されます",
+  "chatConfirmDeleteMessages": "選択した {0} 件のメッセージを削除しますか？元に戻せません。"
 }

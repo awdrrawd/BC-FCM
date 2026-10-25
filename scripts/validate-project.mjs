@@ -49,5 +49,24 @@ for (const file of files('Translation').filter(file => file.endsWith('.json'))) 
         if (placeholders(value) !== placeholders(english[key])) errors.push(`${file}: placeholder mismatch ${key}`);
     }
 }
+// Unused translation keys: a key must be referenced as a quoted string somewhere in src/ (the built-in
+// fallback table does not count). Keys built from a prefix at runtime are listed in DYNAMIC_PREFIXES;
+// keys still under review are listed in PENDING_UNUSED and tracked in docs/translation-review.md.
+const DYNAMIC_PREFIXES = ['themePreset_', 'graphStyle_', 'roomTab_', 'roomOrder_', 'saveModeDesc_'];
+const PENDING_UNUSED = new Set(`
+chatTranslateAuto chatTranslateAutoNote chatTranslateEnable chatTranslateEnableNote chatTranslateEndpoint chatTranslateKey
+chatTranslateKeyNote chatTranslateProvider chatTranslateTarget chatTranslateTitle chatProvMyMemory chatProvLibre chatProvCustom
+chatProvDeepl chatProvGoogle notificationAudio notificationAudioNote chatNotifyAudio chatNotifyAudioNote chatSoundCustomNote
+chatThemePreset chatThemePresetLabel chatThemePresetNote chatTrustImageDomain profilesTitle profilesHint profilesEmpty
+profilesTotal searchProfiles profileRelTitle importDone importWorking roomPublic
+`.split(/\s+/).filter(Boolean));
+const sourceText = files('src').filter(file => file.endsWith('.js') && !file.endsWith('i18n-fallback.js')).map(read).join('\n');
+const unused = Object.keys(english).filter(key => !DYNAMIC_PREFIXES.some(prefix => key.startsWith(prefix))
+    && !PENDING_UNUSED.has(key) && !new RegExp(`['"\`]${key}['"\`]`).test(sourceText));
+for (const key of unused) errors.push(`unused translation key ${key} (delete it from Translation/*.json, or list it in PENDING_UNUSED and docs/translation-review.md)`);
+for (const key of PENDING_UNUSED) {
+    if (!(key in english)) errors.push(`PENDING_UNUSED lists ${key}, which no longer exists; remove it from validate-project.mjs and docs/translation-review.md`);
+    else if (new RegExp(`['"\`]${key}['"\`]`).test(sourceText)) errors.push(`PENDING_UNUSED lists ${key}, but it is referenced now; remove it from the list`);
+}
 if (errors.length) { console.error(errors.join('\n')); process.exitCode = 1; }
-else console.log(`Project validation passed: ${links} references, ${sources.length} modules, translation gaps checked.`);
+else console.log(`Project validation passed: ${links} references, ${sources.length} modules, translation gaps and unused keys checked.`);
