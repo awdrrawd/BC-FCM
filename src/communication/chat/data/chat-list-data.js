@@ -9,8 +9,16 @@ function filterNotificationRows(rows, query, { displayName, biography, cleanMess
     return rows.filter(row => `${displayName(row.memberNumber)} ${row.memberNumber} ${biography(row.memberNumber)} ${cleanMessage(row.content)}`.toLowerCase().includes(normalized));
 }
 
+// Stable sort: pinned members first, every other order is preserved.
+function pinnedFirst(rows, isPinned) {
+    if (typeof isPinned !== 'function') return rows;
+    const pinned = [], rest = [];
+    for (const row of rows) (isPinned(Number(row.memberNumber)) ? pinned : rest).push(row);
+    return pinned.length ? [...pinned, ...rest] : rows;
+}
+
 function filterContactRows(rows, filters, helpers) {
-    return rows.filter(row => {
+    return pinnedFirst(rows.filter(row => {
         const memberNumber = Number(row.memberNumber);
         if (filters.presence === 'online' ? !helpers.isOnline(memberNumber) : helpers.isOnline(memberNumber)) return false;
         if (filters.relation === 'follow' && !helpers.isFavorite(memberNumber)) return false;
@@ -22,7 +30,7 @@ function filterContactRows(rows, filters, helpers) {
             if (!matches) return false;
         }
         return matchesContactSearch(memberNumber, filters.search, helpers.displayName, helpers.biography);
-    });
+    }), helpers.isFavorite);
 }
 
 function buildGroupDefinitions({ roomCharacters, selfMemberNumber, friendRows, isFavorite, groups, memberGroups, text }) {
@@ -48,10 +56,10 @@ function selectedGroupDefinition(definitions, mode, selectedId) {
     return mode === 'room' ? definitions.room : definitions.groups.find(group => group.id === selectedId) || definitions.groups[0];
 }
 
-function filterGroupRows(group, query, displayName, biography) {
-    return (group?.members || [])
+function filterGroupRows(group, query, displayName, biography, isPinned) {
+    return pinnedFirst((group?.members || [])
         .filter(memberNumber => matchesContactSearch(memberNumber, query, displayName, biography))
-        .map(memberNumber => ({ memberNumber, timestamp: 0, unread: 0 }));
+        .map(memberNumber => ({ memberNumber, timestamp: 0, unread: 0 })), isPinned);
 }
 
-export { buildGroupDefinitions, filterContactRows, filterGroupRows, filterNotificationRows, selectedGroupDefinition };
+export { pinnedFirst, buildGroupDefinitions, filterContactRows, filterGroupRows, filterNotificationRows, selectedGroupDefinition };

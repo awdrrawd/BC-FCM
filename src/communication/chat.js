@@ -1,7 +1,7 @@
 import { markSeen } from '../data/profile-seen.js';
 import { processChatMedia } from './chat/controllers/chat-media.js';
 import { cfg, saveCfg, isMobile } from '../core/config.js';
-import { getDisplayName as getSharedDisplayName, getRoomInfo, inRoomFn, onlineFriends, requestOnlineFriends, buildFriendList, getAllRels, isFav, isFriendOf } from '../data/data.js';
+import { getDisplayName as getSharedDisplayName, getRoomInfo, inRoomFn, onlineFriends, requestOnlineFriends, buildFriendList, getAllRels, isFav, toggleFav, isFriendOf } from '../data/data.js';
 import { getCachedRoomInfo, queryRoomInfo } from '../panel/panel-rooms-data.js';
 import { PDB, _pc, Snapshot, loadAvatarFromBundle, syncRoomAvatar } from '../data/profile-db.js';
 import { ChatStore, OfflineQueue } from './chat/data/index.js';
@@ -247,6 +247,7 @@ const memberSelection = createChatMemberSelection({
     refreshList: () => chatList.refreshVisible(),
     refreshBadges: () => chatBalloons.refreshBadges(), getLayout: () => cfg.chatLayout,
     refreshConversation: refreshConversationMain,
+    isPinned: isFav, togglePin: toggleFav, text: T,
 });
 const listNavigation = createChatListNavigation({
     refreshMessageIndex: () => indexRefresh.refresh(),

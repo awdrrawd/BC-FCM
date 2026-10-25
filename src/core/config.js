@@ -22,7 +22,7 @@ let cfg = {
     relationGraph: {},
     panelTabs: {},
     avatars: false, lang: 'auto', saveMode: 'off',
-    favorites: [],                // 關注的成員編號（個人關係頁星號）
+    favorites: [],                // 置頂的成員編號（FCM 星號與 Chat 右鍵共用）
     favoriteRooms: [],
     whisperIndicator: false, whisperColor: '#b070e8',
     ghostHide: false,

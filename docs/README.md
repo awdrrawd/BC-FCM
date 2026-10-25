@@ -14,6 +14,7 @@
 | [integrations.md](integrations.md) | WCE／LCE／LianChat／AFC／MAT／BCX 整合 |
 | [bc-compat.md](bc-compat.md) | BC 函式掛鉤追蹤（`check:bc`） |
 | [automation.md](automation.md) | 指令、Git hooks、GitHub Actions、依賴安全 |
+| [translation-review.md](translation-review.md) | 翻譯 KEY 清理紀錄：已刪除項目與**待觀察**的未引用 key |
 | [verification.md](verification.md) | **待辦**：尚需遊戲內驗收的項目 |
 
 ## 維護原則
