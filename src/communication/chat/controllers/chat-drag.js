@@ -7,6 +7,7 @@ const snapFrames = new WeakMap();
 
 function resetBalloonInteraction(el) {
     cancelSnap(el);
+    stopJelly(el);
     el?.classList.remove('dragging', 'released', 'release-water', 'collision-pushed', 'notify');
     ['--drag-angle', '--drag-stretch', '--drag-squash'].forEach(name => el?.style.removeProperty(name));
 }
@@ -167,18 +168,74 @@ function animateBalloonSnap(el, done) {
         snapFrames.delete(el);
         pushed.forEach(animatePushed);
         saveBalloonPositions(bodies.map(body => body.element));
-        done?.();
+        done?.(EDGE_NORMAL[target.edge]);
     };
     snapFrames.set(el, requestAnimationFrame(frame));
 }
 
-function playBalloonRelease(el) {
-    el.classList.remove('release-water');
-    // Restart from the first keyframe when the balloon actually reaches the edge.
-    el.classList.remove('released');
-    void el.offsetWidth;
-    el.classList.add('released');
-    setTimeout(() => el.classList.remove('released'), 540);
+function playBalloonRelease(el, normal = [0, 1]) {
+    el.classList.remove('release-water', 'released');
+    jellyLand(el, normal[0], normal[1]);
+}
+
+// Jelly deformation. Two damped springs (fixed 1/240s step, frame-rate independent):
+//  - drag spring (x,y): body lags behind the pointer -> stretch along motion + drop tilt
+//  - landing spring (q):  hitting the edge squashes along the impact axis, then bounces back
+// Both keep ringing from their current state after release instead of replaying a keyframe.
+const JELLY_STEP = 1 / 240, JELLY_K = 900, JELLY_D = 26, JELLY_LIMIT = 18;
+const LAND_K = 700, LAND_D = 15, LAND_LIMIT = .3, LAND_KICK = 9;
+const jellies = new WeakMap();
+const EDGE_NORMAL = { left: [-1, 0], right: [1, 0], top: [0, -1], bottom: [0, 1] };
+
+function stopJelly(el) {
+    const j = jellies.get(el);
+    if (j?.raf) cancelAnimationFrame(j.raf);
+    jellies.delete(el);
+    el?.classList.remove('jelly');
+    el?.style.removeProperty('--jelly');
+    el?.style.removeProperty('--water-tilt');
+}
+
+function runJelly(el) {
+    let j = jellies.get(el);
+    if (!j) jellies.set(el, j = { x: 0, y: 0, vx: 0, vy: 0, q: 0, qv: 0, qa: 0, acc: 0, last: 0, raf: 0 });
+    if (j.raf) return j;
+    el.classList.add('jelly');
+    j.last = performance.now();
+    const tick = now => {
+        j.acc += Math.min(.04, (now - j.last) / 1000); j.last = now;
+        while (j.acc >= JELLY_STEP) {
+            j.vx += (-JELLY_K * j.x - JELLY_D * j.vx) * JELLY_STEP;
+            j.vy += (-JELLY_K * j.y - JELLY_D * j.vy) * JELLY_STEP;
+            j.x += j.vx * JELLY_STEP; j.y += j.vy * JELLY_STEP;
+            j.qv += (-LAND_K * j.q - LAND_D * j.qv) * JELLY_STEP;
+            j.q += j.qv * JELLY_STEP;
+            j.acc -= JELLY_STEP;
+        }
+        const len = Math.hypot(j.x, j.y);
+        const soft = JELLY_LIMIT * (1 - Math.exp(-len / JELLY_LIMIT));   // soft cap, never over-deforms
+        const s = 1 + soft / 90, a = Math.atan2(j.y, j.x);                // gentle stretch; the drop tilt carries the pull
+        const q = LAND_LIMIT * Math.tanh(j.q / LAND_LIMIT), f = Math.exp(-q);
+        el.style.setProperty('--jelly',
+            `rotate(${a}rad) scale(${s},${1 / s}) rotate(${-a}rad) rotate(${j.qa}rad) scale(${f},${1 / f}) rotate(${-j.qa}rad)`);
+        // dragging right -> j.x < 0 -> the drop swings left (and the other way round)
+        el.style.setProperty('--water-tilt', `${Math.max(-40, Math.min(40, -j.x * 1.8))}deg`);
+        if (len < .05 && Math.hypot(j.vx, j.vy) < .5 && Math.abs(j.q) < .002 && Math.abs(j.qv) < .05) { stopJelly(el); return; }
+        j.raf = requestAnimationFrame(tick);
+    };
+    j.raf = requestAnimationFrame(tick);
+    return j;
+}
+
+function jellyKick(el, dx, dy) {
+    const j = runJelly(el);
+    j.vx -= dx * 30; j.vy -= dy * 30;      // the body lags behind the pointer
+}
+
+// landing: squash along the impact axis (nx, ny), then bounce
+function jellyLand(el, nx, ny) {
+    const j = runJelly(el);
+    j.qa = Math.atan2(ny, nx); j.qv += LAND_KICK;
 }
 
 function installChatDrag(element, handle, { configKey, isMaximized = () => false } = {}) {
@@ -189,7 +246,7 @@ function installChatDrag(element, handle, { configKey, isMaximized = () => false
         const offsetX = event.clientX - rect.left, offsetY = event.clientY - rect.top;
         const isBalloon = element.matches(SELECTOR);
         const startX = event.clientX, startY = event.clientY;
-        let lastX = event.clientX, lastY = event.clientY, moved = false, queued, moveFrame = 0;
+        let lastX = event.clientX, lastY = event.clientY, moved = false, queued, moveFrame = 0, dir = [0, 1];
         if (isBalloon) { cancelSnap(element); element.classList.remove('released', 'release-water'); }
         handle.setPointerCapture(event.pointerId);
 
@@ -200,16 +257,14 @@ function installChatDrag(element, handle, { configKey, isMaximized = () => false
             } else if (!isBalloon) moved = true;
             const dx = next.clientX - lastX, dy = next.clientY - lastY;
             lastX = next.clientX; lastY = next.clientY;
+            if (dx || dy) { const n = Math.hypot(dx, dy); dir = [dx / n, dy / n]; }
             const left = isBalloon ? next.clientX - element.offsetWidth / 2 : next.clientX - offsetX;
             const top = isBalloon ? next.clientY + 20 : next.clientY - offsetY;
             element.style.left = `${Math.max(0, Math.min(innerWidth - element.offsetWidth, left))}px`;
             element.style.top = `${Math.max(0, Math.min(innerHeight - element.offsetHeight, top))}px`;
             element.style.right = element.style.bottom = 'auto';
             if (isBalloon) {
-                const speed = Math.min(.22, Math.hypot(dx, dy) / 90);
-                element.style.setProperty('--drag-angle', `${Math.max(-7, Math.min(7, dx * .3))}deg`);
-                element.style.setProperty('--drag-stretch', `${1 + speed}`);
-                element.style.setProperty('--drag-squash', `${1 - speed * .55}`);
+                jellyKick(element, dx, dy);
                 resolveBalloonCollision(element, { persist: false, animate: false, direction: { x: dx, y: dy } });
             } else element.style.transform = 'none';
             updateBalloonPreviewSide(element);
@@ -234,13 +289,12 @@ function installChatDrag(element, handle, { configKey, isMaximized = () => false
             if (!moved) return;
             element.dataset.dragMoved = '1';
             setTimeout(() => { delete element.dataset.dragMoved; }, 0);
-            if (isBalloon && cfg.balloonSnap) animateBalloonSnap(element, () => playBalloonRelease(element));
+            if (isBalloon && cfg.balloonSnap) animateBalloonSnap(element, normal => playBalloonRelease(element, normal));
             else if (isBalloon) {
                 resolveBalloonCollision(element, { persist: false });
                 saveBalloonPositions();
-                element.classList.add('released');
                 setTimeout(() => element.classList.remove('release-water'), 150);
-                setTimeout(() => element.classList.remove('released'), 540);
+                jellyLand(element, dir[0], dir[1]);
             }
             else { cfg[configKey] = { x: element.offsetLeft, y: element.offsetTop }; saveCfg(); }
         };
