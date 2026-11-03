@@ -99,6 +99,16 @@ body>.fcm-chat-user-balloon.dragging,body>.fcm-chat-user-balloon.release-water,b
 .fcm-chat-member-menu button:disabled{opacity:.45;cursor:default}.fcm-chat-member-menu button:disabled:hover{background:transparent;color:var(--tx)}.fcm-chat-member-groups{margin:2px 0 4px 8px;padding-left:6px;border-left:1px solid var(--border);max-height:150px;overflow:auto}.fcm-chat-member-groups[hidden]{display:none}
 .fcm-chat-multi-actions [hidden]{display:none!important}.fcm-chat-multi-note{color:var(--dim);font-size:11.5px;line-height:1.35}.fcm-chat-multi-actions button.danger{color:#ff6b6b;border-color:#ff6b6b}.fcm-chat-multi-actions button.danger:hover:not(:disabled){color:#fff;background:#d64545;border-color:#d64545}
 .fcm-chat-pin-divider{grid-column:1/-1;flex:none;width:100%;height:0;margin:2px 0;border:0;border-bottom:.5pt solid var(--ac);pointer-events:none}
+#fcm-chat-balloon.jelly,.fcm-chat-user-balloon.jelly{transform:var(--jelly,none)!important;transition:none!important;animation:none!important}
+#fcm-chat-balloon.jelly>.fcm-water-shape,.fcm-chat-user-balloon.jelly>.fcm-water-shape{transform:rotate(var(--water-tilt,0deg))!important;transform-origin:50% 8%!important;transition:none!important}
+#fcm-chat-balloon.dragging>.fcm-balloon-preview,#fcm-chat-balloon.jelly>.fcm-balloon-preview,#fcm-chat-balloon.release-water>.fcm-balloon-preview,.fcm-chat-user-balloon.dragging>.fcm-balloon-preview,.fcm-chat-user-balloon.jelly>.fcm-balloon-preview,.fcm-chat-user-balloon.release-water>.fcm-balloon-preview{display:none!important}
+/* icon/avatar rides rigidly with the drop (same pivot, same tilt), shrunk and masked to the drop hole */
+#fcm-chat-balloon.jelly.dragging>.fcm-balloon-icon,#fcm-chat-balloon.jelly.release-water>.fcm-balloon-icon{transform-origin:19px -21.3px!important;transform:rotate(var(--water-tilt,0deg)) translateY(10px) translate(19px,13.2px) translate(-17px,-17px)!important;clip-path:circle(25px at 50% 50%);transition:none!important}
+.fcm-chat-user-balloon.jelly.dragging>.fcm-chat-avatar,.fcm-chat-user-balloon.jelly.release-water>.fcm-chat-avatar{transform-origin:27px -13.3px!important;transform:rotate(var(--water-tilt,0deg)) translateY(10px) translate(27px,21.2px) scale(.96) translate(-25px,-25px)!important;clip-path:circle(26px at 50% 50%);transition:none!important}
+/* after the drop is gone (landing), squash around the balloon centre */
+#fcm-chat-balloon.jelly:not(.dragging):not(.release-water),.fcm-chat-user-balloon.jelly:not(.dragging):not(.release-water){transform-origin:50% 50%}
+/* drop outline: one 2px line, identical to the resting balloon border (screen pixels, not scaled with the svg) */
+.fcm-water-shape svg path{fill:none!important;stroke:var(--ac)!important;stroke-width:2px!important;stroke-linejoin:round;vector-effect:non-scaling-stroke;paint-order:normal!important}
 `;
 
 function injectChatStyles() {
