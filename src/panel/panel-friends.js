@@ -3,7 +3,7 @@ import { CAMERA_ICON } from '../ui/icons.js';
 import { cfg } from '../core/config.js';
 import { T } from '../i18n/i18n.js';
 import { PDB, Snapshot } from '../data/profile-db.js';
-import { onlineFriends, showNickname, setShowNickname, getDisplayName, matchesSearch, searchScore, buildFriendList, getAllRels, REL_ORDER, getZone, getRoomInfo, amAdmin, inRoomFn, isFav } from '../data/data.js';
+import { getOnlineFriend, showNickname, setShowNickname, getDisplayName, matchesSearch, searchScore, buildFriendList, getAllRels, REL_ORDER, getZone, getRoomInfo, amAdmin, inRoomFn, isFav } from '../data/data.js';
 import { showRoomJoinConfirm, roomInfoFromResult, makeIdCell } from '../chat/actions.js';
 import { makeAvEl, makeFavStar, makeRelEl, mkBtn, makeSearchWrap, makeSortSel, makeCountBar, paginate, makePageBar, buildMgmtBtns, buildPersonOps, _autoQueueVisible, refreshSnapshotsForList } from './panel-widgets.js';
 import { queryRoomInfo, getCachedRoomInfo, fetchRoomFull } from './panel-rooms-data.js';
@@ -31,7 +31,7 @@ function applyFilters(f) {
     }
     return true;
 }
-function isOnline(mn) { mn = parseInt(mn); return !!(ChatRoomCharacter && ChatRoomCharacter.some(c => c.MemberNumber === mn)) || !!(onlineFriends.find(f => f.MemberNumber === mn)); }
+function isOnline(mn) { mn = parseInt(mn); return !!(ChatRoomCharacter && ChatRoomCharacter.some(c => c.MemberNumber === mn)) || !!getOnlineFriend(mn); }
 
 async function renderFriends(container, _myToken) {
     container.innerHTML = '';
@@ -137,10 +137,9 @@ async function renderFriends(container, _myToken) {
         const relTd = document.createElement('td'); relTd.style.cssText = 'text-align:center;width:70px;min-width:70px;'; relTd.appendChild(makeRelEl(getAllRels(f.mn))); tr.appendChild(relTd);
         const zt = document.createElement('td'); zt.style.textAlign = 'center';
         const zs = document.createElement('span'); zs.className = 'fcm-zone';
-        const riZone = getRoomInfo(f.mn);
-        const hideZone = !online || (online && riZone === null) || (riZone && !riZone.name && riZone.isPrivate);
-        zs.textContent = hideZone ? '—' : (zone || T('zoneUnk')); zt.appendChild(zs); tr.appendChild(zt);
         const ri = getRoomInfo(f.mn);
+        const hideZone = !online || (online && ri === null) || (ri && !ri.name && ri.isPrivate);
+        zs.textContent = hideZone ? '—' : (zone || T('zoneUnk')); zt.appendChild(zs); tr.appendChild(zt);
         const rt = document.createElement('td');
         function _buildRoomLink(ri2, mc, ml) {
             const rcStr = mc !== null ? `${ri2.name}(${mc}/${ml ?? '?'})` : ri2.name;
@@ -152,7 +151,7 @@ async function renderFriends(container, _myToken) {
             //  查不到（私人房不在搜尋結果等）則退回好友端已知的房名＋人數。
             rl.addEventListener('click', () => {
                 const fallback = { room: ri2.name, creator: '', count: mc, limit: ml, desc: '', priv: !!ri2.isPrivate, type: '' };
-                const space = onlineFriends.find(ff => ff.MemberNumber === f.mn)?.ChatRoomSpace;
+                const space = getOnlineFriend(f.mn)?.ChatRoomSpace;
                 const promise = fetchRoomFull(ri2.name, space)
                     .then(full => full ? roomInfoFromResult(full) : fallback)
                     .catch(() => fallback);
@@ -168,7 +167,7 @@ async function renderFriends(container, _myToken) {
             else { const cd = getCachedRoomInfo(ri.name); if (cd) { mc = cd.MemberCount; ml = cd.MemberLimit; } }
             rt.appendChild(_buildRoomLink(ri, mc, ml));
             if (!ri.isCurrent && mc === null) {
-                const friendSpace = onlineFriends.find(ff => ff.MemberNumber === f.mn)?.ChatRoomSpace;
+                const friendSpace = getOnlineFriend(f.mn)?.ChatRoomSpace;
                 queryRoomInfo(ri.name, friendSpace, data => { if (data && rt.isConnected) { rt.innerHTML = ''; rt.appendChild(_buildRoomLink(ri, data.MemberCount, data.MemberLimit)); } });
             }
         } else if (ri && !ri.name && ri.isPrivate) {

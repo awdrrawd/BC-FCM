@@ -45,9 +45,10 @@ function _fittedTextWidth(text, maxW) {
             const res = DrawingGetTextSize(text, maxW);
             size = parseInt(res[1]) || 36;
             const prev = MainCanvas.font;
-            MainCanvas.font = CommonGetFont(String(res[1]));
-            w = MainCanvas.measureText(res[0]).width;
-            MainCanvas.font = prev;
+            try {
+                MainCanvas.font = CommonGetFont(String(res[1]));
+                w = MainCanvas.measureText(res[0]).width;
+            } finally { MainCanvas.font = prev; }
         }
     } catch { /* measurement is optional; falls back to an estimate */ }
     if (!w && typeof MainCanvas !== 'undefined' && MainCanvas) { try { w = MainCanvas.measureText(text).width; } catch { /* fallback estimate follows */ } }
@@ -61,19 +62,7 @@ function _measureRelRegion(text, X, Y, Width) {
     if (!m) return null;
     const mn = parseInt(m[1]);
     if (!mn) return null;
-    let w = 0;
-    try {
-        if (typeof DrawingGetTextSize === 'function' && typeof CommonGetFont === 'function' && typeof MainCanvas !== 'undefined' && MainCanvas) {
-            const res = DrawingGetTextSize(text, Width);
-            const drawText = res[0];
-            const prev = MainCanvas.font;
-            MainCanvas.font = CommonGetFont(String(res[1]));
-            w = MainCanvas.measureText(drawText).width;
-            MainCanvas.font = prev;
-        }
-    } catch { /* measurement is optional; falls back to an estimate */ }
-    if (!w && typeof MainCanvas !== 'undefined' && MainCanvas) { try { w = MainCanvas.measureText(text).width; } catch { /* fallback estimate follows */ } }
-    if (!w) w = Math.min(Width || 600, String(text).length * 18);
+    const { w } = _fittedTextWidth(text, Width || 600);
     const align = (typeof MainCanvas !== 'undefined' && MainCanvas && MainCanvas.textAlign) || 'left';
     const left = align === 'center' ? X - w / 2 : align === 'right' ? X - w : X;
     return { mn, x: left - 5, y: Y - 24, w: w + 10, h: 48 };  // textBaseline=middle → 以 Y 為垂直中心
@@ -128,7 +117,7 @@ function registerHooks() {
         if (data?.Query === 'OnlineFriends') notifyPanelChange('presence');
         return r;
     });
-    // Replaces the old 2-second language poll: BC changes language only here.
+    // BC changes language here; older shared engines may still poll.
     modApi.hookFunction('TranslationSwitchLanguage', 0, (args, next) => {
         const result = next(args);
         window.Liko?.__Sys_i18n__?.refreshLanguage?.();   // optional: an older engine that won the load race still polls
