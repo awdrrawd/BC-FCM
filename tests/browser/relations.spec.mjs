@@ -17,7 +17,7 @@ async function setup(page, count = 8, fullPanel = false) {
             'panel/panel-room.js': 'export const renderRoom=()=>{},resetRoomAdminSearch=()=>{};',
             'panel/panel-roomsearch.js': 'export const renderRoomSearch=()=>{},resetRoomSearchQuery=()=>{};',
             'chat/chat-fx.js': 'export const _removeWhisperAvatar=()=>{};',
-            'data/data.js': 'export const amAdmin=()=>true,getDisplayName=String,inRoomFn=()=>false,getAllRels=()=>[],onlineFriends=[],matchesSearchFields=()=>true,searchScoreFields=()=>0,requestOnlineFriends=()=>{},buildFriendList=()=>[];',
+            'data/data.js': 'export const amAdmin=()=>true,getDisplayName=String,inRoomFn=()=>false,getAllRels=()=>[],getOnlineFriend=()=>undefined,onlineFriends=[],matchesSearchFields=()=>true,searchScoreFields=()=>0,requestOnlineFriends=()=>{},buildFriendList=()=>[];',
         };
         for (const [path, body] of Object.entries(stubs)) await page.route(`**/src/${path}`, route => route.fulfill({ contentType: 'text/javascript', body }));
     }
