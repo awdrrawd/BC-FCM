@@ -1,12 +1,12 @@
 import { roomHeaderText } from '../services/chat-room-header.js';
 
-function createChatConversationPresence({ getRoot, getMemberNumber, getRoom, getRoomCharacters = () => [], getCachedRoomInfo = () => null, getOnlineFriends, roomState, capability, inRoom, sharedProfile, text, queryRoomInfo }) {
+function createChatConversationPresence({ getRoot, getMemberNumber, getRoom, getRoomCharacters = () => [], getCachedRoomInfo = () => null, getOnlineFriend, roomState, capability, inRoom, sharedProfile, text, queryRoomInfo }) {
     function refreshRoomMeta() {
         const memberNumber = Number(getMemberNumber());
         if (!memberNumber) return;
         const { roomInfo, canOpenRoom } = roomState.get(memberNumber);
         if (!canOpenRoom || roomInfo.isCurrent || roomInfo.isPrivate) return;
-        const friend = getOnlineFriends().find(item => Number(item.MemberNumber) === memberNumber);
+        const friend = getOnlineFriend(memberNumber);
         queryRoomInfo(roomInfo.name, friend?.ChatRoomSpace, data => {
             const meta = getRoot()?.querySelector(`[data-room-meta="${memberNumber}"]`);
             if (!meta || Number(getMemberNumber()) !== memberNumber || memberNumber !== Number(meta.dataset.roomMeta)) return;

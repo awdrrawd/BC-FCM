@@ -1,7 +1,7 @@
 import { isSupportedAvatarUrl } from './chat-avatar-url.js';
 import { esc } from './chat-content.js';
 
-function createChatContactService({ config, snapshot, syncRoomAvatar, displayName, inRoom, isFriend, getPlayer, getRoomCharacters, getOnlineFriends, getRemoteProfiles }) {
+function createChatContactService({ config, snapshot, syncRoomAvatar, displayName, inRoom, isFriend, getPlayer, getRoomCharacters, getOnlineFriend, getRemoteProfiles }) {
     const readyAvatars = new Map();
     const pendingAvatars = new Map();
     const pendingMembers = new Map();
@@ -11,7 +11,7 @@ function createChatContactService({ config, snapshot, syncRoomAvatar, displayNam
         const target = Number(memberNumber);
         if (inRoom(target)) return true;
         if (!isFriend(target)) return false;
-        return getOnlineFriends().some(friend => Number(friend.MemberNumber) === target);
+        return !!getOnlineFriend(target);
     };
     const capability = memberNumber => config.mergeWhispers !== false && inRoom(Number(memberNumber)) ? 'whisper' : isFriend(memberNumber) && isOnline(memberNumber) ? 'beep' : 'none';
     const sharedProfile = memberNumber => Number(memberNumber) === Number(getPlayer()?.MemberNumber)

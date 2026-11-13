@@ -37,7 +37,7 @@ test('chat and balloon share decoded sources, snapshot refresh, URL mode and fai
     const service = createChatContactService({ config: {}, snapshot, syncRoomAvatar: async () => { syncCalls++; },
         displayName: () => 'Player', inRoom: () => true, isFriend: () => true,
         getPlayer: () => ({ MemberNumber: 1 }), getRoomCharacters: () => [{ MemberNumber: 7, OnlineSharedSettings: { FCM: shared } }],
-        getOnlineFriends: () => [], getRemoteProfiles: () => new Map(), getRoot: () => null });
+        getOnlineFriend: () => undefined, getRemoteProfiles: () => new Map(), getRoot: () => null });
     const flush = async () => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
     const hydrate = service.hydrateAvatars();
     const simultaneous = service.hydrateAvatars();
@@ -84,7 +84,7 @@ test('turning off whisper integration forces same-room friends to BEEP and block
     try {
         const config = {};
         const contacts = createChatContactService({ config, inRoom: () => true,
-            isFriend: member => member === 42, getOnlineFriends: () => [],
+            isFriend: member => member === 42, getOnlineFriend: () => undefined,
         });
         assert.equal(contacts.capability(42), 'whisper');
         assert.equal(contacts.capability(43), 'whisper');

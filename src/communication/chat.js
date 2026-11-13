@@ -1,7 +1,7 @@
 import { markSeen } from '../data/profile-seen.js';
 import { processChatMedia } from './chat/controllers/chat-media.js';
 import { cfg, saveCfg, isMobile } from '../core/config.js';
-import { getDisplayName as getSharedDisplayName, getRoomInfo, inRoomFn, onlineFriends, requestOnlineFriends, buildFriendList, getAllRels, isFav, toggleFav, isFriendOf } from '../data/data.js';
+import { getDisplayName as getSharedDisplayName, getRoomInfo, inRoomFn, getOnlineFriend, requestOnlineFriends, buildFriendList, getAllRels, isFav, toggleFav, isFriendOf } from '../data/data.js';
 import { getCachedRoomInfo, queryRoomInfo, fetchRoomFull } from '../panel/panel-rooms-data.js';
 import { PDB, _pc, Snapshot, loadAvatarFromBundle, syncRoomAvatar } from '../data/profile-db.js';
 import { ChatStore, OfflineQueue } from './chat/data/index.js';
@@ -65,7 +65,7 @@ function resetMessageSelectionState() {
 
 const contactService = createChatContactService({
     config: cfg, snapshot: Snapshot, syncRoomAvatar, displayName: getSharedDisplayName, inRoom: inRoomFn, isFriend: isFriendOf,
-    getPlayer: () => Player, getRoomCharacters: () => ChatRoomCharacter, getOnlineFriends: () => onlineFriends,
+    getPlayer: () => Player, getRoomCharacters: () => ChatRoomCharacter, getOnlineFriend,
     getRemoteProfiles: () => remoteProfiles,
 });
 const { avatarHtml, avatarUrl, biography, capability, character, getDisplayName, hydrateAvatars: hydrateChatAvatars, isOnline, sharedProfile } = contactService;
@@ -198,7 +198,7 @@ const conversationPresenter = createChatConversationPresenter({
 });
 const conversationPresence = createChatConversationPresence({
     getRoot: () => root, getMemberNumber: () => selectedMember, getRoom: () => ChatRoomData,
-    getOnlineFriends: () => onlineFriends, roomState, capability: composer.getChannel, inRoom: inRoomFn, sharedProfile,
+    getOnlineFriend, roomState, capability: composer.getChannel, inRoom: inRoomFn, sharedProfile,
     getRoomCharacters: () => ChatRoomCharacter, getCachedRoomInfo,
     text: T, queryRoomInfo,
 });
@@ -270,7 +270,7 @@ const memberMenu = createChatMemberMenu({
         const info = roomState.get(memberNumber).roomInfo;
         if (!info?.name) return;
         const cached = getCachedRoomInfo(info.name);
-        const space = onlineFriends.find(friend => Number(friend.MemberNumber) === Number(memberNumber))?.ChatRoomSpace;
+        const space = getOnlineFriend(memberNumber)?.ChatRoomSpace;
         const fallback = {
             room: info.name, creator: cached?.Creator || '', count: cached?.MemberCount ?? info.memberCount ?? null,
             limit: cached?.MemberLimit ?? info.memberLimit ?? null, desc: cached?.Description || '', priv: !!info.isPrivate, type: '',

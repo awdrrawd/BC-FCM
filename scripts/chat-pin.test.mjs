@@ -7,7 +7,7 @@ const hooks = registerHooks({ load(url, context, next) {
         : url.endsWith('/ui/search-clear.js') ? 'export const attachSearchClear = () => {};' : null;
     return source ? { format: 'module', source, shortCircuit: true } : next(url, context);
 } });
-const { pinnedFirst, filterGroupRows } = await import('../src/communication/chat/data/chat-list-data.js');
+const { pinnedFirst, filterGroupRows, buildGroupDefinitions } = await import('../src/communication/chat/data/chat-list-data.js');
 const { contactRowsHtml } = await import('../src/communication/chat/views/chat-list-view.js');
 hooks.deregister();
 
@@ -17,6 +17,19 @@ const helpers = {
     esc: x => String(x), text: x => x,
 };
 const dividers = html => (html.match(/fcm-chat-pin-divider/g) || []).length;
+
+test('manual groups preserve member order and ignore duplicate, deleted and invalid assignments', () => {
+    const definitions = buildGroupDefinitions({ roomCharacters: [], selfMemberNumber: 1,
+        friendRows: [], isFavorite: () => false, text: String,
+        groups: { first: 'First', empty: 'Empty', second: 'Second' },
+        memberGroups: { 10: ['second', 'first', 'first'], 20: ['deleted', 'first'], 30: null, 40: 'first' },
+    });
+    assert.deepEqual(definitions.groups.slice(2), [
+        { id: 'first', label: 'First', members: [10, 20] },
+        { id: 'empty', label: 'Empty', members: [] },
+        { id: 'second', label: 'Second', members: [10] },
+    ]);
+});
 
 test('pinned members sort first and keep their relative order', () => {
     const pinned = new Set([4, 2]);

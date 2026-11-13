@@ -37,11 +37,12 @@ function buildGroupDefinitions({ roomCharacters, selfMemberNumber, friendRows, i
     const self = Number(selfMemberNumber);
     const roomMembers = (roomCharacters || []).map(character => Number(character.MemberNumber)).filter(memberNumber => memberNumber && memberNumber !== self);
     const contacts = friendRows.map(friend => Number(friend.mn)).filter(Boolean);
-    const manual = Object.entries(groups || {}).map(([id, label]) => ({
-        id,
-        label,
-        members: Object.entries(memberGroups || {}).filter(([, assigned]) => Array.isArray(assigned) && assigned.includes(id)).map(([memberNumber]) => Number(memberNumber)),
-    }));
+    const manual = Object.entries(groups || {}).map(([id, label]) => ({ id, label, members: [] }));
+    const byId = new Map(manual.map(group => [group.id, group]));
+    for (const [memberNumber, assigned] of Object.entries(memberGroups || {})) {
+        if (!Array.isArray(assigned)) continue;
+        for (const id of new Set(assigned)) byId.get(id)?.members.push(Number(memberNumber));
+    }
     return {
         room: { id: 'room', label: text('chatRoom'), members: roomMembers },
         groups: [

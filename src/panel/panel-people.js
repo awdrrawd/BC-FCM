@@ -3,7 +3,7 @@ import { makeSearchWrap } from '../ui/search-clear.js';
 import { T } from '../i18n/i18n.js';
 import { PDB, _pc, Snapshot } from '../data/profile-db.js';
 import { importProfileFile } from '../data/profile-import.js';
-import { inRoomFn, amAdmin, getAllRels, onlineFriends, matchesSearchFields, searchScoreFields } from '../data/data.js';
+import { inRoomFn, amAdmin, getAllRels, getOnlineFriend, matchesSearchFields, searchScoreFields } from '../data/data.js';
 import { makeAvEl, makeRelEl, mkBtn, paginate, makePageBar, buildMgmtBtns, buildPersonOps } from './panel-widgets.js';
 import { makeIdCell } from '../chat/actions.js';
 import { wpsShareProfile } from '../chat/wps-share.js';
@@ -157,7 +157,7 @@ async function renderPeople(container, _myToken) {
             const bcName   = p.name    || `#${mn}`;
             const nickName = p.lastNick || null;
             const isInRoom = inRoomFn(mn);
-            const oneSided = getAllRels(mn).every(r => r === 'none') && !isInRoom && !onlineFriends.some(f => f.MemberNumber === mn);
+            const oneSided = getAllRels(mn).every(r => r === 'none') && !isInRoom && !getOnlineFriend(mn);
             const avTd = document.createElement('td'); avTd.appendChild(makeAvEl(mn, snapshotUrl)); tr.appendChild(avTd);
             const nameTd = document.createElement('td');
             const nd = document.createElement('div'); nd.className = 'fcm-name';

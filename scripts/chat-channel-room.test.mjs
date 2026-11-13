@@ -50,7 +50,7 @@ test('presence keeps both same-room channels enabled and retains current room oc
     const nodes = { '[data-room-meta="42"]': meta, '[data-channel="whisper"]': whisper, '[data-channel="beep"]': beep };
     const presence = createChatConversationPresence({
         getRoot: () => ({ querySelector: selector => nodes[selector] }), getMemberNumber: () => 42,
-        getRoom: () => ({ Limit: 10 }), getRoomCharacters: () => [1, 2, 3], getOnlineFriends: () => [],
+        getRoom: () => ({ Limit: 10 }), getRoomCharacters: () => [1, 2, 3], getOnlineFriend: () => undefined,
         roomState: { get: () => ({ roomInfo: { name: 'room', isCurrent: true }, roomText: 'room', canOpenRoom: true }) },
         capability: () => 'beep', inRoom: () => true, sharedProfile: () => ({}), text: String,
         queryRoomInfo: () => assert.fail('current room needs no search'),

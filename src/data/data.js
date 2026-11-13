@@ -4,6 +4,9 @@ import { cfg, saveCfg } from '../core/config.js';
 import { warnLimited } from '../core/logger.js';
 
 let onlineFriends = [];
+const onlineFriendIndex = new Map();
+
+function getOnlineFriend(memberNumber) { return onlineFriendIndex.get(Number(memberNumber)); }
 // DATA HELPERS
 // AFC 戀人清單：優先用 AFC 公開 API（window.Liko.AFC）；退而讀 OnlineSharedSettings.AFC.lovers；
 //  最後才回退舊版 ExtensionSettings.AFC.l（AFC v0.7.0 起戀人已不存於此，僅為相容舊資料）。
@@ -36,7 +39,7 @@ function getRel(mn) {
     if (parseAFC().some(l => parseInt(l.MemberNumber) === mn)) return 'lover';
     if (getSubSet().has(mn)) return 'sub';
     if (Player.FriendNames && Player.FriendNames.has(mn)) return 'friend';
-    const _of = onlineFriends.find(f => f.MemberNumber === mn);
+    const _of = getOnlineFriend(mn);
     if (_of && _of.Type === 'Friend') return 'friend';
     if (Player.FriendList && Player.FriendList.includes(mn)) return 'contact';
     if (Player.WhiteList && Player.WhiteList.includes(mn)) return 'whitelist';
@@ -50,7 +53,7 @@ function getAllRels(mn) {
     if ((Player.Lovership && Player.Lovership.some(l => parseInt(l.MemberNumber) === mn)) || parseAFC().some(l => parseInt(l.MemberNumber) === mn)) roles.push('lover');
     if (getSubSet().has(mn)) roles.push('sub');
     if (!roles.length && Player.FriendNames && Player.FriendNames.has(mn)) roles.push('friend');
-    const _of2 = onlineFriends.find(f => f.MemberNumber === mn);
+    const _of2 = getOnlineFriend(mn);
     if (!roles.length && _of2 && _of2.Type === 'Friend') roles.push('friend');
     if (!roles.length && Player.FriendList && Player.FriendList.includes(mn)) roles.push('contact');
     if (Player.WhiteList && Player.WhiteList.includes(mn)) roles.push('whitelist');
@@ -74,7 +77,7 @@ function getDisplayName(mn, nickOverride) {
         return C.Name || `#${mn}`;
     }
     // 2. 線上好友
-    const online = onlineFriends.find(f => f.MemberNumber === mn);
+    const online = getOnlineFriend(mn);
     if (online) {
         // 優先檢查快取暱稱
         if (useNick) {
@@ -145,13 +148,13 @@ function buildFriendList() {
     (Player.WhiteList || []).forEach(mn => add(mn, 0));
     (Player.BlackList || []).forEach(mn => add(mn, 0));
     try { (Player.GhostList || []).forEach(mn => add(mn, 0)); } catch (error) { warnLimited('ghost list read failed', error); }
-    return rows.filter(r => r.mn !== selfMn).map(r => ({ mn: r.mn, addedAt: r.addedAt, name: getDisplayName(r.mn), rel: getRel(r.mn) }));
+    return rows.map(r => ({ mn: r.mn, addedAt: r.addedAt, name: getDisplayName(r.mn), rel: getRel(r.mn) }));
 }
 function getZone(mn) {
     mn = parseInt(mn);
     const inRoomC = ChatRoomCharacter && ChatRoomCharacter.find(c => c.MemberNumber === mn);
     if (inRoomC) { const sp = inRoomC.Pronouns || inRoomC.Gender || ''; if (sp === 'M') return T('zoneM'); return T('zoneF'); }
-    const f = onlineFriends.find(f => f.MemberNumber === mn);
+    const f = getOnlineFriend(mn);
     if (!f) return null;
     const sp = f.ChatRoomSpace !== undefined ? f.ChatRoomSpace : '';
     if (sp === 'M') return T('zoneM'); if (sp === 'X' || sp === 'B') return T('zoneX'); return T('zoneF');
@@ -160,7 +163,7 @@ function getRoomInfo(mn) {
     mn = parseInt(mn);
     const inRoomC = ChatRoomCharacter && ChatRoomCharacter.find(c => c.MemberNumber === mn);
     if (inRoomC && ChatRoomData) return { name: ChatRoomData.Name, isPrivate: !!(ChatRoomData.Private), isCurrent: true };
-    const f = onlineFriends.find(f => f.MemberNumber === mn);
+    const f = getOnlineFriend(mn);
     if (!f) return null;
     // 依 BC ServerFriendInfo：房間人數/上限已隨線上好友資料一併回傳，直接採用可省去額外查詢
     const mc = f.ChatRoomMemberCount ?? null, ml = f.ChatRoomLimit ?? null;
@@ -188,7 +191,7 @@ function canBeep(mn) {
     if (inRoomFn(mn)) return true;
     const rel = getRel(mn);
     if (rel === 'owner' || rel === 'lover' || rel === 'sub') return true;
-    const _of = onlineFriends.find(f => f.MemberNumber === mn);
+    const _of = getOnlineFriend(mn);
     return !!(_of && _of.Type === 'Friend');
 }
 
@@ -245,7 +248,14 @@ function toggleFav(mn) {
     saveCfg();
     return i < 0;   // true = 現在是最愛
 }
-function setOnlineFriends(v) { onlineFriends = v; }
+function setOnlineFriends(rows) {
+    onlineFriends = rows;
+    onlineFriendIndex.clear();
+    for (const row of rows) {
+        const memberNumber = Number(row.MemberNumber);
+        if (!onlineFriendIndex.has(memberNumber)) onlineFriendIndex.set(memberNumber, row);
+    }
+}
 function requestOnlineFriends() {
     try {
         if (typeof ServerSend !== 'function') return false;
@@ -257,4 +267,4 @@ function requestOnlineFriends() {
 }
 function setShowNickname(v) { showNickname = v; }
 
-export { onlineFriends, setOnlineFriends, requestOnlineFriends, showNickname, setShowNickname, getRel, getAllRels, REL_ORDER, getDisplayName, matchesSearch, searchScore, matchesSearchFields, searchScoreFields, buildFriendList, getZone, getRoomInfo, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep, _getWhisperTargetMN, isFav, toggleFav };
+export { onlineFriends, getOnlineFriend, setOnlineFriends, requestOnlineFriends, showNickname, setShowNickname, getRel, getAllRels, REL_ORDER, getDisplayName, matchesSearch, searchScore, matchesSearchFields, searchScoreFields, buildFriendList, getZone, getRoomInfo, getRoomPerms, amAdmin, inRoomFn, isFriendOf, canBeep, _getWhisperTargetMN, isFav, toggleFav };
