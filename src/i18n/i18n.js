@@ -26,7 +26,7 @@ function assetUrl(path) {
     return url.toString();
 }
 
-// 抓「目前語言 + EN 後備」的字庫檔並註冊到共用引擎；引擎依 URL 去重、自帶時間戳破快取。
+// 抓「目前語言 + EN 後備」的字庫檔並註冊到共用引擎；引擎共用載入中的 Promise，成功後沿用字庫。
 //  fetch 失敗／未完成時沿用內建後備（i18n-fallback.js）。
 async function ensureI18n() {
     try {

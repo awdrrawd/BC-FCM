@@ -24,7 +24,7 @@ const bcGlobals = [
 ];
 
 export default [
-  { ignores: ['dist/**', 'node_modules/**', 'public/**', 'Plugins/**', 'Translation/**', 'loader.user.js', 'loader.local.user.js', 'scripts/**', 'playwright-report/**', 'test-results/**'] },
+  { ignores: ['src/i18n/i18n-engine.js', 'dist/**', 'node_modules/**', 'public/**', 'Plugins/**', 'Translation/**', 'loader.user.js', 'loader.local.user.js', 'scripts/**', 'playwright-report/**', 'test-results/**'] },
   js.configs.recommended,
   {
     files: ['tests/browser/**', 'playwright.config.mjs'],
