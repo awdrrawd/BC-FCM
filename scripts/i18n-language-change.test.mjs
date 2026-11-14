@@ -6,6 +6,7 @@ const listeners = {};
 const store = new Map([['BondageClubLanguage', 'EN']]);
 const intervals = [];
 globalThis.window = globalThis;
+globalThis.Liko = { __Sys_Flags__: {} }; // Language tests must not download flag images.
 globalThis.document = { hidden: false, addEventListener: (type, fn) => { listeners[`doc:${type}`] = fn; }, head: { appendChild() {} }, createElement: () => ({}) };
 globalThis.addEventListener = (type, fn) => { listeners[type] = fn; };
 globalThis.localStorage = { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, value) };
