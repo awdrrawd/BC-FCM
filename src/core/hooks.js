@@ -1,5 +1,5 @@
 import { modApi, cfg, MOD_VER, BTN_X, BTN_Y, BTN_W, BTN_H } from './config.js';
-import { fcmIconImage } from '../ui/fcm-icon.js';
+import { FCM_ICON_SVG, fcmIconImage } from '../ui/fcm-icon.js';
 import { T } from '../i18n/i18n.js';
 import { setOnlineFriends } from '../data/data.js';
 import { PDB, syncRoomAvatar } from '../data/profile-db.js';
@@ -10,7 +10,7 @@ import { handleIncomingFriendReq, handleIncomingRoomShare, FRIENDREQ_MSG, ROOMSH
 import { handleIncomingBeep, handleIncomingBeepDisplay, handleIncomingPrivateChat, handleIncomingChatMessageId, handleIncomingChatTag, handleIncomingFriendRequestNotice, handleIncomingWhisper, handleIncomingWhisperDisplay, handleOutgoingServerSend, handleOnlineFriendsUpdate } from '../communication/chat.js';
 import { shouldBypassBcxReceiveRules } from '../communication/bcx-compat.js';
 import { warnLimited } from './logger.js';
-import { drawLastSeen } from '../data/profile-seen.js';
+import { drawLastSeen, externalSeenDrawn } from '../data/profile-seen.js';
 
 // Profile 關係人快速搜尋：透過 hook DrawTextFit 擷取 BC 實際繪製的「關係列」
 //  （主人 CollaredBy/TrialBy、戀人 Dating/Engaged/MarriedWith，皆結尾帶「(MemberNumber)」），
@@ -261,8 +261,42 @@ function registerHooks() {
 
     observeWpsOpenTokens();
     // Profile 右上角「最後見面」：WCE / LCE 沒在畫時由 FCM 補上
+    const domProfile = typeof globalThis.InformationSheetMenuButton === 'function';
+    if (domProfile) {
+        modApi.hookFunction('InformationSheetLoad', 0, async (args, next) => {
+            const result = await next(args);
+            const sheet = document.getElementById('information-sheet-screen');
+            const character = InformationSheetSelection;
+            if (!sheet || !character) return result;
+            if (cfg.btnShowProfile && character.IsPlayer()) {
+                const menu = sheet.querySelector('#information-sheet-screen-menu');
+                const icon = `data:image/svg+xml,${encodeURIComponent(FCM_ICON_SVG)}`;
+                menu?.append(globalThis.InformationSheetMenuButton('fcm-profile-open', openPanel, icon, 'FCM'));
+            }
+            if (character.BCESeen && !externalSeenDrawn()) {
+                const seen = document.createElement('p');
+                seen.textContent = `${T('profileLastSeen')} ${new Date(character.BCESeen).toLocaleString()}`;
+                sheet.querySelector('.information-sheet-identity-slot')?.append(seen);
+            }
+            if (cfg.profileRelations) {
+                for (const row of sheet.querySelectorAll('.information-sheet-relations-slot .information-sheet-owner, .information-sheet-relations-slot .information-sheet-entry-title')) {
+                    const fields = row.querySelectorAll('.information-sheet-copy');
+                    if (fields.length !== 2 || !/^\d+$/.test(fields[1].textContent)) continue;
+                    const member = Number(fields[1].textContent);
+                    const search = document.createElement('button');
+                    search.type = 'button';
+                    search.textContent = T('btnSearch');
+                    search.setAttribute('aria-label', `${T('btnSearch')} (${member})`);
+                    search.style.color = cfg.profileRelColor || '';
+                    search.onclick = () => openPeopleSearch(member);
+                    row.append(search);
+                }
+            }
+            return result;
+        });
+    }
     modApi.hookFunction('InformationSheetRun', 9, (args, next) => {
-        drawLastSeen();
+        if (!domProfile) drawLastSeen();
         return next(args);
     });
     modApi.hookFunction('DrawCharacter', 5, (args, next) => {
@@ -285,6 +319,7 @@ function registerHooks() {
     });
     // BC 原生關係列：priority 5（與 BC 按鈕同層）→ AFC 面板(7) 會畫在其上，展開時自然被蓋住
     modApi.hookFunction('InformationSheetRun', 5, (args, next) => {
+        if (domProfile) return next(args);
         const collecting = cfg.profileRelations && typeof CurrentScreen !== 'undefined' && CurrentScreen === 'InformationSheet'
                 && !(typeof InformationSheetSecondScreen !== 'undefined' && InformationSheetSecondScreen);
         if (collecting) _relCollect = [];
@@ -330,6 +365,7 @@ function registerHooks() {
         return r;
     });
     modApi.hookFunction('InformationSheetClick', 5, (args, next) => {
+        if (domProfile) return next(args);
         const viewingSelf = (typeof InformationSheetSelection !== 'undefined') &&
                   (InformationSheetSelection === Player.MemberNumber || InformationSheetSelection?.MemberNumber === Player.MemberNumber);
         if (viewingSelf && cfg.btnShowProfile && typeof MouseIn === 'function' && MouseIn(1715, 420, 90, 90)) { openPanel(); return; }

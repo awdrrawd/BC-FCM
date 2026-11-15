@@ -1,9 +1,9 @@
 {
-  "gameVersion": "R133",
-  "commit": "0444daadce251b9529e1eaff1ccdde4f3bfea710",
+  "gameVersion": "R134Beta3",
+  "commit": "dcf8b3eb00649c8db67f09ef93d917c35b5f220e",
   "functions": {
     "ChatRoomClick": {
-      "hash": "938A8D24",
+      "hash": "49382E96",
       "file": "Screens/Online/ChatRoom/ChatRoom.js"
     },
     "ChatRoomLeave": {
@@ -11,7 +11,7 @@
       "file": "Screens/Online/ChatRoom/ChatRoom.js"
     },
     "ChatRoomMessage": {
-      "hash": "42605304",
+      "hash": "657E9417",
       "file": "Screens/Online/ChatRoom/ChatRoom.js"
     },
     "ChatRoomMessageDisplay": {
@@ -19,7 +19,7 @@
       "file": "Screens/Online/ChatRoom/ChatRoom.js"
     },
     "ChatRoomSync": {
-      "hash": "DAEBD74D",
+      "hash": "6F5B5E1A",
       "file": "Screens/Online/ChatRoom/ChatRoom.js"
     },
     "ChatRoomSyncMemberJoin": {
@@ -39,15 +39,15 @@
       "file": "Screens/Online/ChatRoom/ChatRoom.js"
     },
     "ChatRoomSyncSingle": {
-      "hash": "E5456B3F",
+      "hash": "139C0D33",
       "file": "Screens/Online/ChatRoom/ChatRoom.js"
     },
     "DrawCharacter": {
-      "hash": "2CD2CA5F",
+      "hash": "9272BAF3",
       "file": "Scripts/Drawing.js"
     },
     "DrawProcess": {
-      "hash": "91C96D27",
+      "hash": "807CA55E",
       "file": "Scripts/Drawing.js"
     },
     "DrawTextFit": {
@@ -55,15 +55,19 @@
       "file": "Scripts/Drawing.js"
     },
     "InformationSheetClick": {
-      "hash": "A220F4FA",
+      "hash": "80547B77",
+      "file": "Screens/Character/InformationSheet/InformationSheet.js"
+    },
+    "InformationSheetLoad": {
+      "hash": "1121BD37",
       "file": "Screens/Character/InformationSheet/InformationSheet.js"
     },
     "InformationSheetRun": {
-      "hash": "F33DBCA5",
+      "hash": "82ADDEDB",
       "file": "Screens/Character/InformationSheet/InformationSheet.js"
     },
     "MainHallClick": {
-      "hash": "4B5BCAEE",
+      "hash": "4FA65FF2",
       "file": "Screens/Room/MainHall/MainHall.js"
     },
     "MainHallRun": {
@@ -71,7 +75,7 @@
       "file": "Screens/Room/MainHall/MainHall.js"
     },
     "ServerAccountBeep": {
-      "hash": "D1B35DC1",
+      "hash": "DB0EEA1C",
       "file": "Scripts/Server.js"
     },
     "ServerAccountQueryResult": {
@@ -83,7 +87,7 @@
       "file": "Scripts/Server.js"
     },
     "TranslationSwitchLanguage": {
-      "hash": "C3CDB3D8",
+      "hash": "352C1A61",
       "file": "Scripts/Translation.js"
     }
   }

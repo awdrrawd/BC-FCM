@@ -1,6 +1,11 @@
 import { WhisperMetadata, classifyIncomingBeep, findPendingOutgoingWhisper } from './chat-transport.js';
 import { PRIVATE_TAG, PRIVATE_BEEP, META_TAG, createPrivatePayloadReceiver } from './chat-private-payload.js';
 
+function visibleBeepText(message) {
+    const parsed = typeof message === 'string' && globalThis.FriendListBeepParseMessage?.(message);
+    return parsed?.metadata?.messageType === 'Reaction' ? null : (parsed?.text ?? message);
+}
+
 function createChatTransportHandler({ getPlayer, getMessages, getRoot, recordMessage, chatStore, setRemoteProfile, displayName, showRoomInvite, htmlText, warn, isEnabled, isOutgoingSuppressed, nativeTags, getOutgoing, mergeWhispers = () => true }) {
     const whisperMetadata = new WhisperMetadata();
     const bypassPayloads = new WeakMap();
@@ -36,13 +41,16 @@ function createChatTransportHandler({ getPlayer, getMessages, getRoot, recordMes
     }
 
     function incomingBeep(data) {
-        const payload = isEnabled() && !data?.BeepType ? privateReceiver.consumeBeep(Number(data.MemberNumber), data.Message) : null;
+        if (!data) return;
+        const message = data.BeepType ? data.Message : visibleBeepText(data.Message);
+        if (!data.BeepType && message === null) return;
+        const payload = isEnabled() && !data.BeepType ? privateReceiver.consumeBeep(Number(data.MemberNumber), message) : null;
         if (payload) {
             beepPayloads.set(data, payload);
             recordMessage({ ...payload, id: localMessageId(data.MemberNumber, payload.id), sharedMsgId: payload.id, memberNumber: data.MemberNumber, direction: 'in', channel: 'beep' });
             return;
         }
-        const incoming = classifyIncomingBeep(data);
+        const incoming = classifyIncomingBeep(message === data.Message ? data : { ...data, Message: message });
         if (incoming.type === 'profile') {
             setRemoteProfile(Number(data.MemberNumber), incoming.profile);
             return;
@@ -60,7 +68,7 @@ function createChatTransportHandler({ getPlayer, getMessages, getRoot, recordMes
             });
             return;
         }
-        if (incoming.type === 'message') recordMessage({ memberNumber: data.MemberNumber, name: data.MemberName, direction: 'in', channel: 'beep', content: data.Message });
+        if (incoming.type === 'message') recordMessage({ memberNumber: data.MemberNumber, name: data.MemberName, direction: 'in', channel: 'beep', content: message });
     }
 
     function incomingWhisper(data) {
@@ -103,7 +111,9 @@ function createChatTransportHandler({ getPlayer, getMessages, getRoot, recordMes
     function outgoing(type, data) {
         if (!isEnabled() || isOutgoingSuppressed() || !data) return;
         if (type === 'AccountBeep' && data.MemberNumber && data.Message && !data.BeepType) {
-            recordMessage({ memberNumber: data.MemberNumber, direction: 'out', channel: 'beep', content: data.Message }, { notify: false });
+            const message = visibleBeepText(data.Message);
+            if (message === null) return;
+            recordMessage({ memberNumber: data.MemberNumber, direction: 'out', channel: 'beep', content: message }, { notify: false });
         } else if (mergeWhispers() && type === 'ChatRoomChat' && data.Type === 'Whisper' && data.Target && data.Content) {
             recordMessage({ memberNumber: data.Target, direction: 'out', channel: 'whisper', content: data.Content }, { notify: false });
         }
