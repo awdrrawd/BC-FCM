@@ -1,5 +1,5 @@
 {
-  "gameVersion": "R134Beta3",
+  "gameVersion": "R134",
   "commit": "dcf8b3eb00649c8db67f09ef93d917c35b5f220e",
   "functions": {
     "ChatRoomClick": {
