@@ -280,3 +280,18 @@ test('disabled whisper integration ignores incoming, displayed and outgoing whis
     handler.incomingWhisper(whisper);
     assert.equal(records.at(-1).channel, 'whisper');
 });
+
+test('native beep metadata stays out of incoming and outgoing chat history', t => {
+    globalThis.FriendListBeepParseMessage = raw => ({
+        text: 'hello', metadata: { messageType: raw === 'reaction packet' ? 'Reaction' : 'Message' },
+    });
+    t.after(() => { delete globalThis.FriendListBeepParseMessage; });
+    const { handler, records } = receiverContext();
+    for (const Message of ['text with metadata', 'reaction packet']) {
+        const data = { MemberNumber: 3, Message };
+        handler.incomingBeep(data);
+        handler.outgoing('AccountBeep', data);
+        assert.equal(data.Message, Message);
+    }
+    assert.deepEqual(records.map(({ direction, content }) => [direction, content]), [['in', 'hello'], ['out', 'hello']]);
+});
