@@ -269,7 +269,6 @@
   "profileRelLabel": "Recherche rapide des relations du profil",
   "profileRelNote": "Sur une fiche de personnage, transforme les ID des relations (maître/amants) en boutons — cliquer ouvre la recherche FCM préremplie avec cet ID (nécessite la fonction d'enregistrement de profil)",
   "noBeepNotFriend": "Pas un ami — BEEP impossible",
-  "colorNone": "Sans couleur",
   "addFriendTitle": "Ajouter « {0} » comme ami ?",
   "addFriendNotifyHint": "(Peut être notifié — FCM requis)",
   "btnAgree": "Accepter",

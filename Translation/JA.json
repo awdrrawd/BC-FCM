@@ -269,7 +269,6 @@
   "profileRelLabel": "Profile 関係人クイック検索",
   "profileRelNote": "キャラのプロフィール画面で、マスター／恋人など関係人の ID をボタン化。クリックで FCM の人物検索を開き ID を入力（Profile 保存機能が必要）",
   "noBeepNotFriend": "フレンドではないため BEEP 不可",
-  "colorNone": "色なし",
   "addFriendTitle": "「{0}」をフレンドに追加しますか？",
   "addFriendNotifyHint": "（相手に通知を送れます。FCM が必要）",
   "btnAgree": "同意",

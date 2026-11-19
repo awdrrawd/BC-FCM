@@ -269,7 +269,6 @@
   "profileRelLabel": "Profile 關係人快速搜尋",
   "profileRelNote": "查看角色資料頁時，將主人／戀人等關係人的 ID 做成按鈕，點擊即開啟 FCM 人員查詢並帶入該 ID（須配合 Profile 保存功能）",
   "noBeepNotFriend": "非好友，無法私訊",
-  "colorNone": "無色",
   "addFriendTitle": "是否添加「{0}」為好友？",
   "addFriendNotifyHint": "（可發送通知給對方，需有 FCM）",
   "btnAgree": "同意",

@@ -269,7 +269,6 @@
   "profileRelLabel": "Búsqueda rápida de relaciones",
   "profileRelNote": "En un perfil, convierte los ID de personas relacionadas (dueña/amantes) en botones; al pulsarlos abre la búsqueda de personas de FCM con ese ID (requiere guardar perfiles)",
   "noBeepNotFriend": "No es tu amiga — no puedes enviarle un BEEP",
-  "colorNone": "Sin color",
   "addFriendTitle": "¿Añadir a «{0}» como amiga?",
   "addFriendNotifyHint": "(Puedes avisarle; requiere FCM)",
   "btnAgree": "Aceptar",

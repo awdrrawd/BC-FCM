@@ -269,7 +269,6 @@
   "profileRelLabel": "Tra nhanh quan hệ hồ sơ",
   "profileRelNote": "Trên hồ sơ nhân vật, biến ID của người có quan hệ (chủ nhân/người yêu) thành nút; nhấp để mở tìm kiếm Mọi người của FCM với ID đã điền sẵn (cần bật lưu hồ sơ)",
   "noBeepNotFriend": "Không phải bạn bè — không thể BEEP",
-  "colorNone": "Không màu",
   "addFriendTitle": "Thêm “{0}” làm bạn?",
   "addFriendNotifyHint": "(Có thể báo cho họ — cần FCM)",
   "btnAgree": "Đồng ý",

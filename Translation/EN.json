@@ -269,7 +269,6 @@
   "profileRelLabel": "Quick Search Profile Relations",
   "profileRelNote": "On a character profile page, turn related people (owner/lovers) IDs into buttons — click to open FCM People search prefilled with that ID (requires the Profile save feature)",
   "noBeepNotFriend": "Not a friend — cannot BEEP",
-  "colorNone": "No color",
   "addFriendTitle": "Add \"{0}\" as a friend?",
   "addFriendNotifyHint": "(Can notify them — requires FCM)",
   "btnAgree": "Agree",
