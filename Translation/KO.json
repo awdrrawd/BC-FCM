@@ -269,7 +269,6 @@
   "profileRelLabel": "Profile 관계인 빠른 검색",
   "profileRelNote": "캐릭터 프로필 화면에서 주인／연인 등 관계인의 ID를 버튼으로 만들어 클릭 시 FCM 인물 검색을 열고 해당 ID를 입력 (Profile 저장 기능 필요)",
   "noBeepNotFriend": "친구가 아니므로 BEEP 불가",
-  "colorNone": "색상 없음",
   "addFriendTitle": "\"{0}\" 님을 친구로 추가할까요?",
   "addFriendNotifyHint": "(상대에게 알림 전송 가능 — FCM 필요)",
   "btnAgree": "동의",

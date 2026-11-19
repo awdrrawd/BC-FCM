@@ -32,7 +32,6 @@ let cfg = {
     btnShowMainHall: true,
     btnShowProfile: true,
     profileRelations: false,
-    profileRelColor: '#8868c0',   // Profile 關係人快速搜尋：底線顏色（null = 無色/不畫底線）
     // ── 主題顏色（面板底色 / 字體顏色 / 強調色）──
     panelColor: THEME_DEFAULTS.panelColor,
     fontColor: THEME_DEFAULTS.fontColor,

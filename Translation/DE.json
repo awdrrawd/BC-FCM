@@ -269,7 +269,6 @@
   "profileRelLabel": "Schnellsuche für Profil-Beziehungen",
   "profileRelNote": "Wandelt auf einer Charakter-Profilseite die IDs verwandter Personen (Besitzer/Geliebte) in Schaltflächen um — Klick öffnet die FCM-Personensuche mit dieser ID (erfordert die Profil-Speicherfunktion)",
   "noBeepNotFriend": "Kein Freund — BEEP nicht möglich",
-  "colorNone": "Keine Farbe",
   "addFriendTitle": "„{0}\" als Freund hinzufügen?",
   "addFriendNotifyHint": "(Kann benachrichtigt werden — FCM erforderlich)",
   "btnAgree": "Zustimmen",

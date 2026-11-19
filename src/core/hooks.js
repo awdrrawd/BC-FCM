@@ -1,5 +1,6 @@
 import { modApi, cfg, MOD_VER, BTN_X, BTN_Y, BTN_W, BTN_H } from './config.js';
 import { FCM_ICON_SVG, fcmIconImage } from '../ui/fcm-icon.js';
+import { SEARCH_ICON } from '../ui/icons.js';
 import { T } from '../i18n/i18n.js';
 import { setOnlineFriends } from '../data/data.js';
 import { PDB, syncRoomAvatar } from '../data/profile-db.js';
@@ -22,15 +23,34 @@ let _relRegions = [];
 let _afcRegions = [];   // AFC 拓展戀人面板的可點區塊（透過 window.Liko.AFC 公開 API）
 let _hooksRegistered = false;
 
-// 將 hex 顏色朝白色混合，用於 hover 時提亮底線（amt: 0~1）
-function _lightenHex(hex, amt) {
-    try {
-        const h = String(hex).replace('#', '');
-        const n = h.length === 3 ? h.split('').map(c => c + c).join('') : h;
-        const r = parseInt(n.substr(0, 2), 16), g = parseInt(n.substr(2, 2), 16), b = parseInt(n.substr(4, 2), 16);
-        const mix = c => Math.round(c + (255 - c) * amt);
-        return `rgb(${mix(r)},${mix(g)},${mix(b)})`;
-    } catch { return hex; }
+const INFO_SEARCH_STYLE_ID = 'fcm-info-search-style';
+// 資訊頁關係人搜尋圖示：顏色一律 currentColor，跟著所在 since 行的文字色走（MISC 的 --lce-text 染色範圍內）
+function _ensureInfoSearchStyle() {
+    if (document.getElementById(INFO_SEARCH_STYLE_ID)) return;
+    const st = document.createElement('style');
+    st.id = INFO_SEARCH_STYLE_ID;
+    st.textContent = `
+.fcm-info-search-since{cursor:pointer;}
+.fcm-info-search-since:focus-visible{outline:1px solid currentColor;outline-offset:2px;}
+.fcm-info-search,.fcm-info-search-icon{display:inline-flex;align-items:center;vertical-align:-0.2em;margin:0 0 0 .4em;padding:0;height:1.15em;border:0;background:none;color:inherit;font:inherit;line-height:0;opacity:.75;transition:opacity .15s;}
+.fcm-info-search{justify-content:center;width:1.15em;cursor:pointer;}
+.fcm-info-search:hover,.fcm-info-search:focus-visible,.fcm-info-search-since:hover .fcm-info-search-icon,.fcm-info-search-since:focus-visible .fcm-info-search-icon{opacity:1;}
+.fcm-info-search svg,.fcm-info-search-glyph svg{width:100%;height:100%;display:block;stroke-width:2.25;}
+.fcm-info-search-glyph{display:inline-block;flex:none;width:1.15em;height:1.15em;}
+.fcm-info-search-label{display:inline-block;max-width:0;margin-left:0;overflow:hidden;white-space:nowrap;opacity:0;line-height:1;font-size:.95em;transition:max-width .2s ease,margin-left .2s ease,opacity .2s ease;}
+.fcm-info-search-since:hover .fcm-info-search-label,.fcm-info-search-since:focus-visible .fcm-info-search-label{max-width:8em;margin-left:.25em;opacity:1;}`;
+    document.head.appendChild(st);
+}
+
+function _makeInfoSearchButton(member) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'fcm-info-search';
+    btn.innerHTML = SEARCH_ICON;
+    btn.title = `${T('btnSearch')} (${member})`;
+    btn.setAttribute('aria-label', `${T('btnSearch')} (${member})`);
+    btn.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); openPeopleSearch(member); });
+    return btn;
 }
 
 function _afcPanelOpen() {
@@ -279,17 +299,36 @@ function registerHooks() {
                 sheet.querySelector('.information-sheet-identity-slot')?.append(seen);
             }
             if (cfg.profileRelations) {
+                _ensureInfoSearchStyle();
                 for (const row of sheet.querySelectorAll('.information-sheet-relations-slot .information-sheet-owner, .information-sheet-relations-slot .information-sheet-entry-title')) {
+                    if (row.dataset.fcmSearch) continue;
                     const fields = row.querySelectorAll('.information-sheet-copy');
                     if (fields.length !== 2 || !/^\d+$/.test(fields[1].textContent)) continue;
+                    row.dataset.fcmSearch = '1';
                     const member = Number(fields[1].textContent);
-                    const search = document.createElement('button');
-                    search.type = 'button';
-                    search.textContent = T('btnSearch');
-                    search.setAttribute('aria-label', `${T('btnSearch')} (${member})`);
-                    search.style.color = cfg.profileRelColor || '';
-                    search.onclick = () => openPeopleSearch(member);
-                    row.append(search);
+                    // 整條「持續時間 (information-sheet-since)」可點，行尾附放大鏡圖示；沒有該行（無起算時間）時退回名稱行尾的按鈕
+                    const since = row.nextElementSibling;
+                    if (since && since.classList.contains('information-sheet-since')) {
+                        const open = () => openPeopleSearch(member);
+                        since.classList.add('fcm-info-search-since');
+                        since.setAttribute('role', 'button');
+                        since.tabIndex = 0;
+                        since.addEventListener('click', ev => { ev.preventDefault(); open(); });
+                        since.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); } });
+                        const icon = document.createElement('span');
+                        icon.className = 'fcm-info-search-icon';
+                        icon.setAttribute('aria-hidden', 'true');
+                        const glyph = document.createElement('span');
+                        glyph.className = 'fcm-info-search-glyph';
+                        glyph.innerHTML = SEARCH_ICON;
+                        const label = document.createElement('span');
+                        label.className = 'fcm-info-search-label';
+                        label.textContent = T('btnSearch');   // 依目前語言顯示（搜尋 / Search）
+                        icon.append(glyph, label);
+                        since.append(icon);
+                    } else {
+                        row.append(_makeInfoSearchButton(member));
+                    }
                 }
             }
             return result;
@@ -338,18 +377,6 @@ function registerHooks() {
                 regions = C ? regions.filter(reg => valid.has(reg.mn)) : [];
             } catch (error) { warnLimited('profile relation filtering failed', error); }
             _relRegions = regions;
-            try {
-                for (const reg of _relRegions) {
-                    const hov = typeof MouseIn === 'function' && MouseIn(reg.x, reg.y, reg.w, reg.h);
-                    // 只畫底線（貼合文字寬度），不畫按鈕外框；hover 時加粗變亮；無色時不畫
-                    if (cfg.profileRelColor && typeof MainCanvas !== 'undefined' && MainCanvas) {
-                        MainCanvas.save();
-                        MainCanvas.fillStyle = hov ? _lightenHex(cfg.profileRelColor, 0.4) : cfg.profileRelColor;
-                        MainCanvas.fillRect(reg.x + 5, reg.y + reg.h - 6, Math.max(0, reg.w - 10), hov ? 3 : 2);
-                        MainCanvas.restore();
-                    }
-                }
-            } catch (error) { warnLimited('profile relation overlay draw failed', error); }
         } else {
             _relRegions = [];
         }
@@ -382,7 +409,7 @@ function registerHooks() {
 
     // ── AFC 拓展戀人面板支援（priority 8，遵守 AFC 優先序契約）──────────
     //  AFC 於 priority 7 繪製「更多戀人」面板並填好 getProfileLoverRegions()；
-    //  我們掛 priority 8（外層）→ next() 後 AFC 已畫完，於面板之上疊底線並優先吃點擊。
+    //  我們掛 priority 8（外層）→ next() 後 AFC 已畫完，於面板之上優先吃點擊。
     modApi.hookFunction('InformationSheetRun', 8, (args, next) => {
         const r = next(args);
         _afcRegions = [];
@@ -394,16 +421,7 @@ function registerHooks() {
                     const nameStr = `♥ ${e.name} (${e.memberNumber})`;   // 對齊 AFC 的名稱行格式
                     const fit = _fittedTextWidth(nameStr, e.w);
                     const w = Math.max(0, Math.min(fit.w, e.w));
-                    const hit = { mn: parseInt(e.memberNumber), x: e.x - 5, y: e.y, w: w + 10, h: 46 };
-                    _afcRegions.push(hit);
-                    const hov = typeof MouseIn === 'function' && MouseIn(hit.x, hit.y, hit.w, hit.h);
-                    if (cfg.profileRelColor && typeof MainCanvas !== 'undefined' && MainCanvas) {
-                        MainCanvas.save();
-                        MainCanvas.fillStyle = hov ? _lightenHex(cfg.profileRelColor, 0.4) : cfg.profileRelColor;
-                        // AFC: region.y = 名稱行中心 - 26；底線畫在名稱文字正下方
-                        MainCanvas.fillRect(e.x, e.y + 26 + fit.size * 0.5 + 1, w, hov ? 3 : 2);
-                        MainCanvas.restore();
-                    }
+                    _afcRegions.push({ mn: parseInt(e.memberNumber), x: e.x - 5, y: e.y, w: w + 10, h: 46 });
                 }
             }
         } catch (error) { warnLimited('AFC profile region capture failed', error); _afcRegions = []; }
