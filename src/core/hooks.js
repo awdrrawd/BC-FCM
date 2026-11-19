@@ -32,7 +32,7 @@ function _ensureInfoSearchStyle() {
     st.textContent = `
 .fcm-info-search-since{cursor:pointer;}
 .fcm-info-search-since:focus-visible{outline:1px solid currentColor;outline-offset:2px;}
-.fcm-info-search,.fcm-info-search-icon{display:inline-flex;align-items:center;vertical-align:-0.2em;margin:0 0 0 .4em;padding:0;height:1.15em;border:0;background:none;color:inherit;font:inherit;line-height:0;opacity:.75;transition:opacity .15s;}
+.fcm-info-search,.fcm-info-search-icon{flex:none;display:inline-flex;align-items:center;vertical-align:-0.2em;margin:0 0 0 .4em;padding:0;height:1.15em;border:0;background:none;color:inherit;font:inherit;line-height:0;opacity:.75;transition:opacity .15s;}
 .fcm-info-search{justify-content:center;width:1.15em;cursor:pointer;}
 .fcm-info-search:hover,.fcm-info-search:focus-visible,.fcm-info-search-since:hover .fcm-info-search-icon,.fcm-info-search-since:focus-visible .fcm-info-search-icon{opacity:1;}
 .fcm-info-search svg,.fcm-info-search-glyph svg{width:100%;height:100%;display:block;stroke-width:2.25;}
@@ -51,6 +51,41 @@ function _makeInfoSearchButton(member) {
     btn.setAttribute('aria-label', `${T('btnSearch')} (${member})`);
     btn.addEventListener('click', ev => { ev.preventDefault(); ev.stopPropagation(); openPeopleSearch(member); });
     return btn;
+}
+
+// 讓整條行（BC 的 since 行、AFC 的日期行）可點開人員查詢，行尾附放大鏡圖示（懸停展開文字）
+function _attachSinceSearch(line, member) {
+    const open = () => openPeopleSearch(member);
+    line.classList.add('fcm-info-search-since');
+    line.setAttribute('role', 'button');
+    line.tabIndex = 0;
+    line.addEventListener('click', ev => { ev.preventDefault(); open(); });
+    line.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); } });
+    const icon = document.createElement('span');
+    icon.className = 'fcm-info-search-icon';
+    icon.setAttribute('aria-hidden', 'true');
+    const glyph = document.createElement('span');
+    glyph.className = 'fcm-info-search-glyph';
+    glyph.innerHTML = SEARCH_ICON;
+    const label = document.createElement('span');
+    label.className = 'fcm-info-search-label';
+    label.textContent = T('btnSearch');   // 依目前語言顯示（搜尋 / Search）
+    icon.append(glyph, label);
+    line.append(icon);
+}
+
+// AFC「更多戀人」面板（DOM）：在每個條目的日期行（.afc-lover-date）後附加搜尋圖示。
+// AFC 重建面板時會產生新元素，所以以面板元素上的旗標避免重複附加。
+function _decorateAfcPanel(panel) {
+    if (!panel || panel.dataset.fcmSearch || !cfg.profileRelations) return;
+    panel.dataset.fcmSearch = '1';
+    _ensureInfoSearchStyle();
+    for (const row of panel.querySelectorAll('.afc-lover[data-member-number]')) {
+        const member = Number(row.dataset.memberNumber);
+        const date = row.querySelector('.afc-lover-date');
+        if (!date || !Number.isSafeInteger(member) || member <= 0) continue;
+        _attachSinceSearch(date, member);
+    }
 }
 
 function _afcPanelOpen() {
@@ -309,23 +344,7 @@ function registerHooks() {
                     // 整條「持續時間 (information-sheet-since)」可點，行尾附放大鏡圖示；沒有該行（無起算時間）時退回名稱行尾的按鈕
                     const since = row.nextElementSibling;
                     if (since && since.classList.contains('information-sheet-since')) {
-                        const open = () => openPeopleSearch(member);
-                        since.classList.add('fcm-info-search-since');
-                        since.setAttribute('role', 'button');
-                        since.tabIndex = 0;
-                        since.addEventListener('click', ev => { ev.preventDefault(); open(); });
-                        since.addEventListener('keydown', ev => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); open(); } });
-                        const icon = document.createElement('span');
-                        icon.className = 'fcm-info-search-icon';
-                        icon.setAttribute('aria-hidden', 'true');
-                        const glyph = document.createElement('span');
-                        glyph.className = 'fcm-info-search-glyph';
-                        glyph.innerHTML = SEARCH_ICON;
-                        const label = document.createElement('span');
-                        label.className = 'fcm-info-search-label';
-                        label.textContent = T('btnSearch');   // 依目前語言顯示（搜尋 / Search）
-                        icon.append(glyph, label);
-                        since.append(icon);
+                        _attachSinceSearch(since, member);
                     } else {
                         row.append(_makeInfoSearchButton(member));
                     }
@@ -407,11 +426,25 @@ function registerHooks() {
         return next(args);
     });
 
+    // AFC 面板（重新）產生後立即附加，避免等到下一幀才出現
+    if (domProfile && typeof document !== 'undefined') {
+        document.addEventListener('afc:profile-panel-rendered', ev => {
+            try { if (cfg.profileRelations) _decorateAfcPanel(ev.detail?.panel); }
+            catch (error) { warnLimited('AFC profile panel decoration failed', error); }
+        });
+    }
+
     // ── AFC 拓展戀人面板支援（priority 8，遵守 AFC 優先序契約）──────────
     //  AFC 於 priority 7 繪製「更多戀人」面板並填好 getProfileLoverRegions()；
     //  我們掛 priority 8（外層）→ next() 後 AFC 已畫完，於面板之上優先吃點擊。
     modApi.hookFunction('InformationSheetRun', 8, (args, next) => {
         const r = next(args);
+        // DOM 版資訊頁：AFC 面板是 DOM 元素，直接在日期行後附加搜尋圖示（不需畫布區塊）
+        if (domProfile) {
+            try { if (cfg.profileRelations && _afcPanelOpen()) _decorateAfcPanel(document.getElementById('afc-profile-panel')); }
+            catch (error) { warnLimited('AFC profile panel decoration failed', error); }
+            return r;
+        }
         _afcRegions = [];
         try {
             const AFC = window.Liko && window.Liko.AFC;
@@ -428,6 +461,7 @@ function registerHooks() {
         return r;
     });
     modApi.hookFunction('InformationSheetClick', 8, (args, next) => {
+        if (domProfile) return next(args);
         if (cfg.profileRelations && _afcPanelOpen()) {
             try {
                 for (const reg of _afcRegions) {
