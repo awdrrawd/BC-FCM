@@ -25,7 +25,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
-    "@playwright/test": "^1.65.0",
+    "@playwright/test": "^1.65.1",
     "acorn": "^8.19.0",
     "concurrently": "^10.0.7",
     "esbuild": "^0.28.2",
