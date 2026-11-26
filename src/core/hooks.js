@@ -12,6 +12,7 @@ import { handleIncomingBeep, handleIncomingBeepDisplay, handleIncomingPrivateCha
 import { shouldBypassBcxReceiveRules } from '../communication/bcx-compat.js';
 import { warnLimited } from './logger.js';
 import { drawLastSeen, externalSeenDrawn } from '../data/profile-seen.js';
+import { decorateInfoSheetRelations } from './info-sheet-relations.js';
 
 // Profile 關係人快速搜尋：透過 hook DrawTextFit 擷取 BC 實際繪製的「關係列」
 //  （主人 CollaredBy/TrialBy、戀人 Dating/Engaged/MarriedWith，皆結尾帶「(MemberNumber)」），
@@ -335,20 +336,9 @@ function registerHooks() {
             }
             if (cfg.profileRelations) {
                 _ensureInfoSearchStyle();
-                for (const row of sheet.querySelectorAll('.information-sheet-relations-slot .information-sheet-owner, .information-sheet-relations-slot .information-sheet-entry-title')) {
-                    if (row.dataset.fcmSearch) continue;
-                    const fields = row.querySelectorAll('.information-sheet-copy');
-                    if (fields.length !== 2 || !/^\d+$/.test(fields[1].textContent)) continue;
-                    row.dataset.fcmSearch = '1';
-                    const member = Number(fields[1].textContent);
-                    // 整條「持續時間 (information-sheet-since)」可點，行尾附放大鏡圖示；沒有該行（無起算時間）時退回名稱行尾的按鈕
-                    const since = row.nextElementSibling;
-                    if (since && since.classList.contains('information-sheet-since')) {
-                        _attachSinceSearch(since, member);
-                    } else {
-                        row.append(_makeInfoSearchButton(member));
-                    }
-                }
+                // 主人／戀人列：整條「持續時間 (information-sheet-since)」可點，行尾附放大鏡圖示；
+                // 沒有該行（無起算時間）時退回名稱行尾的按鈕
+                decorateInfoSheetRelations(sheet, { attachSince: _attachSinceSearch, makeButton: _makeInfoSearchButton });
             }
             return result;
         });
