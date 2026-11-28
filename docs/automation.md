@@ -47,14 +47,14 @@ git config --local fcm.testChannel msedge        # push hook 會讀取；移除�
 
 `.github/workflows/deploy.yml`（名稱 `quality`）在 PR、main push 或手動觸發時：
 
-1. Node 24、`npm ci`（依 lockfile）。
+1. Node 24、`npm ci`（依 lockfile）、`npm run check:i18n`（共用 i18n 副本未被手改）。
 2. `npm run check`。
 3. 安裝 Chromium，執行 `npm run test:browser`；失敗時保存截圖、trace 與報告 7 天。
 4. 確認 `dist/` 不含 `tests`（瀏覽器 fixture 不進正式產物）。
 
-只有 main 的非 PR 執行能在全部通過後部署 Pages；PR 沒有 Pages 或 OIDC 寫入權限。不需要設定遊戲帳號、密碼或 API key。
+同一個 PR 有新提交時取消舊檢查，main 的執行不中斷。只有 main 的非 PR 執行能在全部通過後部署 Pages；PR 沒有 Pages 或 OIDC 寫入權限。不需要設定遊戲帳號、密碼或 API key。
 
-`.github/workflows/bc-compat.yml` 每週一比對 BC 函式雜湊，差異以標籤 `bc-compat` 的 issue 回報，不阻擋 PR 與部署。`dependabot.yml` 負責依賴更新。
+`.github/workflows/bc-compat.yml` 每週一比對 BC 函式雜湊，差異以標籤 `bc-compat` 的 issue 回報，不阻擋 PR 與部署。步驟在 Bondage-College-Mirror 的共用 workflow。`dependabot.yml` 每週六 08:05（台北時間）負責依賴更新。`sync-i18n.yml` 手動同步共用 i18n 引擎，同樣使用共用 workflow。
 
 ### 需要在 GitHub 設定
 
