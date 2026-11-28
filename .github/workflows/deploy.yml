@@ -10,8 +10,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: "fcm-${{ github.ref }}"
-  cancel-in-progress: false
+  group: "fcm-${{ github.event.pull_request.number || github.ref }}"
+  # 同一個 PR 有新提交時取消舊檢查；main 的檢查與部署不中斷。
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   build:
@@ -20,6 +21,8 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
       - name: Use Node.js 24.x
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
@@ -28,6 +31,9 @@ jobs:
 
       - name: Install locked dependencies
         run: npm ci
+
+      - name: Verify shared i18n copy
+        run: npm run check:i18n
 
       - name: Validate, lint, test and build
         run: npm run check
@@ -62,6 +68,10 @@ jobs:
     if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
     needs: build
     runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     permissions:
       pages: write
       id-token: write
