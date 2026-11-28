@@ -54,7 +54,7 @@ git config --local fcm.testChannel msedge        # push hook 會讀取；移除�
 
 同一個 PR 有新提交時取消舊檢查，main 的執行不中斷。只有 main 的非 PR 執行能在全部通過後部署 Pages；PR 沒有 Pages 或 OIDC 寫入權限。不需要設定遊戲帳號、密碼或 API key。
 
-`.github/workflows/bc-compat.yml` 每週一比對 BC 函式雜湊，差異以標籤 `bc-compat` 的 issue 回報，不阻擋 PR 與部署。步驟在 Bondage-College-Mirror 的共用 workflow。`dependabot.yml` 每週六 08:05（台北時間）負責依賴更新。`sync-i18n.yml` 手動同步共用 i18n 引擎，同樣使用共用 workflow。
+`.github/workflows/bc-compat.yml` 每週一比對 BC 函式雜湊，差異以標籤 `bc-compat` 的 issue 回報，不阻擋 PR 與部署。步驟在 Bondage-College-Mirror 的共用 workflow。`dependabot.yml` 每週六 08:05（台北時間）負責依賴更新，新版本發布滿 7 天才提出（安全性更新不受影響）。`sync-i18n.yml` 手動同步共用 i18n 引擎，同樣使用共用 workflow。
 
 ### 需要在 GitHub 設定
 
